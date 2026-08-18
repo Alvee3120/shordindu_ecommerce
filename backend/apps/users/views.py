@@ -1,3 +1,132 @@
-from django.shortcuts import render
+from django.conf import settings
+from rest_framework import generics, permissions, status, viewsets
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.exceptions import TokenError
+from rest_framework_simplejwt.serializers import TokenRefreshSerializer
+from rest_framework_simplejwt.tokens import RefreshToken
 
-# Create your views here.
+from .cookies import clear_auth_cookies, set_auth_cookies
+from .models import Address
+from .serializers import (
+    AddressSerializer,
+    ChangePasswordSerializer,
+    SigninSerializer,
+    SignupSerializer,
+    UserSerializer,
+)
+from .tasks import send_welcome_email
+
+
+class SignupView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = SignupSerializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        user = serializer.save()
+
+        send_welcome_email.delay(user.id)
+
+        refresh = RefreshToken.for_user(user)
+        response = Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
+        set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
+
+
+class SigninView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        serializer = SigninSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+        user = serializer.validated_data["user"]
+
+        refresh = RefreshToken.for_user(user)
+        response = Response(UserSerializer(user).data, status=status.HTTP_200_OK)
+        set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        return response
+
+
+class LogoutView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        raw_refresh = request.COOKIES.get(settings.AUTH_COOKIE_REFRESH)
+        if raw_refresh:
+            try:
+                RefreshToken(raw_refresh).blacklist()
+            except TokenError:
+                pass
+
+        response = Response(status=status.HTTP_205_RESET_CONTENT)
+        clear_auth_cookies(response)
+        return response
+
+
+class CookieTokenRefreshView(APIView):
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        raw_refresh = request.COOKIES.get(settings.AUTH_COOKIE_REFRESH)
+        if not raw_refresh:
+            return Response({"detail": "Refresh token missing."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        serializer = TokenRefreshSerializer(data={"refresh": raw_refresh})
+        try:
+            serializer.is_valid(raise_exception=True)
+        except TokenError:
+            return Response({"detail": "Refresh token invalid or expired."}, status=status.HTTP_401_UNAUTHORIZED)
+
+        access = serializer.validated_data["access"]
+        new_refresh = serializer.validated_data.get("refresh", raw_refresh)
+
+        response = Response(status=status.HTTP_200_OK)
+        set_auth_cookies(response, access, new_refresh)
+        return response
+
+
+class ChangePasswordView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        serializer = ChangePasswordSerializer(data=request.data, context={"request": request})
+        serializer.is_valid(raise_exception=True)
+
+        user = request.user
+        user.set_password(serializer.validated_data["new_password"])
+        user.force_password_change = False
+        user.save(update_fields=["password", "force_password_change"])
+        return Response(status=status.HTTP_200_OK)
+
+
+class MeView(generics.RetrieveAPIView):
+    serializer_class = UserSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_object(self):
+        return self.request.user
+
+
+class AddressViewSet(viewsets.ModelViewSet):
+    serializer_class = AddressSerializer
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get_queryset(self):
+        return Address.objects.filter(user=self.request.user)
+
+    def perform_create(self, serializer):
+        self._unset_other_defaults(serializer.validated_data)
+        serializer.save(user=self.request.user)
+
+    def perform_update(self, serializer):
+        self._unset_other_defaults(serializer.validated_data, exclude_pk=serializer.instance.pk)
+        serializer.save()
+
+    def _unset_other_defaults(self, validated_data, exclude_pk=None):
+        if not validated_data.get("is_default"):
+            return
+        qs = Address.objects.filter(user=self.request.user, is_default=True)
+        if exclude_pk:
+            qs = qs.exclude(pk=exclude_pk)
+        qs.update(is_default=False)
