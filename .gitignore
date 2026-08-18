@@ -17,6 +17,9 @@ backend/*.log
 *.env
 !.env.example
 
+# Local test artifacts
+cookies.txt
+
 # Editors / OS
 .vscode/
 .idea/
