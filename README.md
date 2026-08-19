@@ -5,6 +5,9 @@ Full-stack e-commerce platform (Dress, Sharee, Pant, Orna, Bag, Blouse, Panjabi,
 - `backend/` — Django + Django REST Framework API (owned by Alvee, branch `alvee-backend`)
 - `frontend/` — Next.js frontend (owned by Nusrat, branch `nusrat-frontend`)
 
+**Frontend engineers start here: [`API_GUIDE.md`](API_GUIDE.md)** — every endpoint, request/response
+shapes, the cookie-based auth flow, and the guest-cart mechanics.
+
 ## Backend setup
 
 Requirements: Python 3.12+, PostgreSQL, Redis.
@@ -71,6 +74,6 @@ backend/
     catalog/       # categories, products, attributes, variations
     cart/          # cart, cart items
     orders/        # orders, payments, coupons
-    reviews/       # reviews, wishlist
+    reviews/       # reviews
 frontend/          # Next.js app (placeholder — see frontend/README.md)
 ```

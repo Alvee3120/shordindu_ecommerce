@@ -2,6 +2,7 @@
 Django settings for the Shordindu e-commerce backend.
 """
 
+from datetime import timedelta
 from pathlib import Path
 
 import environ
@@ -40,8 +41,11 @@ DJANGO_APPS = [
 
 THIRD_PARTY_APPS = [
     "rest_framework",
+    "rest_framework_simplejwt",
+    "rest_framework_simplejwt.token_blacklist",
     "corsheaders",
     "drf_spectacular",
+    "django_filters",
 ]
 
 LOCAL_APPS = [
@@ -184,11 +188,18 @@ CORS_ALLOW_CREDENTIALS = True
 REST_FRAMEWORK = {
     "DEFAULT_SCHEMA_CLASS": "drf_spectacular.openapi.AutoSchema",
     "DEFAULT_AUTHENTICATION_CLASSES": [
+        "apps.users.authentication.CookieJWTAuthentication",
         "rest_framework.authentication.SessionAuthentication",
     ],
     "DEFAULT_PERMISSION_CLASSES": [
         "rest_framework.permissions.IsAuthenticatedOrReadOnly",
     ],
+    "DEFAULT_FILTER_BACKENDS": [
+        "django_filters.rest_framework.DjangoFilterBackend",
+        "rest_framework.filters.SearchFilter",
+        "rest_framework.filters.OrderingFilter",
+    ],
+    "DEFAULT_PAGINATION_CLASS": "apps.core.pagination.StandardResultsPagination",
 }
 
 SPECTACULAR_SETTINGS = {
@@ -197,6 +208,30 @@ SPECTACULAR_SETTINGS = {
     "VERSION": "1.0.0",
     "SERVE_INCLUDE_SCHEMA": False,
 }
+
+
+# --------------------------------------------------------------------------
+# JWT auth (issued as httpOnly cookies, never in the response body)
+# --------------------------------------------------------------------------
+
+SIMPLE_JWT = {
+    "ACCESS_TOKEN_LIFETIME": timedelta(minutes=15),
+    "REFRESH_TOKEN_LIFETIME": timedelta(days=7),
+    "ROTATE_REFRESH_TOKENS": True,
+    "BLACKLIST_AFTER_ROTATION": True,
+    "UPDATE_LAST_LOGIN": True,
+}
+
+# Cross-origin (localhost:3000 -> localhost:8000) but same-site, so Lax is
+# enough to have the cookie ride along on normal fetch requests while still
+# being withheld from cross-site POST/PUT/DELETE (the usual CSRF vector).
+AUTH_COOKIE_ACCESS = "access_token"
+AUTH_COOKIE_REFRESH = "refresh_token"
+AUTH_COOKIE_SECURE = env.bool("AUTH_COOKIE_SECURE", default=not DEBUG)
+AUTH_COOKIE_SAMESITE = env("AUTH_COOKIE_SAMESITE", default="Lax")
+AUTH_COOKIE_DOMAIN = env("AUTH_COOKIE_DOMAIN", default=None) or None
+# Refresh token only ever needs to be readable by the auth endpoints.
+AUTH_COOKIE_REFRESH_PATH = "/api/auth/"
 
 
 # --------------------------------------------------------------------------

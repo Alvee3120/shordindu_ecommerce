@@ -62,3 +62,20 @@ class User(AbstractBaseUser, PermissionsMixin):
 
     def __str__(self):
         return self.email
+
+
+class Address(models.Model):
+    # user is nullable so a guest checkout (no account created) can still
+    # have an address row for orders.shipping_address_id to point to.
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="addresses")
+    name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=32, blank=True)
+    address = models.TextField()
+    district = models.CharField(max_length=100)
+    is_default = models.BooleanField(default=False)
+
+    class Meta:
+        db_table = "addresses"
+
+    def __str__(self):
+        return f"{self.name} - {self.district}"
