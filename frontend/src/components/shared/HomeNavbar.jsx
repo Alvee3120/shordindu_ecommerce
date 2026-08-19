@@ -7,7 +7,7 @@ import { FiMenu, FiX, FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaUser } from "react-icons/fa";
 
 const logoSrcLight = "/assets/logo/logolight.png";
-const logoSrcDark = "/assets/logo/sidelogoDark.svg";
+const logoSrcDark = "/assets/logo/logoDark.png";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -114,7 +114,7 @@ export default function HomeNavbar() {
                 setSearchOpen(false);
               }}
             >
-              <Image src={logoSrc} alt="Logo" width={100} height={100} priority />
+              <Image src={logoSrc} alt="Logo" width={80} height={80} priority />
             </Link>
           </div>
 
