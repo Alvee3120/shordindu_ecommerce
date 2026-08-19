@@ -1,13 +1,26 @@
-from rest_framework import viewsets
+from rest_framework import status, viewsets
+from rest_framework.response import Response
 
 from apps.core.permissions import IsStaffOrReadOnly
 
-from .models import Attribute, AttributeValue, Category
+from .models import (
+    Attribute,
+    AttributeValue,
+    Category,
+    Product,
+    ProductAttributeValue,
+    ProductImage,
+    ProductVariation,
+)
 from .serializers import (
     AttributeSerializer,
     AttributeValueSerializer,
     CategoryDetailSerializer,
     CategorySerializer,
+    ProductAttributeValueSerializer,
+    ProductImageSerializer,
+    ProductSerializer,
+    ProductVariationSerializer,
 )
 
 
@@ -30,4 +43,33 @@ class AttributeViewSet(viewsets.ModelViewSet):
 class AttributeValueViewSet(viewsets.ModelViewSet):
     queryset = AttributeValue.objects.all()
     serializer_class = AttributeValueSerializer
+    permission_classes = [IsStaffOrReadOnly]
+
+
+class ProductViewSet(viewsets.ModelViewSet):
+    queryset = Product.objects.all().select_related("category").order_by("-created_at")
+    serializer_class = ProductSerializer
+    permission_classes = [IsStaffOrReadOnly]
+
+
+class ProductVariationViewSet(viewsets.ModelViewSet):
+    queryset = ProductVariation.objects.all().select_related("product")
+    serializer_class = ProductVariationSerializer
+    permission_classes = [IsStaffOrReadOnly]
+
+    def create(self, request, *args, **kwargs):
+        if not request.data.get("product"):
+            return Response({"product": ["This field is required."]}, status=status.HTTP_400_BAD_REQUEST)
+        return super().create(request, *args, **kwargs)
+
+
+class ProductImageViewSet(viewsets.ModelViewSet):
+    queryset = ProductImage.objects.all().select_related("product", "variation")
+    serializer_class = ProductImageSerializer
+    permission_classes = [IsStaffOrReadOnly]
+
+
+class ProductAttributeValueViewSet(viewsets.ModelViewSet):
+    queryset = ProductAttributeValue.objects.all().select_related("product", "attribute_value")
+    serializer_class = ProductAttributeValueSerializer
     permission_classes = [IsStaffOrReadOnly]
