@@ -1,6 +1,6 @@
 from rest_framework import serializers
 
-from .models import Review, Wishlist
+from .models import Review
 
 
 class ReviewSerializer(serializers.ModelSerializer):
@@ -10,14 +10,5 @@ class ReviewSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = Review
-        fields = ["id", "product", "user", "user_name", "rating", "comment", "created_at"]
-        read_only_fields = ["created_at"]
-
-
-class WishlistSerializer(serializers.ModelSerializer):
-    product_name = serializers.CharField(source="product.name", read_only=True)
-
-    class Meta:
-        model = Wishlist
-        fields = ["id", "product", "product_name", "variation", "created_at"]
+        fields = ["id", "product", "user", "user_name", "rating", "comment", "image", "created_at"]
         read_only_fields = ["created_at"]
