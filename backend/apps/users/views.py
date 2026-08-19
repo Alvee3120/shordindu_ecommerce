@@ -6,6 +6,9 @@ from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.serializers import TokenRefreshSerializer
 from rest_framework_simplejwt.tokens import RefreshToken
 
+from apps.cart.cart_resolver import CART_COOKIE_NAME
+from apps.cart.services import merge_guest_cart
+
 from .cookies import clear_auth_cookies, set_auth_cookies
 from .models import Address
 from .serializers import (
@@ -27,10 +30,12 @@ class SignupView(APIView):
         user = serializer.save()
 
         send_welcome_email.delay(user.id)
+        merge_guest_cart(request, user)
 
         refresh = RefreshToken.for_user(user)
         response = Response(UserSerializer(user).data, status=status.HTTP_201_CREATED)
         set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        response.delete_cookie(CART_COOKIE_NAME, path="/")
         return response
 
 
@@ -42,9 +47,12 @@ class SigninView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.validated_data["user"]
 
+        merge_guest_cart(request, user)
+
         refresh = RefreshToken.for_user(user)
         response = Response(UserSerializer(user).data, status=status.HTTP_200_OK)
         set_auth_cookies(response, str(refresh.access_token), str(refresh))
+        response.delete_cookie(CART_COOKIE_NAME, path="/")
         return response
 
 

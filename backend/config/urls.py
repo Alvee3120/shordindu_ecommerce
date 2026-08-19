@@ -10,6 +10,7 @@ urlpatterns = [
     path("api/docs/", SpectacularSwaggerView.as_view(url_name="schema"), name="swagger-ui"),
     path("api/", include("apps.users.urls")),
     path("api/", include("apps.catalog.urls")),
+    path("api/", include("apps.cart.urls")),
 ]
 
 if settings.DEBUG and not settings.USE_S3:
