@@ -50,7 +50,7 @@ export default function CampaignBanner() {
 
           <Link
             href={campaignUrl}
-            className="inline-block rounded-md bg-(--primary) px-6 py-3 text-xs font-semibold tracking-wide text-white uppercase transition-colors hover:bg-neutral-800 sm:text-sm"
+            className="inline-block rounded-md bg-(--primary) transition-transform hover:scale-105 px-6 py-3 text-xs font-semibold tracking-wide text-white uppercase sm:text-sm"
           >
             Explore Collection
           </Link>
