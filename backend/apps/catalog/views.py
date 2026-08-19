@@ -1,4 +1,5 @@
 from rest_framework import status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.core.permissions import IsStaffOrReadOnly
@@ -8,6 +9,7 @@ from .models import (
     AttributeValue,
     Category,
     Product,
+    ProductAddon,
     ProductAttributeValue,
     ProductImage,
     ProductVariation,
@@ -17,6 +19,7 @@ from .serializers import (
     AttributeValueSerializer,
     CategoryDetailSerializer,
     CategorySerializer,
+    ProductAddonSerializer,
     ProductAttributeValueSerializer,
     ProductImageSerializer,
     ProductSerializer,
@@ -51,6 +54,19 @@ class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = [IsStaffOrReadOnly]
 
+    def get_queryset(self):
+        queryset = super().get_queryset()
+        if self.action == "list":
+            queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
+        return queryset
+
+    @action(detail=True, methods=["get"])
+    def addons(self, request, pk=None):
+        product = self.get_object()
+        addon_links = product.addon_links.select_related("addon_product").order_by("sort_order", "id")
+        serializer = ProductAddonSerializer(addon_links, many=True, context=self.get_serializer_context())
+        return Response(serializer.data)
+
 
 class ProductVariationViewSet(viewsets.ModelViewSet):
     queryset = ProductVariation.objects.all().select_related("product")
@@ -72,4 +88,10 @@ class ProductImageViewSet(viewsets.ModelViewSet):
 class ProductAttributeValueViewSet(viewsets.ModelViewSet):
     queryset = ProductAttributeValue.objects.all().select_related("product", "attribute_value")
     serializer_class = ProductAttributeValueSerializer
+    permission_classes = [IsStaffOrReadOnly]
+
+
+class ProductAddonViewSet(viewsets.ModelViewSet):
+    queryset = ProductAddon.objects.all().select_related("parent_product", "addon_product")
+    serializer_class = ProductAddonSerializer
     permission_classes = [IsStaffOrReadOnly]

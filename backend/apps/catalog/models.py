@@ -167,3 +167,21 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"{self.product.name} image {self.id}"
+
+
+class ProductAddon(models.Model):
+    parent_product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="addon_links")
+    addon_product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="parent_links")
+    is_required = models.BooleanField(default=False)
+    min_select = models.PositiveIntegerField(default=0)
+    max_select = models.PositiveIntegerField(default=1)
+    price_override = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "product_addons"
+        ordering = ["sort_order", "id"]
+        unique_together = ("parent_product", "addon_product")
+
+    def __str__(self):
+        return f"{self.parent_product.name} -> {self.addon_product.name}"

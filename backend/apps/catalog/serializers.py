@@ -5,6 +5,7 @@ from .models import (
     AttributeValue,
     Category,
     Product,
+    ProductAddon,
     ProductAttributeValue,
     ProductImage,
     ProductVariation,
@@ -186,3 +187,21 @@ class ProductSerializer(serializers.ModelSerializer):
             setattr(instance, attr, value)
         instance.save()
         return instance
+
+
+class ProductAddonSerializer(serializers.ModelSerializer):
+    addon_product_detail = ProductSerializer(source="addon_product", read_only=True)
+
+    class Meta:
+        model = ProductAddon
+        fields = [
+            "id",
+            "parent_product",
+            "addon_product",
+            "addon_product_detail",
+            "is_required",
+            "min_select",
+            "max_select",
+            "price_override",
+            "sort_order",
+        ]

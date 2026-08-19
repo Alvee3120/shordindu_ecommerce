@@ -12,5 +12,6 @@ router.register("product-images", views.ProductImageViewSet, basename="product-i
 router.register(
     "product-attribute-values", views.ProductAttributeValueViewSet, basename="product-attribute-value"
 )
+router.register("product-addons", views.ProductAddonViewSet, basename="product-addon")
 
 urlpatterns = router.urls

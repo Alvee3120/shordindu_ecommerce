@@ -6,6 +6,7 @@ from .models import (
     AttributeValue,
     Category,
     Product,
+    ProductAddon,
     ProductAttributeValue,
     ProductImage,
     ProductVariation,
@@ -63,13 +64,20 @@ class ProductImageInline(admin.TabularInline):
     extra = 1
 
 
+class ProductAddonInline(admin.TabularInline):
+    model = ProductAddon
+    fk_name = "parent_product"
+    extra = 1
+    fields = ["addon_product", "is_required", "min_select", "max_select", "price_override", "sort_order"]
+
+
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
     list_display = ["name", "category", "product_type", "visibility_type", "status"]
     list_filter = ["category", "product_type", "visibility_type", "status"]
     search_fields = ["name", "slug", "sku_prefix"]
     prepopulated_fields = {"slug": ("name",)}
-    inlines = [ProductAttributeValueInline, ProductVariationInline, ProductImageInline]
+    inlines = [ProductAttributeValueInline, ProductVariationInline, ProductImageInline, ProductAddonInline]
 
 
 class VariationAttributeValueInline(admin.TabularInline):
@@ -90,3 +98,10 @@ class ProductImageAdmin(admin.ModelAdmin):
     list_display = ["product", "variation", "alt_text", "sort_order", "is_primary"]
     list_filter = ["is_primary"]
     search_fields = ["product__name", "alt_text"]
+
+
+@admin.register(ProductAddon)
+class ProductAddonAdmin(admin.ModelAdmin):
+    list_display = ["parent_product", "addon_product", "is_required", "min_select", "max_select"]
+    list_filter = ["is_required"]
+    search_fields = ["parent_product__name", "addon_product__name"]
