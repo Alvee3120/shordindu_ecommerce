@@ -1,3 +1,4 @@
+from django.db.models import Avg
 from rest_framework import serializers
 
 from .models import (
@@ -124,6 +125,8 @@ class ProductSerializer(serializers.ModelSerializer):
     )
     variations = ProductVariationSerializer(many=True, required=False)
     images = ProductImageSerializer(many=True, read_only=True)
+    average_rating = serializers.SerializerMethodField()
+    review_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Product
@@ -142,10 +145,19 @@ class ProductSerializer(serializers.ModelSerializer):
             "attribute_value_ids",
             "variations",
             "images",
+            "average_rating",
+            "review_count",
             "created_at",
             "updated_at",
         ]
         extra_kwargs = {"slug": {"required": False}}
+
+    def get_average_rating(self, obj):
+        avg = obj.reviews.aggregate(avg=Avg("rating"))["avg"]
+        return round(avg, 2) if avg is not None else None
+
+    def get_review_count(self, obj):
+        return obj.reviews.count()
 
     def validate(self, attrs):
         if self.instance is None:
