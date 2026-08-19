@@ -65,18 +65,17 @@ class User(AbstractBaseUser, PermissionsMixin):
 
 
 class Address(models.Model):
-    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name="addresses")
-    label = models.CharField(max_length=100, blank=True)
-    line1 = models.CharField(max_length=255)
-    line2 = models.CharField(max_length=255, blank=True)
-    city = models.CharField(max_length=100)
-    state = models.CharField(max_length=100, blank=True)
-    postal_code = models.CharField(max_length=20, blank=True)
-    country = models.CharField(max_length=100)
+    # user is nullable so a guest checkout (no account created) can still
+    # have an address row for orders.shipping_address_id to point to.
+    user = models.ForeignKey(User, on_delete=models.CASCADE, null=True, blank=True, related_name="addresses")
+    name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=32, blank=True)
+    address = models.TextField()
+    district = models.CharField(max_length=100)
     is_default = models.BooleanField(default=False)
 
     class Meta:
         db_table = "addresses"
 
     def __str__(self):
-        return f"{self.label or self.line1} ({self.user.email})"
+        return f"{self.name} - {self.district}"

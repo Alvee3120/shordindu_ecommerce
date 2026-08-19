@@ -59,14 +59,4 @@ class ChangePasswordSerializer(serializers.Serializer):
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-        fields = [
-            "id",
-            "label",
-            "line1",
-            "line2",
-            "city",
-            "state",
-            "postal_code",
-            "country",
-            "is_default",
-        ]
+        fields = ["id", "name", "phone", "address", "district", "is_default"]

@@ -44,6 +44,6 @@ class UserAdmin(DjangoUserAdmin):
 
 @admin.register(Address)
 class AddressAdmin(admin.ModelAdmin):
-    list_display = ["user", "label", "city", "country", "is_default"]
-    list_filter = ["country", "is_default"]
-    search_fields = ["user__email", "line1", "city"]
+    list_display = ["name", "phone", "district", "user", "is_default"]
+    list_filter = ["district", "is_default"]
+    search_fields = ["name", "phone", "user__email", "district"]

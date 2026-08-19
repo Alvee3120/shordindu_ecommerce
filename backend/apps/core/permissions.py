@@ -8,3 +8,10 @@ class IsStaffOrReadOnly(BasePermission):
         if request.method in SAFE_METHODS:
             return True
         return bool(request.user and request.user.is_authenticated and request.user.is_staff)
+
+
+class IsStaffOnly(BasePermission):
+    """Staff/admin accounts only, for both reads and writes."""
+
+    def has_permission(self, request, view):
+        return bool(request.user and request.user.is_authenticated and request.user.is_staff)

@@ -11,6 +11,7 @@ urlpatterns = [
     path("api/", include("apps.users.urls")),
     path("api/", include("apps.catalog.urls")),
     path("api/", include("apps.cart.urls")),
+    path("api/", include("apps.orders.urls")),
 ]
 
 if settings.DEBUG and not settings.USE_S3:
