@@ -4,6 +4,7 @@ from rest_framework.response import Response
 
 from apps.core.permissions import IsStaffOrReadOnly
 
+from .filters import ProductFilter
 from .models import (
     Attribute,
     AttributeValue,
@@ -53,12 +54,15 @@ class ProductViewSet(viewsets.ModelViewSet):
     queryset = Product.objects.all().select_related("category").order_by("-created_at")
     serializer_class = ProductSerializer
     permission_classes = [IsStaffOrReadOnly]
+    filterset_class = ProductFilter
+    search_fields = ["name", "description", "sku_prefix"]
+    ordering_fields = ["name", "created_at"]
 
     def get_queryset(self):
         queryset = super().get_queryset()
         if self.action == "list":
             queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
-        return queryset
+        return queryset.distinct()
 
     @action(detail=True, methods=["get"])
     def addons(self, request, pk=None):

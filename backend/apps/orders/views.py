@@ -45,6 +45,7 @@ class CheckoutView(APIView):
 class OrderViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
+    filterset_fields = ["status", "payment_status"]
 
     def get_queryset(self):
         user = self.request.user

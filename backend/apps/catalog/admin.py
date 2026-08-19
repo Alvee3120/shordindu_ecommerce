@@ -5,6 +5,7 @@ from .models import (
     Attribute,
     AttributeValue,
     Category,
+    InventoryLog,
     Product,
     ProductAddon,
     ProductAttributeValue,
@@ -105,3 +106,18 @@ class ProductAddonAdmin(admin.ModelAdmin):
     list_display = ["parent_product", "addon_product", "is_required", "min_select", "max_select"]
     list_filter = ["is_required"]
     search_fields = ["parent_product__name", "addon_product__name"]
+
+
+@admin.register(InventoryLog)
+class InventoryLogAdmin(admin.ModelAdmin):
+    list_display = ["variation", "change_qty", "reason", "reference_id", "created_at"]
+    list_filter = ["reason"]
+    search_fields = ["variation__sku", "reference_id"]
+
+    def has_add_permission(self, request):
+        # Inventory logs are only ever written by the system (checkout,
+        # future restock flows), never hand-entered.
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False

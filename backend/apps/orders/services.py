@@ -1,8 +1,10 @@
 from decimal import Decimal
 
 from django.db import transaction
+from django.db.models import F
 
 from apps.cart.cart_resolver import resolve_cart
+from apps.catalog.models import InventoryLog, ProductVariation
 from apps.users.models import Address, User
 from apps.users.utils import generate_secure_password
 
@@ -13,6 +15,16 @@ from .utils import generate_order_number
 class CheckoutError(Exception):
     def __init__(self, errors):
         self.errors = errors
+
+
+def _decrement_stock(variation, quantity, order_number):
+    ProductVariation.objects.filter(pk=variation.pk).update(stock_quantity=F("stock_quantity") - quantity)
+    InventoryLog.objects.create(
+        variation=variation,
+        change_qty=-quantity,
+        reason="order_placed",
+        reference_id=order_number,
+    )
 
 
 @transaction.atomic
@@ -104,6 +116,7 @@ def checkout(request, data):
             unit_price=item.unit_price_snapshot,
             line_total=item.unit_price_snapshot * item.quantity,
         )
+        _decrement_stock(item.variation, item.quantity, order.order_number)
         for child in item.children.all():
             OrderItem.objects.create(
                 order=order,
@@ -116,6 +129,7 @@ def checkout(request, data):
                 line_total=child.unit_price_snapshot * child.quantity,
                 parent_order_item=order_item,
             )
+            _decrement_stock(child.variation, child.quantity, order.order_number)
 
     if coupon:
         OrderCoupon.objects.create(order=order, coupon=coupon, discount_amount=discount_total)

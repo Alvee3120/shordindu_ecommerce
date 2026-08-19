@@ -49,3 +49,10 @@ class OrderAdmin(admin.ModelAdmin):
 class CouponAdmin(admin.ModelAdmin):
     list_display = ["code", "type", "value", "min_order_amount", "usage_limit", "starts_at", "ends_at"]
     search_fields = ["code"]
+
+
+@admin.register(Payment)
+class PaymentAdmin(admin.ModelAdmin):
+    list_display = ["order", "method", "amount", "status", "paid_at"]
+    list_filter = ["method", "status"]
+    search_fields = ["order__order_number", "transaction_id"]

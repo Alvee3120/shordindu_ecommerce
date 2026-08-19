@@ -8,15 +8,10 @@ from .serializers import ReviewSerializer, WishlistSerializer
 
 
 class ReviewViewSet(viewsets.ModelViewSet):
+    queryset = Review.objects.all().select_related("user", "product").order_by("-created_at")
     serializer_class = ReviewSerializer
     permission_classes = [IsOwnerOrReadOnly]
-
-    def get_queryset(self):
-        queryset = Review.objects.all().select_related("user", "product").order_by("-created_at")
-        product_id = self.request.query_params.get("product")
-        if product_id:
-            queryset = queryset.filter(product_id=product_id)
-        return queryset
+    filterset_fields = ["product", "rating"]
 
 
 class WishlistViewSet(viewsets.ModelViewSet):

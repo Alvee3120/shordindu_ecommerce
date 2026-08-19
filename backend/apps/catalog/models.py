@@ -185,3 +185,18 @@ class ProductAddon(models.Model):
 
     def __str__(self):
         return f"{self.parent_product.name} -> {self.addon_product.name}"
+
+
+class InventoryLog(models.Model):
+    variation = models.ForeignKey(ProductVariation, on_delete=models.CASCADE, related_name="inventory_logs")
+    change_qty = models.IntegerField()
+    reason = models.CharField(max_length=100)
+    reference_id = models.CharField(max_length=100, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "inventory_logs"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.variation.sku} {self.change_qty:+d} ({self.reason})"
