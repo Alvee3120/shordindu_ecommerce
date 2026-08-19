@@ -1,5 +1,8 @@
 import localFont from "next/font/local";
 import "./globals.css";
+import Navbar from "@/components/shared/Navbar";
+import Footer from "@/components/shared/Footer";
+import FooterT from "@/components/shared/FooterT";
 
 export const myFonts = localFont({
   src: [
@@ -8,7 +11,7 @@ export const myFonts = localFont({
       style: "normal",
     },
   ],
-  variable: '--sora'
+  variable: "--sora",
 });
 
 export const metadata = {
@@ -25,12 +28,15 @@ export const metadata = {
 };
 
 export default function RootLayout({ children }) {
+   
   return (
-    <html
-      lang="en"
-      className={` ${myFonts.variable} h-full antialiased`}
-    >
-      <body className="min-h-full flex flex-col">{children}</body>
+    <html lang="en" className={` ${myFonts.variable} h-full antialiased`}>
+      <body className="min-h-full flex flex-col">
+        <Navbar />
+        <main> {children}</main>
+        {/* <Footer /> */}
+        <FooterT />
+      </body>
     </html>
   );
 }
