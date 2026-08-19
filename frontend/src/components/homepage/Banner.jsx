@@ -100,18 +100,21 @@ export default function Banner() {
         ))}
       </div>
 
-      {/* Shop Now button */}
-      <Link
-        href="/shop"
-        className="absolute bottom-6 left-6 z-30 rounded-full bg-(--primary) px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105 sm:bottom-8 sm:left-10"
-      >
-        Shop Now
-      </Link>
+      {/* Content container — bottom-anchored, width-constrained like the rest of the site */}
+      <div className="absolute inset-x-0 bottom-6 z-30 sm:bottom-10">
+        <div className="mx-auto flex w-full max-w-7xl items-end justify-between px-6 sm:px-10">
+          <Link
+            href="/shop"
+            className="rounded-full bg-(--primary) px-5 py-2.5 text-sm font-semibold text-white shadow-lg transition-transform hover:scale-105"
+          >
+            Shop Now
+          </Link>
 
-      {/* Tagline */}
-      <p className="font-sora absolute right-6 bottom-6 z-30 max-w-[160px] text-right text-xs leading-snug font-medium text-white/90 sm:right-10 sm:bottom-8 sm:max-w-[200px] sm:text-sm">
-        Step Into Effortless Elegance With Shordindu
-      </p>
+          <p className="font-sora max-w-[160px] text-right text-xs leading-snug font-medium text-white/90 sm:max-w-[200px] sm:text-sm">
+            Step Into Effortless Elegance With Shordindu
+          </p>
+        </div>
+      </div>
 
       {/* Dot indicators */}
       <div className="absolute bottom-6 left-1/2 z-30 flex -translate-x-1/2 gap-2 sm:bottom-8">
