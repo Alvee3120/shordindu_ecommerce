@@ -25,3 +25,20 @@ body {
 .font-sora {
   font-family: var(--sora), "Montserrat", sans-serif;
 }
+
+.water-fill {
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  color: transparent;
+  animation: wave-slosh 1.4s linear infinite;
+}
+
+@keyframes wave-slosh {
+  from {
+    background-position-x: 0, 0;
+  }
+  to {
+    background-position-x: 0, 60px;
+  }
+}
