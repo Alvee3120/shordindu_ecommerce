@@ -3,12 +3,11 @@
 import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { usePathname } from "next/navigation";
 import { FiMenu, FiX, FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaUser } from "react-icons/fa";
 
 const logoSrcLight = "/assets/logo/logolight.png";
-const logoSrcDark = "/assets/logo/logoDark.png";
+const logoSrcDark = "/assets/logo/sidelogoDark.svg";
 
 const navLinks = [
   { label: "Home", href: "/" },
@@ -18,21 +17,17 @@ const navLinks = [
   { label: "Bag", href: "/bag" },
 ];
 
-export default function Navbar() {
-  const pathname = usePathname();
-  const isHome = pathname === "/";
-
+export default function HomeNavbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
 
   useEffect(() => {
-    if (!isHome) return; // no scroll tracking needed on non-home pages
     const handleScroll = () => setScrolled(window.scrollY > 20);
     handleScroll();
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
-  }, [isHome]);
+  }, []);
 
   // lock body scroll while side drawer is open
   useEffect(() => {
@@ -64,20 +59,22 @@ export default function Navbar() {
     setSearchOpen((prev) => !prev);
   };
 
-  // On the homepage: transparent + dark logo + white text until scrolled, then flips.
-  // On every other page: always solid white bar + light logo + primary text/icons.
-  const isTransparentState = isHome && !scrolled && !searchOpen;
-  const logoSrc = isTransparentState ? logoSrcDark : logoSrcLight;
-  const linkColorClass = isTransparentState
-    ? "text-white hover:text-white/80"
-    : "text-(--primary) hover:text-(--primary)/80";
-  const iconColorClass = linkColorClass;
+  // not scrolled: dark logo + white text/icons (sits over a dark/hero banner)
+  // scrolled: light logo + primary-colored text/icons (sits over the white/blurred bar)
+  const isScrolled = scrolled || searchOpen;
+  const logoSrc = isScrolled ? logoSrcLight : logoSrcDark;
+  const linkColorClass = isScrolled
+    ? "text-(--primary) hover:text-(--primary)/80"
+    : "text-white hover:text-white/80";
+  const iconColorClass = isScrolled
+    ? "text-(--primary) hover:text-(--primary)/80"
+    : "text-white hover:text-white/80";
 
   return (
     <>
       <header
         className={`fixed top-0 left-0 z-50 w-full transition-all duration-300 ${
-          isTransparentState ? "bg-transparent" : "bg-white/70 backdrop-blur-md shadow-sm"
+          isScrolled ? "bg-white/70 backdrop-blur-md shadow-sm" : "bg-transparent"
         }`}
       >
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
@@ -117,7 +114,7 @@ export default function Navbar() {
                 setSearchOpen(false);
               }}
             >
-              <Image src={logoSrc} alt="Logo" width={80} height={80} priority />
+              <Image src={logoSrc} alt="Logo" width={100} height={100} priority />
             </Link>
           </div>
 
@@ -160,6 +157,7 @@ export default function Navbar() {
               className={`relative flex items-center justify-center rounded-full p-2 transition-colors ${iconColorClass}`}
             >
               <FaShoppingCart size={20} />
+              {/* optional item-count badge */}
               <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
                 2
               </span>
@@ -167,7 +165,7 @@ export default function Navbar() {
           </div>
         </nav>
 
-        {/* Mobile search bar */}
+        {/* Mobile search bar — drops down below the header */}
         <div
           className={`overflow-hidden transition-all duration-300 md:hidden ${
             searchOpen ? "max-h-20 border-t border-gray-200" : "max-h-0"
@@ -195,6 +193,7 @@ export default function Navbar() {
       >
         <div className="absolute inset-0 bg-black/40" onClick={() => setMenuOpen(false)} />
 
+        {/* Side drawer panel — always on a white surface, so use dark logo + primary color regardless of navbar state */}
         <div
           className={`absolute top-0 left-0 h-full w-72 max-w-[80%] bg-white shadow-xl transition-transform duration-300 ${
             menuOpen ? "translate-x-0" : "-translate-x-full"

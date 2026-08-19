@@ -1,8 +1,9 @@
 import localFont from "next/font/local";
 import "./globals.css";
-import Navbar from "@/components/shared/Navbar";
+import NavbarSwitcher from "@/components/shared/NavbarSwitcher";
 import Footer from "@/components/shared/Footer";
 import FooterT from "@/components/shared/FooterT";
+import SmoothScroll from "@/components/shared/SmoothScroll";
 import AppLoadingShell from "./AppLoadingShell";
 
 export const myFonts = localFont({
@@ -13,6 +14,16 @@ export const myFonts = localFont({
     },
   ],
   variable: "--sora",
+});
+
+export const myFontsT = localFont({
+  src: [
+    {
+      path: "./font/bangla.ttf",
+      style: "normal",
+    },
+  ],
+  variable: "--bangla",
 });
 
 export const metadata = {
@@ -30,14 +41,16 @@ export const metadata = {
 
 export default function RootLayout({ children }) {
   return (
-    <html lang="en" className={` ${myFonts.variable} h-full antialiased`}>
+    <html lang="en" className={` ${myFonts.variable} ${myFontsT.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <AppLoadingShell brandText="shordindu">
-          <Navbar />
-          <main> {children}</main>
-          {/* <Footer /> */}
-          <FooterT />
-        </AppLoadingShell>
+        <SmoothScroll>
+          <AppLoadingShell brandText="shordindu">
+            <NavbarSwitcher />
+            <main>{children}</main>
+            {/* <Footer /> */}
+            <FooterT />
+          </AppLoadingShell>
+        </SmoothScroll>
       </body>
     </html>
   );

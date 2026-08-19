@@ -1,12 +1,9 @@
-import { resolve } from "styled-jsx/css";
+import Banner from "@/components/homepage/Banner";
 
-
-
-export default async function Home() {
-// await new Promise((resolve) => setTimeout(resolve, 3000));
+export default function Home() {
   return (
-  <div className="min-h-screen">
-    
+  <div className="">
+    <Banner />
   </div>
   );
 }

@@ -3,6 +3,7 @@
 
 @theme {
   --font-sora: var(--sora), "Montserrat", sans-serif;
+  --font-bangla: var(--bangla), sans-serif;
 }
 
 :root {
@@ -16,6 +17,7 @@ body {
   background: var(--background);
   color: var(--foreground);
   font-family: "Montserrat", sans-serif;
+  overflow-x: hidden;
 }
 
 .montserrat {
@@ -25,6 +27,11 @@ body {
 .font-sora {
   font-family: var(--sora), "Montserrat", sans-serif;
 }
+
+.font-bangla {
+  font-family: var(--bangla), sans-serif;
+}
+
 
 .water-fill {
   -webkit-background-clip: text;

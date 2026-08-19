@@ -14,13 +14,13 @@ const categoryLinks = [
 ];
 
 const policyLinks = [
-  { label: "Terms & Conditions", href: "/terms" },
-  { label: "Privacy Policy", href: "/privacy" },
-  { label: "Return & Exchange & Cancellation Policy", href: "/return-policy" },
+  { label: "Terms & Conditions", href: "/footerLinks/terms" },
+  { label: "Privacy Policy", href: "/footerLinks/privacy" },
+  { label: "Return & Exchange & Cancellation Policy", href: "/footerLinks/return-policy" },
 ];
 
 const otherLinks = [
-  { label: "Order & Delivery Process", href: "/order-delivery" },
+  { label: "Order & Delivery Process", href: "/footerLinks/order-delivery" },
 ];
 
 export default function FooterT() {
@@ -28,7 +28,7 @@ export default function FooterT() {
     <footer className="relative overflow-hidden bg-(--primary) text-white">
       {/* Giant brand signature — background layer */}
       <div className="hidden sm:block pointer-events-none absolute inset-x-0 bottom-28 select-none overflow-hidden font-sora">
-        <p className="-mb-4 translate-x-[-2%] text-center text-[18vw] leading-none font-bold whitespace-nowrap text-white/5 sm:text-[15vw]">
+        <p className="-mb-4 translate-x-[-2%] font-sora text-center text-[18vw] leading-none font-bold whitespace-nowrap text-white/5 sm:text-[15vw]">
           shordindu.
         </p>
       </div>
@@ -50,7 +50,7 @@ export default function FooterT() {
             </p>
             <div className="flex items-center gap-3">
               <a
-                href="https://instagram.com/shordindu"
+                href="https://www.instagram.com/wear_shordindu/"
                 target="_blank"
                 rel="noopener noreferrer"
                 aria-label="Follow us on Instagram"
@@ -162,13 +162,13 @@ export default function FooterT() {
           </p>
           <div className="hidden sm:flex items-center gap-6">
             <Link
-              href="/terms"
+              href="/footerLinks/terms"
               className="text-xs font-medium tracking-wide text-gray-400 uppercase transition-colors hover:text-white"
             >
               Terms & Conditions
             </Link>
             <Link
-              href="/privacy"
+              href="/footerLinks/privacy"
               className="text-xs font-medium tracking-wide text-gray-400 uppercase transition-colors hover:text-white"
             >
               Privacy Policy
