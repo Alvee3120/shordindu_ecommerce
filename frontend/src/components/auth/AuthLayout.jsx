@@ -6,7 +6,7 @@ const logoSrc = "/assets/logo/logoDark.png";
 
 export default function AuthLayout({ children }) {
   return (
-    <main className="relative flex min-h-screen w-full max-w-7xl pt-10 items-center overflow-hidden bg-neutral-900">
+    <main className="relative flex min-h-screen w-full pt-10 items-center overflow-hidden bg-neutral-900">
       {/* Background image */}
       <div className="absolute inset-0 z-0">
         <Image
@@ -20,9 +20,9 @@ export default function AuthLayout({ children }) {
       </div>
 
       {/* Content */}
-      <div className="relative z-10 mx-auto flex w-full  flex-col items-center justify-between gap-16 px-6 py-16 sm:px-8 lg:flex-row lg:items-center lg:gap-8">
+      <div className="relative z-10 mx-auto flex w-full max-w-7xl flex-col items-center justify-between gap-16 px-4 py-16 sm:px-6 lg:flex-row lg:items-center lg:gap-8">
         {/* Left: branding */}
-        <div className="hidden sm:block w-full ml-20 max-w-md text-white lg:pb-10">
+        <div className="hidden sm:block w-full  max-w-md text-white lg:pb-10">
           <Image
             src={logoSrc}
             alt="Shordindu"

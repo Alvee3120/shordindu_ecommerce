@@ -4,9 +4,11 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { changePassword } from "@/lib/auth";
+import { useAuth } from "@/context/AuthContext";
 
 export default function ChangePasswordPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [form, setForm] = useState({ old_password: "", new_password: "" });
   const [fieldErrors, setFieldErrors] = useState({});
   const [formError, setFormError] = useState("");
@@ -27,7 +29,7 @@ export default function ChangePasswordPage() {
       await changePassword(form);
       toast.success("Password changed successfully");
       setForm({ old_password: "", new_password: "" });
-      router.push("/dashboard");
+      router.push(`/dashboard/${user?.role ?? "customer"}`);
     } catch (err) {
       if (err.status === 400 && err.data) {
         setFieldErrors(err.data);

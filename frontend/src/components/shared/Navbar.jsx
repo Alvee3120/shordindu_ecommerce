@@ -22,8 +22,15 @@ const navLinks = [
 export default function Navbar() {
   const pathname = usePathname();
   const isHome = pathname === "/";
-  const { isAuthenticated } = useAuth();
-  const accountHref = isAuthenticated ? "/dashboard" : "/auth/login";
+  const { user, isAuthenticated } = useAuth();
+  const dashboardHrefByRole = {
+    admin: "/dashboard/admin",
+    staff: "/dashboard/staff",
+    customer: "/dashboard/customer",
+  };
+  const accountHref = isAuthenticated
+    ? dashboardHrefByRole[user?.role] ?? "/dashboard/customer"
+    : "/auth/login";
 
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
