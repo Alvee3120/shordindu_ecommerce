@@ -5,6 +5,8 @@ import Footer from "@/components/shared/Footer";
 import FooterT from "@/components/shared/FooterT";
 import SmoothScroll from "@/components/shared/SmoothScroll";
 import AppLoadingShell from "./AppLoadingShell";
+import { Toaster } from "sonner";
+import { AuthProvider } from "@/context/AuthContext";
 
 export const myFonts = localFont({
   src: [
@@ -43,14 +45,17 @@ export default function RootLayout({ children }) {
   return (
     <html lang="en" className={` ${myFonts.variable} ${myFontsT.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <SmoothScroll>
-          <AppLoadingShell brandText="shordindu">
-            <NavbarSwitcher />
-            <main>{children}</main>
-            {/* <Footer /> */}
-            <FooterT />
-          </AppLoadingShell>
-        </SmoothScroll>
+        <Toaster position="top-center" richColors />
+        <AuthProvider>
+          <SmoothScroll>
+            <AppLoadingShell brandText="shordindu">
+              <NavbarSwitcher />
+              <main>{children}</main>
+              {/* <Footer /> */}
+              <FooterT />
+            </AppLoadingShell>
+          </SmoothScroll>
+        </AuthProvider>
       </body>
     </html>
   );

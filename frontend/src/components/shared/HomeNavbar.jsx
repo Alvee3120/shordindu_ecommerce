@@ -5,6 +5,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { FiMenu, FiX, FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaUser } from "react-icons/fa";
+import { useAuth } from "@/context/AuthContext";
 
 const logoSrcLight = "/assets/logo/logolight.png";
 const logoSrcDark = "/assets/logo/logoDark.png";
@@ -18,6 +19,8 @@ const navLinks = [
 ];
 
 export default function HomeNavbar() {
+  const { isAuthenticated } = useAuth();
+  const accountHref = isAuthenticated ? "/dashboard" : "/auth/login";
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
@@ -143,7 +146,7 @@ export default function HomeNavbar() {
 
             {/* user icon */}
             <Link
-              href="/account"
+              href={accountHref}
               aria-label="Account"
               className={`flex items-center justify-center rounded-full p-2 transition-colors ${iconColorClass}`}
             >
@@ -227,7 +230,7 @@ export default function HomeNavbar() {
 
           <div className="mt-2 flex items-center gap-4 border-t border-gray-200 px-4 py-4">
             <Link
-              href="/account"
+              href={accountHref}
               onClick={() => setMenuOpen(false)}
               className="flex items-center gap-2 text-sm font-medium text-gray-700 hover:text-(--primary)/90"
             >
