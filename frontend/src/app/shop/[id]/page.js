@@ -5,11 +5,12 @@ import { useParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
-import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus, FiTruck, FiShield, FiRefreshCw, FiX } from "react-icons/fi";
+import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus, FiTruck, FiShield, FiMaximize2, FiX } from "react-icons/fi";
 import { getProduct, getProductAddons, listProducts, toCardProduct } from "@/lib/products";
 import { addCartItem, addCartItemAddon, getCart, updateCartItem, deleteCartItem } from "@/lib/cart";
 import { useCart } from "@/context/CartContext";
 import ProductCard from "@/components/ProductCard";
+import ProductReviews from "@/components/ProductReviews";
 
 export default function ProductDetailsPage() {
   const { id } = useParams();
@@ -395,15 +396,7 @@ export default function ProductDetailsPage() {
             {product.name}
           </h1>
 
-          {product.average_rating != null && (
-            <p className="flex items-center gap-1.5 text-sm text-neutral-600">
-              <span className="text-amber-500">
-                {"★".repeat(Math.round(product.average_rating))}
-                {"☆".repeat(5 - Math.round(product.average_rating))}
-              </span>
-              <span className="text-neutral-400">{product.review_count} reviews</span>
-            </p>
-          )}
+
 
           <div className="mt-1 flex items-center gap-3">
             <span className="text-2xl font-bold text-neutral-900">
@@ -424,12 +417,22 @@ export default function ProductDetailsPage() {
               {product.description}
             </p>
           )}
-
+          
           {isVariable && attributeGroups.length > 0 && (
             <div className="mt-2 flex flex-col gap-3">
               {attributeGroups.map((group) => (
                 <div key={group.attribute}>
-                  <p className="mb-1.5 text-sm font-medium text-neutral-700">{group.attribute}:</p>
+                  <div className="mb-1.5 flex items-center justify-between">
+                    <p className="text-sm font-medium text-neutral-700">{group.attribute}:</p>
+                    {group.attribute.toLowerCase() === "size" && (
+                      <Link
+                        href="/footerLinks/size-guide"
+                        className="text-xs font-medium text-(--primary) underline underline-offset-2 hover:text-(--primary)/80"
+                      >
+                        Size Guide
+                      </Link>
+                    )}
+                  </div>
                   <div className="flex flex-wrap gap-2">
                     {group.values.map((v) => {
                       const checked = selectedValues[group.attribute] === v.id;
@@ -607,21 +610,32 @@ export default function ProductDetailsPage() {
           </div>
 
           <div className="mt-4 grid grid-cols-3 gap-3 border-t border-neutral-100 pt-5">
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <FiTruck size={20} className="text-neutral-500" />
-              <span className="text-xs text-neutral-500">Fast delivery</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <FiShield size={20} className="text-neutral-500" />
-              <span className="text-xs text-neutral-500">100% authentic</span>
-            </div>
-            <div className="flex flex-col items-center gap-1.5 text-center">
-              <FiRefreshCw size={20} className="text-neutral-500" />
-              <span className="text-xs text-neutral-500">Easy returns</span>
-            </div>
+            <Link
+              href="/footerLinks/order-delivery"
+              className="flex flex-col items-center gap-1.5 text-center text-neutral-500 hover:text-(--primary)"
+            >
+              <FiTruck size={20} />
+              <span className="text-xs">Shipping & Delivery</span>
+            </Link>
+            <Link
+              href="/footerLinks/wash-care"
+              className="flex flex-col items-center gap-1.5 text-center text-neutral-500 hover:text-(--primary)"
+            >
+              <FiShield size={20} />
+              <span className="text-xs">Wash & Care</span>
+            </Link>
+            <Link
+              href="/footerLinks/size-guide"
+              className="flex flex-col items-center gap-1.5 text-center text-neutral-500 hover:text-(--primary)"
+            >
+              <FiMaximize2 size={20} />
+              <span className="text-xs">Size guide</span>
+            </Link>
           </div>
         </div>
       </div>
+
+      {product && <ProductReviews productId={product.id} />}
 
       {relatedProducts.length > 0 && (
         <div className="mt-16 border-t border-neutral-100 pt-10">
