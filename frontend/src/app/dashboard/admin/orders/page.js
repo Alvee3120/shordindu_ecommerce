@@ -3,7 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
+import { FiEye } from "react-icons/fi";
 import { listOrders } from "@/lib/orders";
+import OrderDetailModal from "@/components/admin/OrderDetailModal";
 
 const statusColors = {
   pending: "bg-amber-100 text-amber-700",
@@ -21,6 +23,7 @@ export default function AdminOrdersPage() {
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
   const [loading, setLoading] = useState(true);
+  const [activeOrderId, setActiveOrderId] = useState(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -70,18 +73,19 @@ export default function AdminOrdersPage() {
               <th className="px-5 py-3 font-medium">Payment</th>
               <th className="px-5 py-3 font-medium">Total</th>
               <th className="px-5 py-3 font-medium">Placed</th>
+              <th className="px-5 py-3" />
             </tr>
           </thead>
           <tbody>
             {loading ? (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-neutral-500">
+                <td colSpan={7} className="px-5 py-6 text-center text-neutral-500">
                   Loading...
                 </td>
               </tr>
             ) : orders.length === 0 ? (
               <tr>
-                <td colSpan={6} className="px-5 py-6 text-center text-neutral-500">
+                <td colSpan={7} className="px-5 py-6 text-center text-neutral-500">
                   No orders found.
                 </td>
               </tr>
@@ -97,7 +101,7 @@ export default function AdminOrdersPage() {
                     </Link>
                   </td>
                   <td className="px-5 py-3 text-neutral-600">
-                    {order.guest_email || `User #${order.user ?? "—"}`}
+                    {order.user_name || order.guest_email || "—"}
                   </td>
                   <td className="px-5 py-3">
                     <span
@@ -113,12 +117,32 @@ export default function AdminOrdersPage() {
                   <td className="px-5 py-3 text-neutral-500">
                     {new Date(order.placed_at).toLocaleDateString()}
                   </td>
+                  <td className="px-5 py-3 text-right">
+                    <button
+                      type="button"
+                      onClick={() => setActiveOrderId(order.id)}
+                      aria-label="View order details"
+                      className="inline-flex items-center justify-center rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-(--primary)"
+                    >
+                      <FiEye size={16} />
+                    </button>
+                  </td>
                 </tr>
               ))
             )}
           </tbody>
         </table>
       </div>
+
+      {activeOrderId && (
+        <OrderDetailModal
+          orderId={activeOrderId}
+          onClose={() => setActiveOrderId(null)}
+          onStatusChange={(updated) =>
+            setOrders((prev) => prev.map((o) => (o.id === updated.id ? { ...o, ...updated } : o)))
+          }
+        />
+      )}
 
       {totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-3 text-sm">

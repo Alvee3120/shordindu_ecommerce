@@ -21,13 +21,12 @@ export default function CategoryShowcase() {
         if (cancelled) return;
         const results = Array.isArray(data) ? data : data.results ?? [];
         setCategories(
-          results
-            .map((cat) => ({
-              id: cat.id,
-              label: cat.name,
-              href: `/shop?category=${cat.slug}`,
-              image: cat.image || fallbackImage,
-            }))
+          results.map((cat) => ({
+            id: cat.id,
+            label: cat.name,
+            href: `/shop?category=${cat.id}`,
+            image: cat.image || fallbackImage,
+          }))
         );
       })
       .catch(() => {
@@ -40,8 +39,6 @@ export default function CategoryShowcase() {
       cancelled = true;
     };
   }, []);
-
-  console.log(categories)
 
   const handleScroll = () => {
     const el = scrollRef.current;
@@ -123,10 +120,7 @@ export default function CategoryShowcase() {
                 key={category.id}
                 href={category.href}
                 data-card
-                className={[
-                  "group relative flex-shrink-0 snap-start",
-                  cardWrapClass,
-                ].join(" ")}
+                className={["group relative flex-shrink-0 snap-start", cardWrapClass].join(" ")}
                 style={{
                   width: desktopCardWidth, // ensures 5 cards can fit on desktop
                 }}

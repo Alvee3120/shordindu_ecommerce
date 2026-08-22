@@ -72,7 +72,7 @@ export default function OrderDetailPage() {
       .catch((err) => {
         if (cancelled) return;
         toast.error(err.message);
-        router.replace("/dashboard/orders");
+        router.replace("/dashboard/customer/orders");
       })
       .finally(() => !cancelled && setLoading(false));
     return () => {
@@ -89,7 +89,7 @@ export default function OrderDetailPage() {
   return (
     <div>
       <Link
-        href="/dashboard/orders"
+        href="/dashboard/customer/orders"
         className="mb-4 inline-flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-(--primary)"
       >
         <FiArrowLeft size={14} />

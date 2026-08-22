@@ -38,3 +38,18 @@ export function updateCategory(id, { name, parent, description, image }) {
 export function deleteCategory(id) {
   return apiFetch(`/categories/${id}/`, { method: "DELETE" });
 }
+
+/** Groups a flat category list into top-level categories with a `children` array. */
+export function buildCategoryTree(categoryList) {
+  const byParent = new Map();
+  categoryList.forEach((cat) => {
+    const parentId = cat.parent ?? null;
+    if (!byParent.has(parentId)) byParent.set(parentId, []);
+    byParent.get(parentId).push(cat);
+  });
+  const parents = byParent.get(null) || [];
+  return parents.map((parent) => ({
+    ...parent,
+    children: byParent.get(parent.id) || [],
+  }));
+}

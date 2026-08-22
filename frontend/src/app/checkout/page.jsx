@@ -10,9 +10,12 @@ import { getCart } from "@/lib/cart";
 import { getMe } from "@/lib/auth";
 import { listAddresses } from "@/lib/addresses";
 import { checkout } from "@/lib/orders";
+import { getDeliveryFee } from "@/lib/districts";
 import { useCart } from "@/context/CartContext";
+import DistrictSelect from "@/components/shared/DistrictSelect";
 
-const ESTIMATED_SHIPPING = 120;
+const PHONE_RE = /^(?:\+?880|0)1[3-9]\d{8}$/;
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const EMPTY_GUEST_FORM = {
   email: "",
@@ -20,6 +23,7 @@ const EMPTY_GUEST_FORM = {
   shipping_phone: "",
   shipping_address: "",
   shipping_district: "",
+  order_note: "",
 };
 
 export default function CheckoutPage() {
@@ -35,6 +39,7 @@ export default function CheckoutPage() {
   const [useNewAddress, setUseNewAddress] = useState(false);
   const [guestForm, setGuestForm] = useState(EMPTY_GUEST_FORM);
   const [placingOrder, setPlacingOrder] = useState(false);
+  const [formErrors, setFormErrors] = useState({});
 
   useEffect(() => {
     let cancelled = false;
@@ -74,6 +79,40 @@ export default function CheckoutPage() {
   const handleGuestChange = (e) => {
     const { name, value } = e.target;
     setGuestForm((prev) => ({ ...prev, [name]: value }));
+    if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
+  };
+
+  const handleDistrictChange = (district) => {
+    setGuestForm((prev) => ({ ...prev, shipping_district: district }));
+    if (formErrors.shipping_district) {
+      setFormErrors((prev) => ({ ...prev, shipping_district: undefined }));
+    }
+  };
+
+  const usingInlineAddress = !user || useNewAddress || addresses.length === 0;
+
+  const validateGuestForm = () => {
+    const errors = {};
+    if (!user && !guestForm.email.trim()) {
+      errors.email = "Email is required.";
+    } else if (!user && !EMAIL_RE.test(guestForm.email.trim())) {
+      errors.email = "Enter a valid email address.";
+    }
+    if (!guestForm.shipping_name.trim()) {
+      errors.shipping_name = "Full name is required.";
+    }
+    if (!guestForm.shipping_phone.trim()) {
+      errors.shipping_phone = "Phone number is required.";
+    } else if (!PHONE_RE.test(guestForm.shipping_phone.trim())) {
+      errors.shipping_phone = "Enter a valid Bangladeshi mobile number.";
+    }
+    if (!guestForm.shipping_district) {
+      errors.shipping_district = "Please select a district.";
+    }
+    if (!guestForm.shipping_address.trim()) {
+      errors.shipping_address = "Street address / house details are required.";
+    }
+    return errors;
   };
 
   const handlePlaceOrder = async () => {
@@ -81,9 +120,11 @@ export default function CheckoutPage() {
 
     const payload = {};
     if (user) {
-      if (useNewAddress || !selectedAddressId) {
-        if (!guestForm.shipping_address) {
-          toast.error("Please enter a shipping address.");
+      if (usingInlineAddress) {
+        const errors = validateGuestForm();
+        if (Object.keys(errors).length) {
+          setFormErrors(errors);
+          toast.error("Please fix the highlighted fields.");
           return;
         }
         payload.shipping_name = guestForm.shipping_name;
@@ -94,12 +135,10 @@ export default function CheckoutPage() {
         payload.shipping_address_id = Number(selectedAddressId);
       }
     } else {
-      if (!guestForm.email) {
-        toast.error("Please enter your email.");
-        return;
-      }
-      if (!guestForm.shipping_address) {
-        toast.error("Please enter a shipping address.");
+      const errors = validateGuestForm();
+      if (Object.keys(errors).length) {
+        setFormErrors(errors);
+        toast.error("Please fix the highlighted fields.");
         return;
       }
       payload.email = guestForm.email;
@@ -122,6 +161,10 @@ export default function CheckoutPage() {
     }
   };
 
+  const selectedAddress = addresses.find((a) => String(a.id) === String(selectedAddressId));
+  const activeDistrict = usingInlineAddress ? guestForm.shipping_district : selectedAddress?.district;
+  const deliveryFee = getDeliveryFee(activeDistrict);
+
   if (loading) {
     return <div className="mx-auto max-w-5xl px-6 py-16 text-sm text-neutral-500">Loading checkout...</div>;
   }
@@ -139,7 +182,7 @@ export default function CheckoutPage() {
 
   const items = cart?.items || [];
   const subtotal = Number(cart?.subtotal || 0);
-  const total = subtotal + ESTIMATED_SHIPPING;
+  const total = subtotal + (deliveryFee ?? 0);
 
   return (
     <div className="mx-auto max-w-5xl px-6 py-10 sm:px-8">
@@ -195,61 +238,112 @@ export default function CheckoutPage() {
               </div>
             )}
 
-            {(!user || useNewAddress || addresses.length === 0) && (
+            {usingInlineAddress && (
               <div className="flex flex-col gap-3">
                 {!user && (
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-700">Email</label>
+                    <label htmlFor="email" className="mb-1 block text-xs font-medium text-neutral-700">
+                      Email address <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="email"
+                      id="email"
                       name="email"
                       value={guestForm.email}
                       onChange={handleGuestChange}
-                      required
-                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary) ${
+                        formErrors.email ? "border-red-400" : "border-neutral-300"
+                      }`}
                     />
+                    {formErrors.email && <p className="mt-1 text-xs text-red-500">{formErrors.email}</p>}
                   </div>
                 )}
                 <div className="grid gap-3 sm:grid-cols-2">
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-700">Full name</label>
+                    <label htmlFor="shipping_name" className="mb-1 block text-xs font-medium text-neutral-700">
+                      Full name <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="text"
+                      id="shipping_name"
                       name="shipping_name"
                       value={guestForm.shipping_name}
                       onChange={handleGuestChange}
-                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary) ${
+                        formErrors.shipping_name ? "border-red-400" : "border-neutral-300"
+                      }`}
                     />
+                    {formErrors.shipping_name && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.shipping_name}</p>
+                    )}
                   </div>
                   <div>
-                    <label className="mb-1 block text-xs font-medium text-neutral-700">Phone</label>
+                    <label htmlFor="shipping_phone" className="mb-1 block text-xs font-medium text-neutral-700">
+                      Phone number <span className="text-red-500">*</span>
+                    </label>
                     <input
                       type="tel"
+                      id="shipping_phone"
                       name="shipping_phone"
+                      placeholder="01XXXXXXXXX"
                       value={guestForm.shipping_phone}
                       onChange={handleGuestChange}
-                      className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                      className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary) ${
+                        formErrors.shipping_phone ? "border-red-400" : "border-neutral-300"
+                      }`}
                     />
+                    {formErrors.shipping_phone && (
+                      <p className="mt-1 text-xs text-red-500">{formErrors.shipping_phone}</p>
+                    )}
                   </div>
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-700">Address</label>
+                  <label htmlFor="district" className="mb-1 block text-xs font-medium text-neutral-700">
+                    District <span className="text-red-500">*</span>
+                  </label>
+                  <DistrictSelect
+                    id="district"
+                    value={guestForm.shipping_district}
+                    onChange={handleDistrictChange}
+                    error={formErrors.shipping_district}
+                  />
+                  <p className="mt-1 text-xs text-neutral-500">
+                    {deliveryFee != null
+                      ? `Delivery charge: ৳${deliveryFee} (${
+                          guestForm.shipping_district === "Dhaka" ? "inside Dhaka" : "outside Dhaka"
+                        })`
+                      : "Select a district to calculate delivery charge"}
+                  </p>
+                </div>
+                <div>
+                  <label htmlFor="shipping_address" className="mb-1 block text-xs font-medium text-neutral-700">
+                    Full street address / house details <span className="text-red-500">*</span>
+                  </label>
                   <textarea
+                    id="shipping_address"
                     name="shipping_address"
                     value={guestForm.shipping_address}
                     onChange={handleGuestChange}
                     rows={3}
-                    required
-                    className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                    className={`w-full rounded-lg border px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary) ${
+                      formErrors.shipping_address ? "border-red-400" : "border-neutral-300"
+                    }`}
                   />
+                  {formErrors.shipping_address && (
+                    <p className="mt-1 text-xs text-red-500">{formErrors.shipping_address}</p>
+                  )}
                 </div>
                 <div>
-                  <label className="mb-1 block text-xs font-medium text-neutral-700">District</label>
-                  <input
-                    type="text"
-                    name="shipping_district"
-                    value={guestForm.shipping_district}
+                  <label htmlFor="order_note" className="mb-1 block text-xs font-medium text-neutral-700">
+                    Order note / special instructions <span className="text-neutral-400">(optional)</span>
+                  </label>
+                  <textarea
+                    id="order_note"
+                    name="order_note"
+                    value={guestForm.order_note}
                     onChange={handleGuestChange}
+                    rows={2}
+                    placeholder="E.g. call before delivery, leave with security guard, etc."
                     className="w-full rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
                   />
                 </div>
@@ -311,8 +405,12 @@ export default function CheckoutPage() {
             <span className="font-medium text-(--primary)">৳{subtotal.toFixed(2)}</span>
           </div>
           <div className="flex justify-between border-b border-neutral-100 py-3 text-sm">
-            <span className="text-neutral-500">Shipping</span>
-            <span className="font-medium text-(--primary)">৳{ESTIMATED_SHIPPING.toFixed(2)}</span>
+            <span className="text-neutral-500">Delivery charge</span>
+            <span className="font-medium text-(--primary)">
+              {deliveryFee != null ? `৳${deliveryFee.toFixed(2)}` : (
+                <span className="text-xs font-normal text-neutral-400">Select a district</span>
+              )}
+            </span>
           </div>
           <div className="flex justify-between py-4 text-base font-semibold text-(--primary)">
             <span>Total</span>

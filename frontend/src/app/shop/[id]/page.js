@@ -639,7 +639,7 @@ export default function ProductDetailsPage() {
 
       {relatedProducts.length > 0 && (
         <div className="mt-16 border-t border-neutral-100 pt-10">
-          <h2 className="font-sora mb-6 text-2xl font-bold text-neutral-900">Would you like?</h2>
+          <h2 className="font-sora mb-6 text-2xl font-bold text-neutral-900">You may also like</h2>
           <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
             {relatedProducts.map((relatedProduct) => (
               <ProductCard key={relatedProduct.id} product={relatedProduct} />

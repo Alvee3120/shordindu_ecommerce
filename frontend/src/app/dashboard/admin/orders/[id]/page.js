@@ -108,13 +108,6 @@ export default function AdminOrderDetailPage() {
 
         <div className="flex flex-col gap-6">
           <div className="rounded-xl border border-neutral-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold text-neutral-900">Customer</h2>
-            <p className="text-sm text-neutral-600">
-              {order.guest_email || `User #${order.user ?? "—"}`}
-            </p>
-          </div>
-
-          <div className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="mb-3 text-sm font-semibold text-neutral-900">Shipping Address</h2>
             {order.shipping_address_detail ? (
               <div className="text-sm text-neutral-600">

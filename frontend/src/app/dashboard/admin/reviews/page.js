@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
-import { FiStar, FiTrash2 } from "react-icons/fi";
-import { listReviews, deleteReview } from "@/lib/reviews";
+import { FiStar, FiTrash2, FiCheck } from "react-icons/fi";
+import { listReviews, deleteReview, approveReview } from "@/lib/reviews";
 
 export default function AdminReviewsPage() {
   const [reviews, setReviews] = useState([]);
@@ -11,6 +12,7 @@ export default function AdminReviewsPage() {
   const [page, setPage] = useState(1);
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
+  const [approvingId, setApprovingId] = useState(null);
 
   const load = async (p = page) => {
     setLoading(true);
@@ -41,6 +43,19 @@ export default function AdminReviewsPage() {
       toast.error(err.message);
     } finally {
       setDeletingId(null);
+    }
+  };
+
+  const handleApprove = async (id) => {
+    setApprovingId(id);
+    try {
+      const updated = await approveReview(id);
+      toast.success("Review approved");
+      setReviews((prev) => prev.map((r) => (r.id === id ? updated : r)));
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setApprovingId(null);
     }
   };
 
@@ -75,6 +90,17 @@ export default function AdminReviewsPage() {
                   <span className="text-xs text-neutral-400">
                     {new Date(review.created_at).toLocaleDateString()}
                   </span>
+                  <span
+                    className={`rounded-full px-2 py-0.5 text-xs font-medium capitalize ${
+                      review.status === "approved"
+                        ? "bg-green-100 text-green-700"
+                        : review.status === "rejected"
+                          ? "bg-red-100 text-red-700"
+                          : "bg-amber-100 text-amber-700"
+                    }`}
+                  >
+                    {review.status}
+                  </span>
                 </div>
                 <p className="font-medium text-neutral-900">
                   {review.product_name || `Product #${review.product}`}
@@ -82,19 +108,42 @@ export default function AdminReviewsPage() {
                 {review.comment && (
                   <p className="mt-1 text-sm text-neutral-600">{review.comment}</p>
                 )}
+                {review.image && (
+                  <a
+                    href={review.image}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="relative mt-2 block h-20 w-20 overflow-hidden rounded-lg border border-neutral-200"
+                  >
+                    <Image src={review.image} alt="" fill className="object-cover" sizes="80px" />
+                  </a>
+                )}
                 <p className="mt-1 text-xs text-neutral-400">
                   by {review.user_name || `User #${review.user}`}
                 </p>
               </div>
-              <button
-                type="button"
-                onClick={() => handleDelete(review.id)}
-                disabled={deletingId === review.id}
-                className="flex shrink-0 items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-              >
-                <FiTrash2 size={14} />
-                {deletingId === review.id ? "Deleting..." : "Delete"}
-              </button>
+              <div className="flex shrink-0 items-center gap-3">
+                {review.status !== "approved" && (
+                  <button
+                    type="button"
+                    onClick={() => handleApprove(review.id)}
+                    disabled={approvingId === review.id}
+                    className="flex items-center gap-1.5 text-sm font-medium text-green-600 hover:text-green-700 disabled:opacity-50"
+                  >
+                    <FiCheck size={14} />
+                    {approvingId === review.id ? "Approving..." : "Approve"}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => handleDelete(review.id)}
+                  disabled={deletingId === review.id}
+                  className="flex items-center gap-1.5 text-sm font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
+                >
+                  <FiTrash2 size={14} />
+                  {deletingId === review.id ? "Deleting..." : "Delete"}
+                </button>
+              </div>
             </div>
           ))}
         </div>

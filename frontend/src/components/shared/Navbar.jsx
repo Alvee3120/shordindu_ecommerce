@@ -4,11 +4,11 @@ import { useState, useEffect } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { FiMenu, FiX, FiSearch } from "react-icons/fi";
+import { FiMenu, FiX, FiSearch, FiChevronDown } from "react-icons/fi";
 import { FaShoppingCart, FaUser } from "react-icons/fa";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { getCategories } from "@/lib/categories";
+import { getCategories, buildCategoryTree } from "@/lib/categories";
 import SearchBar from "./SearchBar";
 
 const logoSrcLight = "/assets/logo/logolight.png";
@@ -45,13 +45,16 @@ export default function Navbar() {
   }, []);
 
   const navLinks = [
-    ...staticLinks,
-    ...categories
-      .filter((cat) => !cat.parent)
+    ...staticLinks.map((link) => ({ ...link, children: [] })),
+    ...buildCategoryTree(categories)
       .slice(0, 4)
       .map((cat) => ({
         label: cat.name,
         href: `/shop?category=${cat.id}`,
+        children: cat.children.map((child) => ({
+          label: child.name,
+          href: `/shop?category=${child.id}`,
+        })),
       })),
   ];
 
@@ -82,6 +85,16 @@ export default function Navbar() {
     window.addEventListener("resize", handleResize);
     return () => window.removeEventListener("resize", handleResize);
   }, []);
+
+  const [expandedLinks, setExpandedLinks] = useState(() => new Set());
+  const toggleExpandedLink = (href) => {
+    setExpandedLinks((prev) => {
+      const next = new Set(prev);
+      if (next.has(href)) next.delete(href);
+      else next.add(href);
+      return next;
+    });
+  };
 
   const openMenu = () => {
     setSearchOpen(false);
@@ -114,13 +127,30 @@ export default function Navbar() {
           <div className="flex flex-1 items-center">
             <ul className="hidden items-center gap-8 md:flex">
               {navLinks.map((link) => (
-                <li key={link.href}>
+                <li key={link.href} className="group relative">
                   <Link
                     href={link.href}
-                    className={`text-sm font-medium transition-colors ${linkColorClass}`}
+                    className={`flex items-center gap-1 text-sm font-medium transition-colors ${linkColorClass}`}
                   >
                     {link.label}
+                    {link.children.length > 0 && (
+                      <FiChevronDown size={14} className="transition-transform duration-200 group-hover:rotate-180" />
+                    )}
                   </Link>
+
+                  {link.children.length > 0 && (
+                    <div className="invisible absolute top-full left-0 z-50 min-w-40 translate-y-1 rounded-lg border border-neutral-100 bg-white py-2 opacity-0 shadow-lg transition-all duration-150 group-hover:visible group-hover:translate-y-2 group-hover:opacity-100">
+                      {link.children.map((child) => (
+                        <Link
+                          key={child.href}
+                          href={child.href}
+                          className="block px-4 py-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-(--primary)"
+                        >
+                          {child.label}
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </li>
               ))}
             </ul>
@@ -193,8 +223,8 @@ export default function Navbar() {
 
         {/* Mobile search bar */}
         <div
-          className={`overflow-hidden transition-all duration-300 md:hidden ${
-            searchOpen ? "max-h-20 border-t border-gray-200" : "max-h-0"
+          className={`transition-all duration-300 md:hidden ${
+            searchOpen ? "max-h-20 overflow-visible border-t border-gray-200" : "max-h-0 overflow-hidden"
           }`}
         >
           <div className="bg-white/90 px-4 py-3 backdrop-blur-md">
@@ -231,13 +261,50 @@ export default function Navbar() {
           <ul className="flex flex-col gap-1 px-3 py-4">
             {navLinks.map((link) => (
               <li key={link.href}>
-                <Link
-                  href={link.href}
-                  onClick={() => setMenuOpen(false)}
-                  className="block rounded-md px-3 py-3 text-base font-medium text-gray-700 hover:bg-gray-100 hover:text-(--primary)/90"
-                >
-                  {link.label}
-                </Link>
+                <div className="flex items-center">
+                  <Link
+                    href={link.href}
+                    onClick={() => setMenuOpen(false)}
+                    className="block flex-1 rounded-md px-3 py-3 text-base font-medium text-gray-700 hover:bg-gray-100 hover:text-(--primary)/90"
+                  >
+                    {link.label}
+                  </Link>
+                  {link.children.length > 0 && (
+                    <button
+                      type="button"
+                      onClick={() => toggleExpandedLink(link.href)}
+                      aria-label={expandedLinks.has(link.href) ? `Collapse ${link.label}` : `Expand ${link.label}`}
+                      aria-expanded={expandedLinks.has(link.href)}
+                      className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-gray-400 hover:text-(--primary)"
+                    >
+                      <FiChevronDown
+                        size={16}
+                        className={`transition-transform duration-200 ${expandedLinks.has(link.href) ? "rotate-180" : ""}`}
+                      />
+                    </button>
+                  )}
+                </div>
+                {link.children.length > 0 && (
+                  <div
+                    className={`overflow-hidden transition-all duration-300 ${
+                      expandedLinks.has(link.href) ? "max-h-60 opacity-100" : "max-h-0 opacity-0"
+                    }`}
+                  >
+                    <ul className="ml-3 flex flex-col gap-0.5 border-l border-gray-200 py-1 pl-3">
+                      {link.children.map((child) => (
+                        <li key={child.href}>
+                          <Link
+                            href={child.href}
+                            onClick={() => setMenuOpen(false)}
+                            className="block rounded-md px-3 py-2 text-sm text-gray-600 hover:bg-gray-100 hover:text-(--primary)/90"
+                          >
+                            {child.label}
+                          </Link>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                )}
               </li>
             ))}
           </ul>

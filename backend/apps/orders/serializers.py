@@ -46,6 +46,7 @@ class OrderSerializer(serializers.ModelSerializer):
     payments = PaymentSerializer(many=True, read_only=True)
     coupons = OrderCouponSerializer(source="order_coupons", many=True, read_only=True)
     shipping_address_detail = AddressSerializer(source="shipping_address", read_only=True)
+    user_name = serializers.CharField(source="user.name", read_only=True, default=None)
 
     class Meta:
         model = Order
@@ -53,6 +54,7 @@ class OrderSerializer(serializers.ModelSerializer):
             "id",
             "order_number",
             "user",
+            "user_name",
             "guest_email",
             "status",
             "subtotal",

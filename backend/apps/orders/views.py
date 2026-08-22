@@ -1,4 +1,5 @@
 from rest_framework import permissions, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
@@ -52,6 +53,33 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         if user.is_staff:
             return Order.objects.all().order_by("-placed_at")
         return Order.objects.filter(user=user).order_by("-placed_at")
+
+    def get_permissions(self):
+        if self.action in ("confirm", "cancel", "ship", "deliver"):
+            return [IsStaffOnly()]
+        return super().get_permissions()
+
+    def _set_status(self, new_status):
+        order = self.get_object()
+        order.status = new_status
+        order.save(update_fields=["status"])
+        return Response(self.get_serializer(order).data)
+
+    @action(detail=True, methods=["post"])
+    def confirm(self, request, pk=None):
+        return self._set_status(Order.Status.PROCESSING)
+
+    @action(detail=True, methods=["post"])
+    def cancel(self, request, pk=None):
+        return self._set_status(Order.Status.CANCELLED)
+
+    @action(detail=True, methods=["post"])
+    def ship(self, request, pk=None):
+        return self._set_status(Order.Status.SHIPPED)
+
+    @action(detail=True, methods=["post"])
+    def deliver(self, request, pk=None):
+        return self._set_status(Order.Status.DELIVERED)
 
 
 class CouponViewSet(viewsets.ModelViewSet):

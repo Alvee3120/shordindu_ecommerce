@@ -23,3 +23,20 @@ export function getOrder(id) {
 export function checkout(payload) {
   return apiFetch("/checkout/", { method: "POST", body: payload });
 }
+
+// Admin-only order status transitions.
+export function confirmOrder(id) {
+  return apiFetch(`/orders/${id}/confirm/`, { method: "POST" });
+}
+
+export function cancelOrder(id) {
+  return apiFetch(`/orders/${id}/cancel/`, { method: "POST" });
+}
+
+export function shipOrder(id) {
+  return apiFetch(`/orders/${id}/ship/`, { method: "POST" });
+}
+
+export function deliverOrder(id) {
+  return apiFetch(`/orders/${id}/deliver/`, { method: "POST" });
+}

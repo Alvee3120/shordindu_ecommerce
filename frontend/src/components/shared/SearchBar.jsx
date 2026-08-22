@@ -127,7 +127,7 @@ export default function SearchBar({ className = "", inputClassName = "", autoFoc
                 onClick={() => goToShopSearch(query)}
                 className="block w-full rounded-b-2xl border-t border-neutral-100 px-4 py-3 text-center text-sm font-semibold text-(--primary) transition-colors hover:bg-neutral-50"
               >
-                View More / See All Results
+                 See All Results
               </button>
             </>
           ) : !loading ? (

@@ -2,19 +2,73 @@
 
 import { useMemo, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
+import { buildCategoryTree } from "@/lib/categories";
 
-function buildCategoryTree(categoryList) {
-  const byParent = new Map();
-  categoryList.forEach((cat) => {
-    const parentId = cat.parent ?? null;
-    if (!byParent.has(parentId)) byParent.set(parentId, []);
-    byParent.get(parentId).push(cat);
-  });
-  const parents = byParent.get(null) || [];
-  return parents.map((parent) => ({
-    ...parent,
-    children: byParent.get(parent.id) || [],
-  }));
+const PRICE_BOUNDS = { min: 0, max: 5000, step: 50 };
+
+const rangeThumbClass =
+  "pointer-events-none absolute inset-x-0 top-1/2 h-1.5 w-full -translate-y-1/2 appearance-none bg-transparent " +
+  "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 " +
+  "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 " +
+  "[&::-webkit-slider-thumb]:border-(--primary) [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow " +
+  "[&::-webkit-slider-thumb]:cursor-pointer " +
+  "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 " +
+  "[&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 " +
+  "[&::-moz-range-thumb]:border-(--primary) [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow " +
+  "[&::-moz-range-thumb]:cursor-pointer [&::-moz-range-track]:bg-transparent";
+
+function PriceRangeSlider({ minPrice, maxPrice, onPriceChange }) {
+  const { min: boundMin, max: boundMax, step } = PRICE_BOUNDS;
+  const minVal = minPrice === "" ? boundMin : Number(minPrice);
+  const maxVal = maxPrice === "" ? boundMax : Number(maxPrice);
+
+  const minPercent = ((minVal - boundMin) / (boundMax - boundMin)) * 100;
+  const maxPercent = ((maxVal - boundMin) / (boundMax - boundMin)) * 100;
+
+  const handleMinChange = (e) => {
+    const value = Math.min(Number(e.target.value), maxVal - step);
+    onPriceChange("minPrice", value <= boundMin ? "" : String(value));
+  };
+
+  const handleMaxChange = (e) => {
+    const value = Math.max(Number(e.target.value), minVal + step);
+    onPriceChange("maxPrice", value >= boundMax ? "" : String(value));
+  };
+
+  return (
+    <div>
+      <div className="relative h-1.5 rounded-full bg-neutral-200">
+        <div
+          className="absolute h-1.5 rounded-full bg-(--primary)"
+          style={{ left: `${minPercent}%`, right: `${100 - maxPercent}%` }}
+        />
+        <input
+          type="range"
+          min={boundMin}
+          max={boundMax}
+          step={step}
+          value={minVal}
+          onChange={handleMinChange}
+          aria-label="Minimum price"
+          className={rangeThumbClass}
+        />
+        <input
+          type="range"
+          min={boundMin}
+          max={boundMax}
+          step={step}
+          value={maxVal}
+          onChange={handleMaxChange}
+          aria-label="Maximum price"
+          className={rangeThumbClass}
+        />
+      </div>
+      <p className="mt-4 text-center text-sm font-medium text-neutral-700">
+        ৳{minVal} – ৳{maxVal}
+        {maxVal >= boundMax && "+"}
+      </p>
+    </div>
+  );
 }
 
 /**
@@ -119,25 +173,11 @@ export default function FilterSidebar({
         <h3 className="font-sora mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-900">
           Price Range
         </h3>
-        <div className="flex items-center gap-2">
-          <input
-            type="number"
-            min="0"
-            placeholder="Min"
-            value={filters.minPrice}
-            onChange={(e) => onPriceChange("minPrice", e.target.value)}
-            className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-(--primary)"
-          />
-          <span className="text-neutral-400">–</span>
-          <input
-            type="number"
-            min="0"
-            placeholder="Max"
-            value={filters.maxPrice}
-            onChange={(e) => onPriceChange("maxPrice", e.target.value)}
-            className="w-full rounded-lg border border-neutral-200 px-3 py-2 text-sm outline-none focus:border-(--primary)"
-          />
-        </div>
+        <PriceRangeSlider
+          minPrice={filters.minPrice}
+          maxPrice={filters.maxPrice}
+          onPriceChange={onPriceChange}
+        />
       </div>
 
       <div className="flex items-center gap-3 pt-2">

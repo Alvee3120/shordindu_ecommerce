@@ -128,7 +128,7 @@ export default function OrdersPage() {
                     </td>
                     <td className="px-5 py-3 text-right">
                       <Link
-                        href={`/dashboard/orders/${order.id}`}
+                        href={`/dashboard/customer/orders/${order.id}`}
                         className="inline-flex items-center gap-1 text-sm font-medium text-(--primary) hover:underline"
                       >
                         Details <FiChevronRight size={14} />

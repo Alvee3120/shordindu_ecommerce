@@ -43,11 +43,11 @@ export default function ProductReviews({ productId }) {
     if (!productId) return;
     let cancelled = false;
     setLoading(true);
-    listReviews({ product: productId })
+    listReviews({ product: productId, status: "approved" })
       .then((data) => {
         if (cancelled) return;
         const results = Array.isArray(data) ? data : data?.results ?? [];
-        setReviews(results);
+        setReviews(results.slice(0, 3));
       })
       .catch(() => {
         if (!cancelled) setReviews([]);
@@ -79,12 +79,11 @@ export default function ProductReviews({ productId }) {
     }
     setSubmitting(true);
     try {
-      const newReview = await createReview({ product: productId, rating, comment, image });
-      setReviews((prev) => [newReview, ...prev]);
+      await createReview({ product: productId, rating, comment, image });
       setRating(5);
       setComment("");
       clearImage();
-      toast.success("Review posted.");
+      toast.success("Review submitted for approval.");
     } catch (err) {
       toast.error(err.message || "Could not post review.");
     } finally {

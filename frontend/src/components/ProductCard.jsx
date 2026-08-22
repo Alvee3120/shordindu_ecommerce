@@ -53,16 +53,16 @@ export default function ProductCard({ product }) {
         </Link>
 
         {description && (
-          <p className="line-clamp-2 text-sm text-neutral-500">{description}</p>
+          <p className="line-clamp-2 text-[10px]  sm:text-sm text-neutral-500">{description}</p>
         )}
 
-        <div className="mt-1 flex items-center justify-between gap-1.5 sm:mt-2 sm:gap-2">
-          <span className="text-sm font-bold text-neutral-900 sm:text-lg">
+        <div className="mt-1 flex items-center justify-between gap-1 sm:mt-2 sm:gap-2">
+          <span className="text-xs font-bold text-neutral-900 sm:text-lg">
             {price != null ? `৳ ${price}` : "—"}
           </span>
           <Link
             href={href}
-            className="rounded-full bg-neutral-900 px-2.5 py-1.5 text-[11px] font-semibold whitespace-nowrap text-white transition-colors hover:bg-(--primary) sm:px-4 sm:py-2 sm:text-xs"
+            className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] font-semibold whitespace-nowrap text-white transition-colors hover:bg-(--primary) sm:px-4 sm:py-2 sm:text-xs"
           >
             View Options
           </Link>

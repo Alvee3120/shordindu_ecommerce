@@ -191,16 +191,16 @@ function ShopPageContent() {
   }, [urlSearch]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pb-16 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 pt-28 sm:pt-24 pb-16 sm:px-6">
       <div className="mb-6 flex items-center justify-between gap-4">
-        <div>
-          <h1 className="font-sora text-2xl font-bold text-neutral-900 sm:text-3xl">{heading}</h1>
+        <div className="min-w-0 flex-1">
+          <h1 className="font-sora truncate text-2xl font-bold text-neutral-900 sm:text-3xl">{heading}</h1>
           <p className="mt-1 text-sm text-neutral-500">{count} products found</p>
         </div>
         <button
           type="button"
           onClick={() => setDrawerOpen(true)}
-          className="flex items-center gap-2 rounded-full border border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-(--primary) hover:text-white lg:hidden"
+          className="flex shrink-0 items-center gap-2 rounded-full border border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-(--primary) hover:text-white lg:hidden"
         >
           <FiFilter size={16} />
           Filter

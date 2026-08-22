@@ -1,17 +1,12 @@
+"use client";
+
+import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { FaInstagram, FaFacebookF } from "react-icons/fa";
+import { getCategories } from "@/lib/categories";
 
 const logoSrc = "/assets/logo/logoDark.png";
-
-const categoryLinks = [
-  { label: "Men", href: "/men" },
-  { label: "Women", href: "/women" },
-  { label: "Dress", href: "/dress" },
-  { label: "Saree", href: "/saree" },
-  { label: "Panjabi", href: "/panjabi" },
-  { label: "Bags", href: "/bags" },
-];
 
 const policyLinks = [
   { label: "Terms & Conditions", href: "/footerLinks/terms" },
@@ -24,6 +19,26 @@ const otherLinks = [
 ];
 
 export default function FooterT() {
+  const [categoryLinks, setCategoryLinks] = useState([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    getCategories()
+      .then((data) => {
+        if (cancelled) return;
+        const results = Array.isArray(data) ? data : data.results ?? [];
+        setCategoryLinks(
+          results.map((cat) => ({ id: cat.id, label: cat.name, href: `/shop?category=${cat.id}` }))
+        );
+      })
+      .catch(() => {
+        if (!cancelled) setCategoryLinks([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   return (
     <footer className="relative overflow-hidden bg-(--primary) text-white">
       {/* Giant brand signature — background layer */}
@@ -77,7 +92,7 @@ export default function FooterT() {
             </h4>
             <ul className="flex flex-col gap-3">
               {categoryLinks.map((link) => (
-                <li key={link.href}>
+                <li key={link.id}>
                   <Link
                     href={link.href}
                     className="text-[15px] text-gray-200 transition-colors hover:text-white"
