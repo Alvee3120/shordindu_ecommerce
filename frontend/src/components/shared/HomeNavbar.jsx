@@ -6,20 +6,21 @@ import Link from "next/link";
 import { FiMenu, FiX, FiSearch } from "react-icons/fi";
 import { FaShoppingCart, FaUser } from "react-icons/fa";
 import { useAuth } from "@/context/AuthContext";
+import { useCart } from "@/context/CartContext";
+import { getCategories } from "@/lib/categories";
+import SearchBar from "./SearchBar";
 
 const logoSrcLight = "/assets/logo/logolight.png";
 const logoSrcDark = "/assets/logo/logoDark.png";
 
-const navLinks = [
+const staticLinks = [
   { label: "Home", href: "/" },
   { label: "Shop", href: "/shop" },
-  { label: "Men", href: "/men" },
-  { label: "Women", href: "/women" },
-  { label: "Bag", href: "/bag" },
 ];
 
 export default function HomeNavbar() {
   const { user, isAuthenticated } = useAuth();
+  const { cartCount } = useCart();
   const dashboardHrefByRole = {
     admin: "/dashboard/admin",
     staff: "/dashboard/staff",
@@ -31,6 +32,24 @@ export default function HomeNavbar() {
   const [scrolled, setScrolled] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [categories, setCategories] = useState([]);
+
+  useEffect(() => {
+    getCategories()
+      .then((data) => setCategories(Array.isArray(data) ? data : data?.results ?? []))
+      .catch(() => setCategories([]));
+  }, []);
+
+  const navLinks = [
+    ...staticLinks,
+    ...categories
+      .filter((cat) => !cat.parent)
+      .slice(0, 4)
+      .map((cat) => ({
+        label: cat.name,
+        href: `/shop?category=${cat.id}`,
+      })),
+  ];
 
   useEffect(() => {
     const handleScroll = () => setScrolled(window.scrollY > 20);
@@ -131,14 +150,7 @@ export default function HomeNavbar() {
           {/* Right: search + user + cart */}
           <div className="flex flex-1 items-center justify-end sm:gap-1">
             {/* desktop inline search */}
-            <div className="hidden w-56 items-center gap-2 rounded-full bg-gray-100 px-4 py-2 lg:flex">
-              <FiSearch size={16} className="text-gray-400" />
-              <input
-                type="text"
-                placeholder="Search"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
-              />
-            </div>
+            <SearchBar className="hidden w-64 lg:block" />
 
             {/* mobile search icon toggle */}
             <button
@@ -167,10 +179,11 @@ export default function HomeNavbar() {
               className={`relative flex items-center justify-center rounded-full p-2 transition-colors ${iconColorClass}`}
             >
               <FaShoppingCart size={20} />
-              {/* optional item-count badge */}
-              <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
-                2
-              </span>
+              {cartCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 flex h-4 w-4 items-center justify-center rounded-full bg-red-500 text-[10px] text-white">
+                  {cartCount > 9 ? "9+" : cartCount}
+                </span>
+              )}
             </Link>
           </div>
         </nav>
@@ -182,15 +195,7 @@ export default function HomeNavbar() {
           }`}
         >
           <div className="bg-white/90 px-4 py-3 backdrop-blur-md">
-            <div className="flex items-center gap-2 rounded-full bg-gray-100 px-4 py-2">
-              <FiSearch size={16} className="text-gray-400" />
-              <input
-                type="text"
-                autoFocus={searchOpen}
-                placeholder="Search"
-                className="w-full bg-transparent text-sm outline-none placeholder:text-gray-400"
-              />
-            </div>
+            <SearchBar autoFocus={searchOpen} onNavigate={() => setSearchOpen(false)} />
           </div>
         </div>
       </header>

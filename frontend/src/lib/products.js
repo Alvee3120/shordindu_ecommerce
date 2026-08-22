@@ -1,18 +1,52 @@
 // lib/products.js
 import { apiFetch } from "./api";
 
-export function listProducts({ page, page_size, search, category } = {}) {
+export function listProducts({
+  page,
+  page_size,
+  search,
+  category,
+  min_price,
+  max_price,
+  ordering,
+} = {}) {
   const params = new URLSearchParams();
   if (page) params.set("page", page);
   if (page_size) params.set("page_size", page_size);
   if (search) params.set("search", search);
   if (category) params.set("category", category);
+  if (min_price != null && min_price !== "") params.set("min_price", min_price);
+  if (max_price != null && max_price !== "") params.set("max_price", max_price);
+  if (ordering) params.set("ordering", ordering);
   const query = params.toString();
   return apiFetch(`/products/${query ? `?${query}` : ""}`, { method: "GET" });
 }
 
+/** Flattens a raw API product into the shape ProductCard/SearchBar expect. */
+export function toCardProduct(product) {
+  const primaryImage =
+    product.images?.find((i) => i.is_primary)?.image || product.images?.[0]?.image || null;
+  const firstVariation = product.variations?.[0];
+  return {
+    id: product.id,
+    name: product.name,
+    description: product.description,
+    image: primaryImage,
+    price: firstVariation?.price ?? null,
+    rating: product.average_rating ?? 0,
+    reviewCount: product.review_count ?? 0,
+    variationId: firstVariation?.id ?? null,
+    inStock: (firstVariation?.stock_quantity ?? 0) > 0,
+    href: `/shop/${product.id}`,
+  };
+}
+
 export function getProduct(id) {
   return apiFetch(`/products/${id}/`, { method: "GET" });
+}
+
+export function getProductAddons(id) {
+  return apiFetch(`/products/${id}/addons/`, { method: "GET" });
 }
 
 export function createProduct(payload) {

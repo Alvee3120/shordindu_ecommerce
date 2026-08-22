@@ -10,6 +10,8 @@ from .models import Cart, CartItem
 class CartItemSerializer(serializers.ModelSerializer):
     product_name = serializers.CharField(source="product.name", read_only=True)
     variation_sku = serializers.CharField(source="variation.sku", read_only=True)
+    variation_label = serializers.SerializerMethodField()
+    product_image = serializers.SerializerMethodField()
     line_total = serializers.SerializerMethodField()
     children = serializers.SerializerMethodField()
 
@@ -19,8 +21,10 @@ class CartItemSerializer(serializers.ModelSerializer):
             "id",
             "product",
             "product_name",
+            "product_image",
             "variation",
             "variation_sku",
+            "variation_label",
             "quantity",
             "unit_price_snapshot",
             "line_total",
@@ -31,6 +35,24 @@ class CartItemSerializer(serializers.ModelSerializer):
 
     def get_line_total(self, obj):
         return obj.unit_price_snapshot * obj.quantity
+
+    def get_variation_label(self, obj):
+        values = [av.attribute_value.value for av in obj.variation.variation_attribute_values.all()]
+        return " / ".join(values)
+
+    def get_product_image(self, obj):
+        # Prefer an image tied to this exact variation, then the product's
+        # primary image, then whatever's first — mirrors the storefront PDP.
+        image = (
+            obj.product.images.filter(variation=obj.variation).first()
+            or obj.product.images.filter(is_primary=True).first()
+            or obj.product.images.first()
+        )
+        if not image:
+            return None
+        request = self.context.get("request")
+        url = image.image.url
+        return request.build_absolute_uri(url) if request else url
 
     def get_children(self, obj):
         # Self-referential nesting: resolved by name at call time, not class

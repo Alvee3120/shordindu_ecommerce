@@ -13,3 +13,13 @@ export function listOrders({ page, status, payment_status } = {}) {
 export function getOrder(id) {
   return apiFetch(`/orders/${id}/`, { method: "GET" });
 }
+
+/**
+ * Places the order for whatever's in the current cart (cash on delivery is
+ * the only payment method the backend supports, so there's no method field).
+ * Pass shipping_address_id for a saved address, or the shipping_* inline
+ * fields (+ email for a guest) to ship somewhere new.
+ */
+export function checkout(payload) {
+  return apiFetch("/checkout/", { method: "POST", body: payload });
+}

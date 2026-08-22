@@ -7,6 +7,7 @@ import SmoothScroll from "@/components/shared/SmoothScroll";
 import AppLoadingShell from "./AppLoadingShell";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
+import { CartProvider } from "@/context/CartContext";
 
 export const myFonts = localFont({
   src: [
@@ -47,14 +48,16 @@ export default function RootLayout({ children }) {
       <body className="min-h-full flex flex-col">
         <Toaster position="top-center" richColors />
         <AuthProvider>
-          <SmoothScroll>
-            <AppLoadingShell brandText="shordindu">
-              <NavbarSwitcher />
-              <main>{children}</main>
-              {/* <Footer /> */}
-              <FooterT />
-            </AppLoadingShell>
-          </SmoothScroll>
+          <CartProvider>
+            <SmoothScroll>
+              <AppLoadingShell brandText="shordindu">
+                <NavbarSwitcher />
+                <main>{children}</main>
+                {/* <Footer /> */}
+                <FooterT />
+              </AppLoadingShell>
+            </SmoothScroll>
+          </CartProvider>
         </AuthProvider>
       </body>
     </html>

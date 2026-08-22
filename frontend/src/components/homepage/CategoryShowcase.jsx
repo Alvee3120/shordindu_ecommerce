@@ -22,7 +22,6 @@ export default function CategoryShowcase() {
         const results = Array.isArray(data) ? data : data.results ?? [];
         setCategories(
           results
-            .filter((cat) => !cat.parent)
             .map((cat) => ({
               id: cat.id,
               label: cat.name,
@@ -41,6 +40,8 @@ export default function CategoryShowcase() {
       cancelled = true;
     };
   }, []);
+
+  console.log(categories)
 
   const handleScroll = () => {
     const el = scrollRef.current;

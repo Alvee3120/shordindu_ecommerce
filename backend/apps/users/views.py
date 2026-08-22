@@ -1,4 +1,5 @@
 from django.conf import settings
+from kombu.exceptions import OperationalError as BrokerOperationalError
 from rest_framework import generics, permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -17,6 +18,7 @@ from .serializers import (
     SigninSerializer,
     SignupSerializer,
     UserSerializer,
+    UserUpdateSerializer,
 )
 from .tasks import send_welcome_email
 
@@ -29,7 +31,10 @@ class SignupView(APIView):
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
 
-        send_welcome_email.delay(user.id)
+        try:
+            send_welcome_email.delay(user.id)
+        except (BrokerOperationalError, ConnectionError):
+            pass
         merge_guest_cart(request, user)
 
         refresh = RefreshToken.for_user(user)
@@ -108,12 +113,24 @@ class ChangePasswordView(APIView):
         return Response(status=status.HTTP_200_OK)
 
 
-class MeView(generics.RetrieveAPIView):
-    serializer_class = UserSerializer
+class MeView(generics.RetrieveUpdateAPIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get_object(self):
         return self.request.user
+
+    def get_serializer_class(self):
+        if self.request.method in ("PUT", "PATCH"):
+            return UserUpdateSerializer
+        return UserSerializer
+
+    def update(self, request, *args, **kwargs):
+        partial = kwargs.pop("partial", False)
+        instance = self.get_object()
+        serializer = self.get_serializer(instance, data=request.data, partial=partial)
+        serializer.is_valid(raise_exception=True)
+        serializer.save()
+        return Response(UserSerializer(instance).data)
 
 
 class AddressViewSet(viewsets.ModelViewSet):

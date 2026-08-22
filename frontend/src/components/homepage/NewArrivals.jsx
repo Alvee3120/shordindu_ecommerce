@@ -61,7 +61,7 @@ export default function NewArrivals() {
                     description: product.description,
                     image: primaryImage,
                     price: price ?? "—",
-                    href: `/shop/${product.slug}`,
+                    href: `/shop/${product.id}`,
                   }}
                 />
               );

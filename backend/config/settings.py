@@ -180,6 +180,10 @@ CORS_ALLOW_ALL_ORIGINS = env("CORS_ALLOW_ALL_ORIGINS")
 # requests from the Next.js frontend, so credentialed CORS is required.
 CORS_ALLOW_CREDENTIALS = True
 
+# Django's CSRF middleware checks the Origin header against this list on
+# unsafe methods, independently of CORS_ALLOWED_ORIGINS above.
+CSRF_TRUSTED_ORIGINS = env.list("CSRF_TRUSTED_ORIGINS", default=["http://localhost:3000"])
+
 
 # --------------------------------------------------------------------------
 # Django REST Framework / drf-spectacular

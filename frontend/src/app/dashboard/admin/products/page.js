@@ -43,6 +43,7 @@ const EMPTY_VARIATION_ROW = () => ({
   compare_at_price: "",
   stock_quantity: "0",
   is_active: true,
+  attribute_value_ids: [],
   saving: false,
 });
 
@@ -83,6 +84,7 @@ export default function AdminProductsPage() {
   const [deletingVariationKey, setDeletingVariationKey] = useState(null);
 
   const [productImages, setProductImages] = useState([]);
+  const [pendingImages, setPendingImages] = useState([]); // [{key, file, preview}] for "new" products
   const [uploadingImage, setUploadingImage] = useState(false);
   const [deletingImageId, setDeletingImageId] = useState(null);
 
@@ -128,6 +130,8 @@ export default function AdminProductsPage() {
     setSelectedValues({});
     setVariations([EMPTY_VARIATION_ROW()]);
     setProductImages([]);
+    pendingImages.forEach((img) => URL.revokeObjectURL(img.preview));
+    setPendingImages([]);
     setProductAddons([]);
     setAddonForm(EMPTY_ADDON_FORM);
     setFieldErrors({});
@@ -164,6 +168,7 @@ export default function AdminProductsPage() {
         compare_at_price: v.compare_at_price ?? "",
         stock_quantity: v.stock_quantity,
         is_active: v.is_active,
+        attribute_value_ids: (v.attribute_values || []).map((av) => av.attribute_value),
         saving: false,
       }))
     );
@@ -194,6 +199,9 @@ export default function AdminProductsPage() {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
     setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
+    if (name === "product_type" && value === "simple") {
+      setVariations((prev) => (prev.length > 1 ? [prev[0]] : prev));
+    }
   };
 
   // ---- Attribute values ----
@@ -243,6 +251,21 @@ export default function AdminProductsPage() {
     setVariations((prev) => [...prev, EMPTY_VARIATION_ROW()]);
   };
 
+  const toggleVariationAttributeValue = (key, valueId) => {
+    setVariations((prev) =>
+      prev.map((row) => {
+        if (row.key !== key) return row;
+        const has = row.attribute_value_ids.includes(valueId);
+        return {
+          ...row,
+          attribute_value_ids: has
+            ? row.attribute_value_ids.filter((id) => id !== valueId)
+            : [...row.attribute_value_ids, valueId],
+        };
+      })
+    );
+  };
+
   const saveVariationRow = async (row) => {
     if (editingId === "new") return; // new-product rows are sent with the create call
     if (!row.sku) {
@@ -257,6 +280,7 @@ export default function AdminProductsPage() {
         compare_at_price: row.compare_at_price === "" ? null : row.compare_at_price,
         stock_quantity: row.stock_quantity || 0,
         is_active: row.is_active,
+        attribute_value_ids: row.attribute_value_ids,
       };
       if (row.id) {
         await updateProductVariation(row.id, payload);
@@ -293,23 +317,46 @@ export default function AdminProductsPage() {
 
   // ---- Images ----
   const handleImageUpload = async (e) => {
-    const file = e.target.files?.[0];
+    const files = Array.from(e.target.files || []);
     e.target.value = "";
-    if (!file || editingId === "new") return;
+    if (files.length === 0) return;
+
+    if (editingId === "new") {
+      setPendingImages((prev) => [
+        ...prev,
+        ...files.map((file) => ({
+          key: `pending-${Math.random().toString(36).slice(2)}`,
+          file,
+          preview: URL.createObjectURL(file),
+        })),
+      ]);
+      return;
+    }
+
     setUploadingImage(true);
     try {
-      const image = await createProductImage({
-        product: editingId,
-        image: file,
-        is_primary: productImages.length === 0,
-      });
-      setProductImages((prev) => [...prev, image]);
-      toast.success("Image uploaded");
+      for (let i = 0; i < files.length; i += 1) {
+        const image = await createProductImage({
+          product: editingId,
+          image: files[i],
+          is_primary: productImages.length === 0 && i === 0,
+        });
+        setProductImages((prev) => [...prev, image]);
+      }
+      toast.success(files.length > 1 ? "Images uploaded" : "Image uploaded");
     } catch (err) {
       toast.error(err.message);
     } finally {
       setUploadingImage(false);
     }
+  };
+
+  const handleRemovePendingImage = (key) => {
+    setPendingImages((prev) => {
+      const target = prev.find((img) => img.key === key);
+      if (target) URL.revokeObjectURL(target.preview);
+      return prev.filter((img) => img.key !== key);
+    });
   };
 
   const handleDeleteImage = async (id) => {
@@ -376,6 +423,12 @@ export default function AdminProductsPage() {
     e.preventDefault();
     setFormError("");
     setFieldErrors({});
+
+    if (form.product_type === "simple" && !variations[0]?.sku) {
+      setFormError("SKU is required to save price & stock.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
@@ -397,9 +450,26 @@ export default function AdminProductsPage() {
               compare_at_price: v.compare_at_price === "" ? null : v.compare_at_price,
               stock_quantity: v.stock_quantity || 0,
               is_active: v.is_active,
+              attribute_value_ids: v.attribute_value_ids,
             })),
         });
-        toast.success("Product created — you can now add images and addons below");
+        if (pendingImages.length > 0) {
+          for (let i = 0; i < pendingImages.length; i += 1) {
+            const img = pendingImages[i];
+            try {
+              await createProductImage({
+                product: created.id,
+                image: img.file,
+                is_primary: i === 0,
+              });
+            } catch (err) {
+              toast.error(`Failed to upload an image: ${err.message}`);
+            }
+            URL.revokeObjectURL(img.preview);
+          }
+          setPendingImages([]);
+        }
+        toast.success("Product created");
         setEditingId(created.id);
         await loadEditorFor(created.id);
         await load();
@@ -413,6 +483,28 @@ export default function AdminProductsPage() {
           status: form.status,
           sku_prefix: form.sku_prefix,
         });
+
+        const rowsToSave = variations.filter((v) => v.sku);
+        for (const row of rowsToSave) {
+          const payload = {
+            sku: row.sku,
+            price: row.price || 0,
+            compare_at_price: row.compare_at_price === "" ? null : row.compare_at_price,
+            stock_quantity: row.stock_quantity || 0,
+            is_active: row.is_active,
+            attribute_value_ids: row.attribute_value_ids,
+          };
+          try {
+            if (row.id) {
+              await updateProductVariation(row.id, payload);
+            } else {
+              await createProductVariation({ ...payload, product: editingId });
+            }
+          } catch (err) {
+            toast.error(`Failed to save variation "${row.sku}": ${err.message}`);
+          }
+        }
+
         toast.success("Product updated");
         closeForm();
         await load();
@@ -630,164 +722,291 @@ export default function AdminProductsPage() {
             )}
           </div>
 
-          {/* Variations */}
-          <div>
-            <div className="mb-1.5 flex items-center justify-between">
-              <label className="block text-sm font-medium text-neutral-700">Product Variations</label>
-              <button
-                type="button"
-                onClick={addVariationRow}
-                className="flex items-center gap-1 text-xs font-medium text-(--primary) hover:underline"
-              >
-                <FiPlus size={12} />
-                Add Row
-              </button>
+          {/* Simple product pricing */}
+          {form.product_type === "simple" && variations[0] && (
+            <div>
+              <label className="mb-1.5 block text-sm font-medium text-neutral-700">Price &amp; Stock</label>
+              <div className="grid gap-4 rounded-lg border border-neutral-200 p-4 sm:grid-cols-4">
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-500">SKU</label>
+                  <input
+                    type="text"
+                    value={variations[0].sku}
+                    onChange={(e) => handleVariationChange(variations[0].key, "sku", e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-500">Price</label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={variations[0].price}
+                    onChange={(e) => handleVariationChange(variations[0].key, "price", e.target.value)}
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-500">
+                    Compare at price <span className="text-neutral-400">(optional)</span>
+                  </label>
+                  <input
+                    type="number"
+                    step="0.01"
+                    value={variations[0].compare_at_price}
+                    onChange={(e) =>
+                      handleVariationChange(variations[0].key, "compare_at_price", e.target.value)
+                    }
+                    className={inputClass}
+                  />
+                </div>
+                <div>
+                  <label className="mb-1 block text-xs font-medium text-neutral-500">Stock quantity</label>
+                  <input
+                    type="number"
+                    value={variations[0].stock_quantity}
+                    onChange={(e) =>
+                      handleVariationChange(variations[0].key, "stock_quantity", e.target.value)
+                    }
+                    className={inputClass}
+                  />
+                </div>
+              </div>
+              {editingId !== "new" && (
+                <button
+                  type="button"
+                  onClick={() => saveVariationRow(variations[0])}
+                  disabled={variations[0].saving}
+                  className="mt-2 flex items-center gap-1.5 text-xs font-medium text-(--primary) hover:underline disabled:opacity-50"
+                >
+                  <FiSave size={12} />
+                  {variations[0].saving ? "Saving..." : "Save price & stock"}
+                </button>
+              )}
             </div>
-            <div className="overflow-x-auto rounded-lg border border-neutral-200">
-              <table className="w-full text-left text-sm">
-                <thead>
-                  <tr className="border-b border-neutral-200 bg-neutral-50 text-neutral-500">
-                    <th className="px-3 py-2 font-medium">Sku</th>
-                    <th className="px-3 py-2 font-medium">Price</th>
-                    <th className="px-3 py-2 font-medium">Compare at price</th>
-                    <th className="px-3 py-2 font-medium">Stock quantity</th>
-                    <th className="px-3 py-2 font-medium">Is active</th>
-                    <th className="px-3 py-2 font-medium text-right">Delete</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {variations.map((row) => (
-                    <tr key={row.key} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-3 py-2">
-                        <input
-                          type="text"
-                          value={row.sku}
-                          onChange={(e) => handleVariationChange(row.key, "sku", e.target.value)}
-                          className="w-32 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={row.price}
-                          onChange={(e) => handleVariationChange(row.key, "price", e.target.value)}
-                          className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          step="0.01"
-                          value={row.compare_at_price}
-                          onChange={(e) =>
-                            handleVariationChange(row.key, "compare_at_price", e.target.value)
-                          }
-                          className="w-28 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="number"
-                          value={row.stock_quantity}
-                          onChange={(e) =>
-                            handleVariationChange(row.key, "stock_quantity", e.target.value)
-                          }
-                          className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <input
-                          type="checkbox"
-                          checked={row.is_active}
-                          onChange={(e) =>
-                            handleVariationChange(row.key, "is_active", e.target.checked)
-                          }
-                          className="h-4 w-4 rounded border-neutral-300 accent-(--primary)"
-                        />
-                      </td>
-                      <td className="px-3 py-2">
-                        <div className="flex justify-end gap-2">
-                          {editingId !== "new" && (
+          )}
+
+          {/* Variations */}
+          {form.product_type === "variable" && (
+            <div>
+              <div className="mb-1.5 flex items-center justify-between">
+                <label className="block text-sm font-medium text-neutral-700">Product Variations</label>
+                <button
+                  type="button"
+                  onClick={addVariationRow}
+                  className="flex items-center gap-1 text-xs font-medium text-(--primary) hover:underline"
+                >
+                  <FiPlus size={12} />
+                  Add Row
+                </button>
+              </div>
+              <div className="overflow-x-auto rounded-lg border border-neutral-200">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-200 bg-neutral-50 text-neutral-500">
+                      <th className="px-3 py-2 font-medium">Sku</th>
+                      <th className="px-3 py-2 font-medium">Price</th>
+                      <th className="px-3 py-2 font-medium">Compare at price</th>
+                      <th className="px-3 py-2 font-medium">Stock quantity</th>
+                      <th className="px-3 py-2 font-medium">Attributes</th>
+                      <th className="px-3 py-2 font-medium">Is active</th>
+                      <th className="px-3 py-2 font-medium text-right">Delete</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {variations.map((row) => (
+                      <tr key={row.key} className="border-b border-neutral-100 last:border-0">
+                        <td className="px-3 py-2">
+                          <input
+                            type="text"
+                            value={row.sku}
+                            onChange={(e) => handleVariationChange(row.key, "sku", e.target.value)}
+                            className="w-32 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={row.price}
+                            onChange={(e) => handleVariationChange(row.key, "price", e.target.value)}
+                            className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            step="0.01"
+                            value={row.compare_at_price}
+                            onChange={(e) =>
+                              handleVariationChange(row.key, "compare_at_price", e.target.value)
+                            }
+                            className="w-28 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="number"
+                            value={row.stock_quantity}
+                            onChange={(e) =>
+                              handleVariationChange(row.key, "stock_quantity", e.target.value)
+                            }
+                            className="w-24 rounded-md border border-neutral-300 px-2 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          {attributes.length === 0 ? (
+                            <span className="text-xs text-neutral-400">No attributes</span>
+                          ) : (
+                            <div className="flex max-w-56 flex-col gap-1.5">
+                              {attributes.map((attr) => (
+                                <div key={attr.id} className="flex flex-wrap items-center gap-1">
+                                  <span className="text-[10px] font-semibold tracking-wide text-neutral-400 uppercase">
+                                    {attr.name}:
+                                  </span>
+                                  {attr.values.map((v) => {
+                                    const checked = row.attribute_value_ids.includes(v.id);
+                                    return (
+                                      <button
+                                        type="button"
+                                        key={v.id}
+                                        onClick={() => toggleVariationAttributeValue(row.key, v.id)}
+                                        className={`rounded-full border px-2 py-0.5 text-[11px] font-medium transition-colors ${
+                                          checked
+                                            ? "border-(--primary) bg-(--primary)/10 text-(--primary)"
+                                            : "border-neutral-300 text-neutral-600 hover:border-neutral-400"
+                                        }`}
+                                      >
+                                        {v.value}
+                                      </button>
+                                    );
+                                  })}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </td>
+                        <td className="px-3 py-2">
+                          <input
+                            type="checkbox"
+                            checked={row.is_active}
+                            onChange={(e) =>
+                              handleVariationChange(row.key, "is_active", e.target.checked)
+                            }
+                            className="h-4 w-4 rounded border-neutral-300 accent-(--primary)"
+                          />
+                        </td>
+                        <td className="px-3 py-2">
+                          <div className="flex justify-end gap-2">
+                            {editingId !== "new" && (
+                              <button
+                                type="button"
+                                onClick={() => saveVariationRow(row)}
+                                disabled={row.saving}
+                                aria-label="Save variation"
+                                className="flex items-center justify-center rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-(--primary) disabled:opacity-50"
+                              >
+                                <FiSave size={14} />
+                              </button>
+                            )}
                             <button
                               type="button"
-                              onClick={() => saveVariationRow(row)}
-                              disabled={row.saving}
-                              aria-label="Save variation"
-                              className="flex items-center justify-center rounded-md p-1.5 text-neutral-500 hover:bg-neutral-100 hover:text-(--primary) disabled:opacity-50"
+                              onClick={() => deleteVariationRow(row)}
+                              disabled={deletingVariationKey === row.key}
+                              aria-label="Delete variation"
+                              className="flex items-center justify-center rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50"
                             >
-                              <FiSave size={14} />
+                              <FiTrash2 size={14} />
                             </button>
-                          )}
-                          <button
-                            type="button"
-                            onClick={() => deleteVariationRow(row)}
-                            disabled={deletingVariationKey === row.key}
-                            aria-label="Delete variation"
-                            className="flex items-center justify-center rounded-md p-1.5 text-red-500 hover:bg-red-50 disabled:opacity-50"
-                          >
-                            <FiTrash2 size={14} />
-                          </button>
-                        </div>
-                      </td>
-                    </tr>
+                          </div>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {editingId === "new" && (
+                <p className="mt-1.5 text-xs text-neutral-400">
+                  Variations are saved together when you create the product.
+                </p>
+              )}
+            </div>
+          )}
+
+          {/* Images */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Product Images</label>
+            <div className="flex flex-wrap gap-3">
+              {editingId === "new"
+                ? pendingImages.map((img, idx) => (
+                    <div
+                      key={img.key}
+                      className="relative h-20 w-20 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.preview} alt="" className="h-full w-full object-cover" />
+                      {idx === 0 && (
+                        <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
+                          <FiStar size={10} />
+                          Primary
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleRemovePendingImage(img.key)}
+                        aria-label="Remove image"
+                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-red-600"
+                      >
+                        <FiTrash2 size={11} />
+                      </button>
+                    </div>
+                  ))
+                : productImages.map((img) => (
+                    <div
+                      key={img.id}
+                      className="relative h-20 w-20 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={img.image} alt={img.alt_text || ""} className="h-full w-full object-cover" />
+                      {img.is_primary && (
+                        <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
+                          <FiStar size={10} />
+                          Primary
+                        </span>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteImage(img.id)}
+                        disabled={deletingImageId === img.id}
+                        aria-label="Remove image"
+                        className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-red-600 disabled:opacity-50"
+                      >
+                        <FiTrash2 size={11} />
+                      </button>
+                    </div>
                   ))}
-                </tbody>
-              </table>
+
+              <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 text-neutral-400 hover:border-(--primary) hover:text-(--primary)">
+                <FiUpload size={16} />
+                <span className="text-[10px] font-medium">
+                  {uploadingImage ? "Uploading..." : "Add"}
+                </span>
+                <input
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  onChange={handleImageUpload}
+                  disabled={uploadingImage}
+                  className="hidden"
+                />
+              </label>
             </div>
             {editingId === "new" && (
               <p className="mt-1.5 text-xs text-neutral-400">
-                Variations are saved together when you create the product.
+                Images are uploaded once you create the product.
               </p>
             )}
           </div>
-
-          {/* Images */}
-          {editingId !== "new" && (
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-neutral-700">Product Images</label>
-              <div className="flex flex-wrap gap-3">
-                {productImages.map((img) => (
-                  <div
-                    key={img.id}
-                    className="relative h-20 w-20 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img src={img.image} alt={img.alt_text || ""} className="h-full w-full object-cover" />
-                    {img.is_primary && (
-                      <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
-                        <FiStar size={10} />
-                        Primary
-                      </span>
-                    )}
-                    <button
-                      type="button"
-                      onClick={() => handleDeleteImage(img.id)}
-                      disabled={deletingImageId === img.id}
-                      aria-label="Remove image"
-                      className="absolute top-1 right-1 flex h-5 w-5 items-center justify-center rounded-full bg-black/60 text-white hover:bg-red-600 disabled:opacity-50"
-                    >
-                      <FiTrash2 size={11} />
-                    </button>
-                  </div>
-                ))}
-
-                <label className="flex h-20 w-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-lg border border-dashed border-neutral-300 text-neutral-400 hover:border-(--primary) hover:text-(--primary)">
-                  <FiUpload size={16} />
-                  <span className="text-[10px] font-medium">
-                    {uploadingImage ? "Uploading..." : "Add"}
-                  </span>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageUpload}
-                    disabled={uploadingImage}
-                    className="hidden"
-                  />
-                </label>
-              </div>
-            </div>
-          )}
 
           {/* Addons */}
           {editingId !== "new" && (

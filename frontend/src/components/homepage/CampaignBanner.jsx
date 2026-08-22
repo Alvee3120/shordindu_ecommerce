@@ -3,7 +3,7 @@ import Link from "next/link";
 
 const campaignImage = "/assets/banner/banner.jpeg";
 const campaignImageMobile = "/assets/banner/bannerM.jpeg";
-const campaignUrl = "https://shordindu.com.bd/product-category/mid-year-clearance-sale";
+const campaignUrl = "/shop";
 
 export default function CampaignBanner() {
   return (
