@@ -72,7 +72,7 @@ class Product(models.Model):
         ACTIVE = "active", "Active"
         ARCHIVED = "archived", "Archived"
 
-    category = models.ForeignKey(Category, on_delete=models.PROTECT, related_name="products")
+    categories = models.ManyToManyField(Category, related_name="products")
     name = models.CharField(max_length=255)
     slug = models.SlugField(max_length=255, unique=True, blank=True)
     description = models.TextField(blank=True)

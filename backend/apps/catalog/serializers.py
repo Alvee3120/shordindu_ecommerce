@@ -116,7 +116,8 @@ class ProductVariationSerializer(serializers.ModelSerializer):
 
 
 class ProductSerializer(serializers.ModelSerializer):
-    category_name = serializers.CharField(source="category.name", read_only=True)
+    categories = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True)
+    category_names = serializers.StringRelatedField(source="categories", many=True, read_only=True)
     attribute_values = ProductAttributeValueSerializer(
         source="product_attribute_values", many=True, read_only=True
     )
@@ -132,8 +133,8 @@ class ProductSerializer(serializers.ModelSerializer):
         model = Product
         fields = [
             "id",
-            "category",
-            "category_name",
+            "categories",
+            "category_names",
             "name",
             "slug",
             "description",
@@ -166,12 +167,19 @@ class ProductSerializer(serializers.ModelSerializer):
                 raise serializers.ValidationError(
                     {"variations": "A variable product needs at least one variation."}
                 )
+        categories = attrs.get("categories")
+        if categories is not None and len(categories) == 0:
+            raise serializers.ValidationError(
+                {"categories": "A product must have at least one category."}
+            )
         return attrs
 
     def create(self, validated_data):
         attribute_value_ids = validated_data.pop("attribute_value_ids", [])
         variations_data = validated_data.pop("variations", [])
+        categories = validated_data.pop("categories", [])
         product = Product.objects.create(**validated_data)
+        product.categories.set(categories)
 
         ProductAttributeValue.objects.bulk_create(
             [ProductAttributeValue(product=product, attribute_value=av) for av in attribute_value_ids]
@@ -195,9 +203,12 @@ class ProductSerializer(serializers.ModelSerializer):
     def update(self, instance, validated_data):
         validated_data.pop("attribute_value_ids", None)
         validated_data.pop("variations", None)
+        categories = validated_data.pop("categories", None)
         for attr, value in validated_data.items():
             setattr(instance, attr, value)
         instance.save()
+        if categories is not None:
+            instance.categories.set(categories)
         return instance
 
 

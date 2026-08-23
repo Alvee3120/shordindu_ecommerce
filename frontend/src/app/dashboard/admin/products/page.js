@@ -29,7 +29,7 @@ import {
 
 const EMPTY_FORM = {
   name: "",
-  category: "",
+  categories: [],
   description: "",
   product_type: "simple",
   visibility_type: "standalone",
@@ -210,7 +210,7 @@ export default function AdminProductsPage() {
     const full = await getProduct(id);
     setForm({
       name: full.name,
-      category: full.category,
+      categories: full.categories || [],
       description: full.description || "",
       product_type: full.product_type,
       visibility_type: full.visibility_type,
@@ -266,6 +266,19 @@ export default function AdminProductsPage() {
     if (name === "product_type" && value === "simple") {
       setVariations((prev) => (prev.length > 1 ? [prev[0]] : prev));
     }
+  };
+
+  const toggleCategory = (categoryId) => {
+    setForm((prev) => {
+      const has = prev.categories.includes(categoryId);
+      return {
+        ...prev,
+        categories: has
+          ? prev.categories.filter((id) => id !== categoryId)
+          : [...prev.categories, categoryId],
+      };
+    });
+    setFieldErrors((prev) => ({ ...prev, categories: undefined }));
   };
 
   // ---- Attribute values ----
@@ -493,13 +506,18 @@ export default function AdminProductsPage() {
       return;
     }
 
+    if (form.categories.length === 0) {
+      setFormError("Select at least one category.");
+      return;
+    }
+
     setSubmitting(true);
 
     try {
       if (editingId === "new") {
         const created = await createProduct({
           name: form.name,
-          category: Number(form.category),
+          categories: form.categories,
           description: form.description,
           product_type: form.product_type,
           visibility_type: form.visibility_type,
@@ -540,7 +558,7 @@ export default function AdminProductsPage() {
       } else {
         await updateProduct(editingId, {
           name: form.name,
-          category: Number(form.category),
+          categories: form.categories,
           description: form.description,
           product_type: form.product_type,
           visibility_type: form.visibility_type,
@@ -748,40 +766,48 @@ export default function AdminProductsPage() {
           )}
 
           {/* Basic fields */}
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-neutral-700">Name</label>
-              <input
-                type="text"
-                name="name"
-                value={form.name}
-                onChange={handleChange}
-                required
-                className={inputClass}
-              />
-              {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name[0]}</p>}
-            </div>
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Name</label>
+            <input
+              type="text"
+              name="name"
+              value={form.name}
+              onChange={handleChange}
+              required
+              className={inputClass}
+            />
+            {fieldErrors.name && <p className="mt-1 text-xs text-red-600">{fieldErrors.name[0]}</p>}
+          </div>
 
-            <div>
-              <label className="mb-1.5 block text-sm font-medium text-neutral-700">Category</label>
-              <select
-                name="category"
-                value={form.category}
-                onChange={handleChange}
-                required
-                className={inputClass}
-              >
-                <option value="">Select category</option>
-                {categories.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
-              {fieldErrors.category && (
-                <p className="mt-1 text-xs text-red-600">{fieldErrors.category[0]}</p>
-              )}
-            </div>
+          {/* Categories */}
+          <div>
+            <label className="mb-1.5 block text-sm font-medium text-neutral-700">Categories</label>
+            {categories.length === 0 ? (
+              <p className="text-sm text-neutral-400">No categories defined yet.</p>
+            ) : (
+              <div className="flex flex-wrap gap-2 rounded-lg border border-neutral-200 p-4">
+                {categories.map((c) => {
+                  const checked = form.categories.includes(c.id);
+                  return (
+                    <button
+                      type="button"
+                      key={c.id}
+                      onClick={() => toggleCategory(c.id)}
+                      className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                        checked
+                          ? "border-(--primary) bg-(--primary)/10 text-(--primary)"
+                          : "border-neutral-300 text-neutral-600 hover:border-neutral-400"
+                      }`}
+                    >
+                      {c.name}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            {fieldErrors.categories && (
+              <p className="mt-1 text-xs text-red-600">{fieldErrors.categories[0]}</p>
+            )}
           </div>
 
           <div>
@@ -1315,7 +1341,9 @@ export default function AdminProductsPage() {
               {products.map((product) => (
                 <tr key={product.id} className="border-b border-neutral-100 last:border-0">
                   <td className="px-5 py-3 font-medium text-neutral-900">{product.name}</td>
-                  <td className="px-5 py-3 text-neutral-500">{product.category_name}</td>
+                  <td className="px-5 py-3 text-neutral-500">
+                    {(product.category_names || []).join(", ") || "—"}
+                  </td>
                   <td className="px-5 py-3">
                     <span
                       className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${

@@ -53,7 +53,7 @@ class AttributeValueViewSet(viewsets.ModelViewSet):
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all().select_related("category").order_by("-created_at")
+    queryset = Product.objects.all().prefetch_related("categories").order_by("-created_at")
     serializer_class = ProductSerializer
     permission_classes = [IsStaffOrReadOnly]
     filterset_class = ProductFilter

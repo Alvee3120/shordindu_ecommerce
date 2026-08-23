@@ -116,6 +116,19 @@ def _parse_attributes(value):
     return pairs
 
 
+def _parse_categories(value):
+    """Parses 'Name1;Name2;Name3' into a list of category names."""
+    s = _clean_str(value)
+    if not s:
+        return []
+    names = []
+    for chunk in s.split(";"):
+        chunk = chunk.strip()
+        if chunk:
+            names.append(chunk)
+    return names
+
+
 def _sheet_rows(ws):
     """Yields (row_number, {header: value}) for a worksheet, skipping the header row and blank rows."""
     rows = ws.iter_rows(values_only=True)
@@ -243,10 +256,12 @@ class BulkImporter:
         if not name:
             raise RowError("Products", row_number, "name is required")
 
-        category_name = _clean_str(row.get("category"))
-        if not category_name:
-            raise RowError("Products", row_number, "category is required")
-        category = self.resolve_category(category_name)
+        category_names = _parse_categories(row.get("categories"))
+        if not category_names:
+            raise RowError(
+                "Products", row_number, "categories is required (at least one category name, separated by ';')"
+            )
+        categories = [self.resolve_category(category_name) for category_name in category_names]
 
         product_type = _clean_str(row.get("product_type")).lower() or Product.ProductType.SIMPLE
         if product_type not in PRODUCT_TYPES:
@@ -320,12 +335,13 @@ class BulkImporter:
         is_new = existing is None
         product = existing or Product(sku_prefix=sku_prefix)
         product.name = name
-        product.category = category
         product.description = description
         product.product_type = product_type
         product.visibility_type = visibility_type
         product.status = status
         product.save()
+
+        product.categories.set(categories)
 
         product.product_attribute_values.all().delete()
         for attr_name, value in product_attr_pairs:
@@ -411,13 +427,13 @@ def build_template_workbook():
     products_ws = wb.active
     products_ws.title = "Products"
     products_ws.append(
-        ["sku_prefix", "name", "category", "description", "product_type", "visibility_type", "status", "attributes"]
+        ["sku_prefix", "name", "categories", "description", "product_type", "visibility_type", "status", "attributes"]
     )
     products_ws.append(
         [
             "SHIRT-001",
             "Classic Cotton Shirt",
-            "Men's Clothing",
+            "Men's Clothing;New Arrivals",
             "A comfortable everyday shirt",
             "variable",
             "standalone",
@@ -451,7 +467,11 @@ def build_template_workbook():
         ("Products sheet", ""),
         ("sku_prefix", "Required, unique. Your own short product code, e.g. SHIRT-001. Links rows in the other sheets."),
         ("name", "Required."),
-        ("category", "Required. An existing category name/slug (see the Categories sheet), or a new one to create."),
+        (
+            "categories",
+            "Required, at least one. Semicolon-separated list of existing category names/slugs (see the "
+            "Categories sheet) or new ones to create, e.g. Men's Clothing;New Arrivals.",
+        ),
         ("description", "Optional."),
         ("product_type", "simple or variable. Default: simple."),
         ("visibility_type", "standalone, addon_only, or both. Default: standalone."),

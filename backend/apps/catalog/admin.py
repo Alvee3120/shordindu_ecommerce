@@ -74,11 +74,20 @@ class ProductAddonInline(admin.TabularInline):
 
 @admin.register(Product)
 class ProductAdmin(admin.ModelAdmin):
-    list_display = ["name", "category", "product_type", "visibility_type", "status"]
-    list_filter = ["category", "product_type", "visibility_type", "status"]
+    list_display = ["name", "categories_display", "product_type", "visibility_type", "status"]
+    list_filter = ["categories", "product_type", "visibility_type", "status"]
     search_fields = ["name", "slug", "sku_prefix"]
     prepopulated_fields = {"slug": ("name",)}
+    filter_horizontal = ["categories"]
     inlines = [ProductAttributeValueInline, ProductVariationInline, ProductImageInline, ProductAddonInline]
+
+    def get_queryset(self, request):
+        return super().get_queryset(request).prefetch_related("categories")
+
+    def categories_display(self, obj):
+        return ", ".join(c.name for c in obj.categories.all())
+
+    categories_display.short_description = "Categories"
 
 
 class VariationAttributeValueInline(admin.TabularInline):

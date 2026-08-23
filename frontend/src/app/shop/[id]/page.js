@@ -57,14 +57,16 @@ export default function ProductDetailsPage() {
     };
   }, [id]);
 
+  const categoryFilterKey = product?.categories?.join(",") || "";
+
   useEffect(() => {
-    if (!product?.category) {
+    if (!categoryFilterKey) {
       // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale related products when there's no category
       setRelatedProducts([]);
       return;
     }
     let cancelled = false;
-    listProducts({ category: product.category, page_size: 8 })
+    listProducts({ category: categoryFilterKey, page_size: 8 })
       .then((data) => {
         if (cancelled) return;
         const results = Array.isArray(data) ? data : data?.results ?? [];
@@ -78,7 +80,7 @@ export default function ProductDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [product?.category, product?.id]);
+  }, [categoryFilterKey, product?.id]);
 
   useEffect(() => {
     const imageCount = product?.images?.length || 0;
@@ -393,7 +395,7 @@ export default function ProductDetailsPage() {
         {/* Info */}
         <div className="flex flex-col gap-3">
           <p className="text-xs font-semibold tracking-widest text-neutral-400 uppercase">
-            {product.category_name}
+            {(product.category_names || []).join(", ")}
           </p>
           <h1 className="font-sora text-3xl leading-tight font-semibold text-neutral-900">
             {product.name}

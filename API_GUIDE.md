@@ -179,8 +179,8 @@ The big one. Full shape:
 ```json
 {
   "id": 1,
-  "category": 3,
-  "category_name": "Dress",
+  "categories": [3],
+  "category_names": ["Dress"],
   "name": "ABC Dress",
   "slug": "abc-dress",
   "description": "...",
@@ -209,6 +209,8 @@ The big one. Full shape:
 
 - `product_type`: `simple` | `variable`. `visibility_type`: `standalone` | `addon_only` | `both`.
   `status`: `draft` | `active` | `archived`.
+- **`categories`/`category_names` are lists** — a product can belong to more than one category. A
+  product must have at least one; sending an empty `categories` list is a 400.
 - **`GET /api/products/` (list) excludes `addon_only` products.** Those only ever appear via a
   parent's addon endpoint (below) or by fetching their own detail id directly.
 - **Simple products still have exactly one variation** — a "default" SKU created automatically
@@ -220,7 +222,7 @@ The big one. Full shape:
 
 | Param | Example | Notes |
 |---|---|---|
-| `category` | `?category=3` | exact category id |
+| `category` | `?category=3` or `?category=3,7` | products in any of these category ids |
 | `product_type` | `?product_type=simple` | |
 | `visibility_type` | `?visibility_type=standalone` | |
 | `status` | `?status=active` | |

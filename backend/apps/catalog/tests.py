@@ -10,7 +10,7 @@ from apps.users.models import User
 PRODUCTS_HEADER = [
     "sku_prefix",
     "name",
-    "category",
+    "categories",
     "description",
     "product_type",
     "visibility_type",
@@ -136,6 +136,33 @@ class BulkImportTests(APITestCase):
         self.assertEqual(response.data["created"]["products"], 1)
         self.assertTrue(Category.objects.filter(name="Headwear").exists())
 
+    def test_creates_product_with_multiple_categories(self):
+        upload = build_upload(
+            products=[
+                ["MULTI-001", "Multi Cat Product", "Shirts;Headwear", "", "simple", "standalone", "active", ""],
+            ],
+            variations=[["MULTI-001", "", "", "15.00", "", "5", "TRUE"]],
+        )
+        self.client.force_authenticate(self.staff)
+        response = self.client.post("/api/products/bulk-import/", {"file": upload}, format="multipart")
+
+        self.assertEqual(response.data["created"]["products"], 1, response.data)
+        product = Product.objects.get(sku_prefix="MULTI-001")
+        self.assertEqual(set(product.categories.values_list("name", flat=True)), {"Shirts", "Headwear"})
+
+    def test_missing_categories_is_reported(self):
+        upload = build_upload(
+            products=[["NOCAT-001", "No Category", "", "", "simple", "standalone", "active", ""]],
+            variations=[["NOCAT-001", "", "", "10.00", "", "1", "TRUE"]],
+        )
+        self.client.force_authenticate(self.staff)
+        response = self.client.post("/api/products/bulk-import/", {"file": upload}, format="multipart")
+
+        self.assertEqual(response.data["created"]["products"], 0)
+        self.assertFalse(Product.objects.filter(sku_prefix="NOCAT-001").exists())
+        self.assertEqual(len(response.data["errors"]), 1)
+        self.assertIn("categories", response.data["errors"][0]["message"])
+
     def test_invalid_row_is_reported_without_blocking_valid_rows(self):
         upload = build_upload(
             products=[
@@ -173,3 +200,68 @@ class BulkImportTests(APITestCase):
             response["Content-Type"],
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         )
+
+
+class ProductCategoryAPITests(APITestCase):
+    def setUp(self):
+        self.staff = User.objects.create_user(
+            email="staff2@example.com", password="pw", name="Staff", is_staff=True
+        )
+        self.shirts = Category.objects.create(name="Shirts")
+        self.headwear = Category.objects.create(name="Headwear")
+        self.client.force_authenticate(self.staff)
+
+    def test_create_product_with_multiple_categories(self):
+        response = self.client.post(
+            "/api/products/",
+            {
+                "name": "Bucket Hat",
+                "categories": [self.shirts.id, self.headwear.id],
+                "sku_prefix": "BUCKET-001",
+                "variations": [{"sku": "BUCKET-001-DEFAULT", "price": "20.00", "stock_quantity": 5}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(set(response.data["categories"]), {self.shirts.id, self.headwear.id})
+        self.assertEqual(set(response.data["category_names"]), {"Shirts", "Headwear"})
+
+    def test_empty_categories_is_rejected(self):
+        response = self.client.post(
+            "/api/products/",
+            {
+                "name": "No Category Product",
+                "categories": [],
+                "sku_prefix": "NOCAT-002",
+                "variations": [{"sku": "NOCAT-002-DEFAULT", "price": "20.00", "stock_quantity": 5}],
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("categories", response.data)
+
+    def test_patch_replaces_categories(self):
+        product = Product.objects.create(name="Cap", sku_prefix="CAP-001")
+        product.categories.set([self.shirts.id])
+        ProductVariation.objects.create(product=product, sku="CAP-001-DEFAULT", price="10.00", stock_quantity=1)
+
+        response = self.client.patch(
+            f"/api/products/{product.id}/", {"categories": [self.headwear.id]}, format="json"
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        product.refresh_from_db()
+        self.assertEqual(list(product.categories.values_list("id", flat=True)), [self.headwear.id])
+
+    def test_filter_by_multiple_category_ids_matches_any(self):
+        p1 = Product.objects.create(name="Shirt A", sku_prefix="A-001")
+        p1.categories.set([self.shirts.id])
+        ProductVariation.objects.create(product=p1, sku="A-001-DEFAULT", price="10.00", stock_quantity=1)
+
+        p2 = Product.objects.create(name="Hat B", sku_prefix="B-001")
+        p2.categories.set([self.headwear.id])
+        ProductVariation.objects.create(product=p2, sku="B-001-DEFAULT", price="10.00", stock_quantity=1)
+
+        response = self.client.get(f"/api/products/?category={self.shirts.id},{self.headwear.id}")
+        self.assertEqual(response.status_code, 200)
+        names = {p["name"] for p in response.data["results"]}
+        self.assertEqual(names, {"Shirt A", "Hat B"})
