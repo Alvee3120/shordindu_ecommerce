@@ -91,7 +91,7 @@ export default function CategoryShowcase() {
       <div className="mx-auto w-full" style={containerStyle}>
         {/* Section label */}
         <div className="mb-10 flex items-center gap-3">
-          <span className="font-sora text-2xl font-medium text-neutral-500">
+          <span className="font-sora text-2xl font-medium text-(--primary)">
             Categories
           </span>
 

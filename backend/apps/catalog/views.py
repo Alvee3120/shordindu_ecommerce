@@ -1,9 +1,11 @@
+from django.http import HttpResponse
 from rest_framework import status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
 from apps.core.permissions import IsStaffOrReadOnly
 
+from . import imports as bulk_imports
 from .filters import ProductFilter
 from .models import (
     Attribute,
@@ -70,6 +72,27 @@ class ProductViewSet(viewsets.ModelViewSet):
         addon_links = product.addon_links.select_related("addon_product").order_by("sort_order", "id")
         serializer = ProductAddonSerializer(addon_links, many=True, context=self.get_serializer_context())
         return Response(serializer.data)
+
+    @action(detail=False, methods=["post"], url_path="bulk-import")
+    def bulk_import(self, request):
+        file = request.FILES.get("file")
+        if not file:
+            return Response({"detail": "No file uploaded. Attach it as 'file'."}, status=status.HTTP_400_BAD_REQUEST)
+        try:
+            result = bulk_imports.BulkImporter().import_workbook(file)
+        except bulk_imports.ImportValidationError as exc:
+            return Response({"detail": str(exc)}, status=status.HTTP_400_BAD_REQUEST)
+        return Response(result)
+
+    @action(detail=False, methods=["get"], url_path="import-template")
+    def import_template(self, request):
+        workbook = bulk_imports.build_template_workbook()
+        response = HttpResponse(
+            content_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+        response["Content-Disposition"] = 'attachment; filename="product_import_template.xlsx"'
+        workbook.save(response)
+        return response
 
 
 class ProductVariationViewSet(viewsets.ModelViewSet):

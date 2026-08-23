@@ -1,5 +1,5 @@
 // lib/products.js
-import { apiFetch } from "./api";
+import { apiFetch, API_BASE_URL } from "./api";
 
 export function listProducts({
   page,
@@ -96,4 +96,30 @@ export function createProductImage({ product, image, alt_text, is_primary, sort_
 
 export function deleteProductImage(id) {
   return apiFetch(`/product-images/${id}/`, { method: "DELETE" });
+}
+
+export function bulkImportProducts(file) {
+  const form = new FormData();
+  form.append("file", file);
+  return apiFetch("/products/bulk-import/", { method: "POST", body: form, isFormData: true });
+}
+
+/** Downloads the .xlsx bulk-import template and saves it via the browser. */
+export async function downloadImportTemplate() {
+  const res = await fetch(`${API_BASE_URL}/products/import-template/`, {
+    method: "GET",
+    credentials: "include",
+  });
+  if (!res.ok) {
+    throw new Error("Could not download the import template. Please try again.");
+  }
+  const blob = await res.blob();
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = "product_import_template.xlsx";
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
 }

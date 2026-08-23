@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiStar, FiUpload, FiSave } from "react-icons/fi";
+import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiStar, FiUpload, FiSave, FiDownload } from "react-icons/fi";
 import {
   listProducts,
   getProduct,
@@ -16,6 +16,8 @@ import {
   removeProductAttributeValue,
   createProductImage,
   deleteProductImage,
+  bulkImportProducts,
+  downloadImportTemplate,
 } from "@/lib/products";
 import { getCategories } from "@/lib/categories";
 import { listAttributes } from "@/lib/attributes";
@@ -93,6 +95,12 @@ export default function AdminProductsPage() {
   const [savingAddon, setSavingAddon] = useState(false);
   const [deletingAddonId, setDeletingAddonId] = useState(null);
 
+  const [showImport, setShowImport] = useState(false);
+  const [importFile, setImportFile] = useState(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState(null);
+  const [downloadingTemplate, setDownloadingTemplate] = useState(false);
+
   const load = async () => {
     setLoading(true);
     try {
@@ -140,7 +148,62 @@ export default function AdminProductsPage() {
 
   const openNewForm = () => {
     resetEditorState();
+    setShowImport(false);
     setEditingId("new");
+  };
+
+  // ---- Bulk import ----
+  const handleDownloadTemplate = async () => {
+    setDownloadingTemplate(true);
+    try {
+      await downloadImportTemplate();
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setDownloadingTemplate(false);
+    }
+  };
+
+  const handleImportFileChange = (e) => {
+    setImportFile(e.target.files?.[0] || null);
+    setImportResult(null);
+  };
+
+  const handleImportSubmit = async (e) => {
+    e.preventDefault();
+    if (!importFile) {
+      toast.error("Choose an .xlsx file first");
+      return;
+    }
+    setImporting(true);
+    setImportResult(null);
+    try {
+      const result = await bulkImportProducts(importFile);
+      setImportResult(result);
+      setImportFile(null);
+
+      const changed =
+        result.created.products +
+        result.updated.products +
+        result.created.variations +
+        result.updated.variations +
+        result.created.addons +
+        result.updated.addons;
+      if (changed > 0) {
+        toast.success(
+          `${result.created.products} product(s) created, ${result.updated.products} updated`
+        );
+        setPage(1);
+        await load();
+      }
+      if (result.errors.length > 0) {
+        toast.error(`${result.errors.length} row(s) had errors - see details below`);
+      }
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setImporting(false);
+    }
   };
 
   const loadEditorFor = async (id) => {
@@ -181,6 +244,7 @@ export default function AdminProductsPage() {
   const openEditForm = async (product) => {
     setFieldErrors({});
     setFormError("");
+    setShowImport(false);
     setEditingId(product.id);
     try {
       await loadEditorFor(product.id);
@@ -556,17 +620,118 @@ export default function AdminProductsPage() {
             </div>
           </form>
           {editingId === null && (
-            <button
-              type="button"
-              onClick={openNewForm}
-              className="flex items-center gap-1.5 rounded-lg bg-(--primary) px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--primary)/90"
-            >
-              <FiPlus size={16} />
-              Add Product
-            </button>
+            <>
+              <button
+                type="button"
+                onClick={() => setShowImport((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-semibold text-neutral-700 transition-colors hover:bg-neutral-50"
+              >
+                <FiUpload size={16} />
+                Import from Excel
+              </button>
+              <button
+                type="button"
+                onClick={openNewForm}
+                className="flex items-center gap-1.5 rounded-lg bg-(--primary) px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--primary)/90"
+              >
+                <FiPlus size={16} />
+                Add Product
+              </button>
+            </>
           )}
         </div>
       </div>
+
+      {showImport && (
+        <div className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-5">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-neutral-900">Import Products from Excel</h2>
+            <button
+              type="button"
+              onClick={() => {
+                setShowImport(false);
+                setImportResult(null);
+                setImportFile(null);
+              }}
+              className="text-sm text-neutral-500 hover:text-neutral-700"
+            >
+              Close
+            </button>
+          </div>
+          <p className="text-sm text-neutral-500">
+            Download the template, fill in your products, variations, and addon links, then upload it
+            here. Re-uploading the same file updates existing products matched by SKU instead of
+            duplicating them. Images are still added per-product below after import.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <button
+              type="button"
+              onClick={handleDownloadTemplate}
+              disabled={downloadingTemplate}
+              className="flex items-center gap-1.5 rounded-lg border border-neutral-300 px-4 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-50"
+            >
+              <FiDownload size={14} />
+              {downloadingTemplate ? "Preparing..." : "Download template"}
+            </button>
+            <form onSubmit={handleImportSubmit} className="flex flex-wrap items-center gap-3">
+              <input
+                type="file"
+                accept=".xlsx"
+                onChange={handleImportFileChange}
+                className="text-sm text-neutral-600"
+              />
+              <button
+                type="submit"
+                disabled={importing || !importFile}
+                className="flex items-center gap-1.5 rounded-lg bg-(--primary) px-4 py-2 text-sm font-semibold text-white hover:bg-(--primary)/90 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                <FiUpload size={14} />
+                {importing ? "Importing..." : "Import"}
+              </button>
+            </form>
+          </div>
+
+          {importResult && (
+            <div className="rounded-lg border border-neutral-200 p-4 text-sm">
+              <div className="mb-3 flex flex-wrap gap-x-6 gap-y-1 text-neutral-700">
+                <span>
+                  Products: {importResult.created.products} created, {importResult.updated.products}{" "}
+                  updated
+                </span>
+                <span>
+                  Variations: {importResult.created.variations} created,{" "}
+                  {importResult.updated.variations} updated
+                </span>
+                <span>
+                  Addons: {importResult.created.addons} created, {importResult.updated.addons} updated
+                </span>
+              </div>
+              {importResult.errors.length > 0 && (
+                <div className="overflow-x-auto rounded-lg border border-red-200">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-red-200 bg-red-50 text-red-700">
+                        <th className="px-3 py-2 font-medium">Sheet</th>
+                        <th className="px-3 py-2 font-medium">Row</th>
+                        <th className="px-3 py-2 font-medium">Error</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {importResult.errors.map((err, idx) => (
+                        <tr key={idx} className="border-b border-red-100 last:border-0">
+                          <td className="px-3 py-2 whitespace-nowrap">{err.sheet}</td>
+                          <td className="px-3 py-2 whitespace-nowrap">{err.row}</td>
+                          <td className="px-3 py-2 text-red-700">{err.message}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      )}
 
       {editingId !== null && (
         <form
