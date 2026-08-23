@@ -11,6 +11,7 @@ import { addCartItem, addCartItemAddon, getCart, updateCartItem, deleteCartItem 
 import { useCart } from "@/context/CartContext";
 import ProductCard from "@/components/ProductCard";
 import ProductReviews from "@/components/ProductReviews";
+import ImageZoom from "@/components/ImageZoom";
 
 export default function ProductDetailsPage() {
   const { id } = useParams();
@@ -121,7 +122,11 @@ export default function ProductDetailsPage() {
   }, [product, selectedValues, attributeGroups]);
 
   if (loading) {
-    return <div className="mx-auto max-w-6xl px-6 py-16 text-sm text-neutral-500">Loading product...</div>;
+    return (
+      <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6 py-16 text-sm text-neutral-500">
+        Loading product...
+      </div>
+    );
   }
 
   if (error || !product) {
@@ -333,11 +338,9 @@ export default function ProductDetailsPage() {
         <div className="flex flex-col gap-3">
           <div className="group relative h-120 w-full overflow-hidden rounded-2xl bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100">
             {images[activeImage] ? (
-              <Image
+              <ImageZoom
                 src={images[activeImage].image}
                 alt={images[activeImage].alt_text || product.name}
-                fill
-                className="object-cover transition-transform duration-500 ease-out [@media(hover:hover)_and_(pointer:fine)]:group-hover:scale-150"
                 sizes="(max-width: 1024px) 100vw, 50vw"
                 priority
               />

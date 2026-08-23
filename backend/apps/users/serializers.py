@@ -18,6 +18,24 @@ class UserUpdateSerializer(serializers.ModelSerializer):
         fields = ["name", "phone"]
 
 
+class AdminUserSerializer(serializers.ModelSerializer):
+    """Used by the admin User Management screen: role and is_active are the
+    only fields staff can edit for another account."""
+
+    class Meta:
+        model = User
+        fields = ["id", "email", "name", "phone", "role", "is_active", "created_at"]
+        read_only_fields = ["id", "email", "name", "phone", "created_at"]
+
+    def update(self, instance, validated_data):
+        # is_staff drives the actual permission checks (IsStaffOnly etc.), so
+        # it has to track role — otherwise promoting someone to staff/admin
+        # here wouldn't actually grant them anything.
+        role = validated_data.get("role", instance.role)
+        instance.is_staff = role in (User.Role.STAFF, User.Role.ADMIN)
+        return super().update(instance, validated_data)
+
+
 class SignupSerializer(serializers.ModelSerializer):
     password = serializers.CharField(write_only=True, trim_whitespace=False, validators=[validate_password])
 

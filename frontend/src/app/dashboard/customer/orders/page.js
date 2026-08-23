@@ -87,7 +87,9 @@ export default function OrdersPage() {
       </div>
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading orders...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading orders...
+        </p>
       ) : orders.length === 0 ? (
         <p className="text-sm text-neutral-500">No orders found.</p>
       ) : (

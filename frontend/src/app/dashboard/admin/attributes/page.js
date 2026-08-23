@@ -129,7 +129,9 @@ export default function AdminAttributesPage() {
       </form>
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading attributes...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading attributes...
+        </p>
       ) : attributes.length === 0 ? (
         <p className="text-sm text-neutral-500">No attributes yet.</p>
       ) : (

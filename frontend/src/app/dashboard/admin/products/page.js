@@ -1129,7 +1129,9 @@ export default function AdminProductsPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading products...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading products...
+        </p>
       ) : products.length === 0 ? (
         <p className="text-sm text-neutral-500">No products found.</p>
       ) : (

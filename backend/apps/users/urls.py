@@ -5,6 +5,7 @@ from . import views
 
 router = DefaultRouter()
 router.register("addresses", views.AddressViewSet, basename="address")
+router.register("users", views.UserManagementViewSet, basename="admin-user")
 
 urlpatterns = [
     path("auth/signup/", views.SignupView.as_view(), name="signup"),

@@ -1,6 +1,7 @@
 from django.conf import settings
+from django.db.models import ProtectedError
 from kombu.exceptions import OperationalError as BrokerOperationalError
-from rest_framework import generics, permissions, status, viewsets
+from rest_framework import generics, permissions, serializers, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -9,11 +10,13 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.cart.cart_resolver import CART_COOKIE_NAME
 from apps.cart.services import merge_guest_cart
+from apps.core.permissions import IsStaffOnly
 
 from .cookies import clear_auth_cookies, set_auth_cookies
-from .models import Address
+from .models import Address, User
 from .serializers import (
     AddressSerializer,
+    AdminUserSerializer,
     ChangePasswordSerializer,
     SigninSerializer,
     SignupSerializer,
@@ -133,12 +136,45 @@ class MeView(generics.RetrieveUpdateAPIView):
         return Response(UserSerializer(instance).data)
 
 
+class UserManagementViewSet(viewsets.ModelViewSet):
+    """Admin-only user management: list/search accounts, change role or
+    active status. No create endpoint here — accounts are made via signup."""
+
+    queryset = User.objects.all().order_by("-created_at")
+    serializer_class = AdminUserSerializer
+    permission_classes = [IsStaffOnly]
+    http_method_names = ["get", "patch", "delete", "head", "options"]
+    filterset_fields = ["role", "is_active"]
+
+    def perform_update(self, serializer):
+        if serializer.instance == self.request.user:
+            if "is_active" in serializer.validated_data:
+                raise serializers.ValidationError("You can't deactivate your own account.")
+            if "role" in serializer.validated_data:
+                raise serializers.ValidationError("You can't change your own role.")
+        serializer.save()
+
+    def perform_destroy(self, instance):
+        if instance == self.request.user:
+            raise serializers.ValidationError("You can't delete your own account.")
+        instance.delete()
+
+
 class AddressViewSet(viewsets.ModelViewSet):
     serializer_class = AddressSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
         return Address.objects.filter(user=self.request.user)
+
+    def destroy(self, request, *args, **kwargs):
+        try:
+            return super().destroy(request, *args, **kwargs)
+        except ProtectedError:
+            return Response(
+                {"detail": "This address is used on an existing order and can't be deleted."},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
     def perform_create(self, serializer):
         self._unset_other_defaults(serializer.validated_data)

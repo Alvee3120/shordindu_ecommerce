@@ -284,7 +284,9 @@ export default function AdminCouponsPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading coupons...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading coupons...
+        </p>
       ) : coupons.length === 0 ? (
         <p className="text-sm text-neutral-500">No coupons yet.</p>
       ) : (

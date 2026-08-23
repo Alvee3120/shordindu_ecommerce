@@ -32,9 +32,14 @@ class Order(models.Model):
     shipping_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     tax_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     grand_total = models.DecimalField(max_digits=10, decimal_places=2)
-    shipping_address = models.ForeignKey(Address, on_delete=models.PROTECT, related_name="shipping_orders")
+    # SET_NULL (not PROTECT) so a customer can delete a saved address even
+    # after it's been used on a past order — the order keeps its own
+    # snapshot-free record either way, it just loses the address link.
+    shipping_address = models.ForeignKey(
+        Address, on_delete=models.SET_NULL, null=True, blank=True, related_name="shipping_orders"
+    )
     billing_address = models.ForeignKey(
-        Address, on_delete=models.PROTECT, null=True, blank=True, related_name="billing_orders"
+        Address, on_delete=models.SET_NULL, null=True, blank=True, related_name="billing_orders"
     )
     payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID)
     placed_at = models.DateTimeField(auto_now_add=True)

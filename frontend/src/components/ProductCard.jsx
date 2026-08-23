@@ -8,15 +8,17 @@ import { FiHeart } from "react-icons/fi";
 /**
  * product: { id, name, description, image, price, href }
  */
-export default function ProductCard({ product }) {
+export default function ProductCard({ product, tall = false }) {
   const [wishlisted, setWishlisted] = useState(false);
   const { name, description, image, price, href = "#" } = product;
 
   return (
-    <div className="group relative flex w-full flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm transition-shadow hover:shadow-lg sm:rounded-3xl">
+    <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm transition-shadow hover:shadow-lg sm:rounded-3xl">
       <Link
         href={href}
-        className="relative block aspect-[4/5] w-full overflow-hidden bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100"
+        className={`relative block w-full overflow-hidden bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100 ${
+          tall ? "h-full min-h-[280px] flex-1" : "aspect-[4/5]"
+        }`}
       >
         {image ? (
           <Image
@@ -57,7 +59,7 @@ export default function ProductCard({ product }) {
         )}
 
         <div className="mt-1 flex items-center justify-between gap-1 sm:mt-2 sm:gap-2">
-          <span className="text-xs font-bold text-neutral-900 sm:text-lg">
+          <span className="text-[10px] font-bold text-neutral-900 sm:text-lg">
             {price != null ? `৳ ${price}` : "—"}
           </span>
           <Link

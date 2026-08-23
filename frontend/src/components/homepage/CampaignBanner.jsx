@@ -44,7 +44,7 @@ export default function CampaignBanner() {
           </h2>
 
           <p className="mb-6 max-w-xs text-sm leading-relaxed text-white/70 sm:text-base">
-            Up to 50% off on selected styles. Refresh your wardrobe before the
+            Up to 40% off on selected styles. Refresh your wardrobe before the
             season ends.
           </p>
 

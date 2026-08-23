@@ -15,6 +15,7 @@ import {
   FiStar,
   FiSliders,
   FiLink2,
+  FiUsers,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 
@@ -42,6 +43,7 @@ const roleLinks = {
     { label: "Product Addons", href: "/dashboard/admin/product-addons", icon: FiLink2 },
     { label: "Coupons", href: "/dashboard/admin/coupons", icon: FiTag },
     { label: "Reviews", href: "/dashboard/admin/reviews", icon: FiStar },
+    { label: "Users", href: "/dashboard/admin/users", icon: FiUsers },
   ],
 };
 
@@ -71,7 +73,7 @@ const DashboardLayout = ({ children }) => {
 
   if (loading || !user) {
     return (
-      <div className="mx-auto max-w-7xl px-4 py-16 text-center text-sm text-neutral-500">
+      <div className="mx-auto min-h-screen max-w-7xl px-4 py-16 text-center text-sm text-neutral-500">
         Loading...
       </div>
     );

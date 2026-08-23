@@ -4,12 +4,14 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import ProductCard from "@/components/ProductCard";
-import { listProducts } from "@/lib/products";
+import { listProducts, toCardProduct } from "@/lib/products";
 import { getCategories, buildCategoryTree } from "@/lib/categories";
 
-const WOMEN_CATEGORY_NAME = "women";
-
-export default function NewArrivals() {
+/**
+ * Shared "trending category" homepage section — fetches a category by name
+ * and renders its products in a grid/scroller with a View All link.
+ */
+export default function CategorySection({ categoryName, title }) {
   const [products, setProducts] = useState([]);
   const [categoryId, setCategoryId] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,24 +26,25 @@ export default function NewArrivals() {
 
   useEffect(() => {
     let cancelled = false;
+    const targetName = categoryName.trim().toLowerCase();
 
     getCategories()
       .then((data) => {
         if (cancelled) return null;
         const results = Array.isArray(data) ? data : data.results ?? [];
-        const women = results.find((cat) => cat.name?.trim().toLowerCase() === WOMEN_CATEGORY_NAME);
-        if (!women) {
+        const category = results.find((cat) => cat.name?.trim().toLowerCase() === targetName);
+        if (!category) {
           setLoading(false);
           return null;
         }
-        setCategoryId(women.id);
-        const [womenWithChildren] = buildCategoryTree(results).filter((cat) => cat.id === women.id);
-        const categoryIds = [women.id, ...(womenWithChildren?.children.map((c) => c.id) ?? [])];
-        return listProducts({ category: categoryIds.join(","), page_size: 4 });
+        setCategoryId(category.id);
+        const [categoryWithChildren] = buildCategoryTree(results).filter((cat) => cat.id === category.id);
+        const categoryIds = [category.id, ...(categoryWithChildren?.children.map((c) => c.id) ?? [])];
+        return listProducts({ category: categoryIds.join(","), page_size: 5 });
       })
       .then((data) => {
         if (cancelled || !data) return;
-        setProducts(data.results ?? []);
+        setProducts((data.results ?? []).map(toCardProduct));
       })
       .catch(() => {
         if (!cancelled) setProducts([]);
@@ -53,19 +56,21 @@ export default function NewArrivals() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [categoryName]);
 
   if (!loading && products.length === 0) return null;
+
+  const gridItems = loading ? Array.from({ length: 5 }) : products.slice(0, 5);
 
   return (
     <section className="w-full bg-white px-6 pt-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 flex items-center justify-between gap-3">
-          <span className="font-sora text-2xl font-medium text-neutral-500">Shordindu Women</span>
+          <span className="font-sora text-2xl font-medium text-neutral-500">{title}</span>
           {!loading && categoryId != null && (
             <Link
               href={`/shop?category=${categoryId}`}
-              className="rounded-full border border-neutral-300 px-6 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:border-neutral-900 hover:text-neutral-900"
+              className="flex items-center gap-1.5 rounded-full border border-neutral-300 px-6 py-2.5 text-sm font-medium text-neutral-700 transition-colors hover:border-neutral-900 hover:text-neutral-900"
             >
               View All
             </Link>
@@ -73,45 +78,23 @@ export default function NewArrivals() {
         </div>
 
         <div className="relative">
-          {loading ? (
-            <div
-              className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:pb-0 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden"
-            >
-              {Array.from({ length: 4 }).map((_, i) => (
+          <div
+            ref={scrollRef}
+            className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:grid sm:grid-cols-4 sm:gap-5 sm:overflow-visible sm:pb-0 [&::-webkit-scrollbar]:hidden"
+          >
+            {gridItems.map((product, i) =>
+              loading ? (
                 <div
                   key={i}
                   className="aspect-[4/5] w-[47%] shrink-0 animate-pulse snap-start rounded-2xl bg-neutral-100 sm:w-auto sm:shrink sm:rounded-3xl"
                 />
-              ))}
-            </div>
-          ) : (
-            <div
-              ref={scrollRef}
-              className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:pb-0 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden"
-            >
-              {products.map((product) => {
-                const primaryImage =
-                  product.images?.find((img) => img.is_primary)?.image ||
-                  product.images?.[0]?.image ||
-                  null;
-                const price = product.variations?.[0]?.price;
-
-                return (
-                  <div key={product.id} data-card className="w-[47%] shrink-0 snap-start sm:w-auto sm:shrink">
-                    <ProductCard
-                      product={{
-                        name: product.name,
-                        description: product.description,
-                        image: primaryImage,
-                        price: price ?? "—",
-                        href: `/shop/${product.id}`,
-                      }}
-                    />
-                  </div>
-                );
-              })}
-            </div>
-          )}
+              ) : (
+                <div key={product.id} data-card className="w-[47%] shrink-0 snap-start sm:w-auto sm:shrink">
+                  <ProductCard product={product} />
+                </div>
+              )
+            )}
+          </div>
 
           {!loading && products.length > 2 && (
             <>

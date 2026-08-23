@@ -244,7 +244,9 @@ export default function AdminCategoriesPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading categories...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading categories...
+        </p>
       ) : categories.length === 0 ? (
         <p className="text-sm text-neutral-500">No categories yet.</p>
       ) : (

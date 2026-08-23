@@ -1,5 +1,6 @@
 from rest_framework import serializers
 
+from apps.users.models import User
 from apps.users.serializers import AddressSerializer
 
 from .models import Coupon, Order, OrderCoupon, OrderItem, Payment
@@ -78,7 +79,7 @@ class OrderSerializer(serializers.ModelSerializer):
 
 
 class CheckoutSerializer(serializers.Serializer):
-    email = serializers.EmailField(required=False, allow_blank=True)
+    email = serializers.EmailField(required=False, allow_blank=True, default="")
     create_account = serializers.BooleanField(default=False)
     shipping_address_id = serializers.IntegerField(required=False)
     shipping_name = serializers.CharField(required=False, allow_blank=True)
@@ -95,8 +96,13 @@ class CheckoutSerializer(serializers.Serializer):
                     "Provide shipping_address_id or inline shipping address fields."
                 )
         else:
-            if not attrs.get("email"):
-                raise serializers.ValidationError({"email": "Required for guest checkout."})
+            if attrs.get("create_account"):
+                if not attrs.get("email"):
+                    raise serializers.ValidationError({"email": "Required to create an account."})
+                if User.objects.filter(email__iexact=attrs["email"]).exists():
+                    raise serializers.ValidationError(
+                        {"email": "An account with this email already exists. Please sign in first."}
+                    )
             if not attrs.get("shipping_address"):
                 raise serializers.ValidationError({"shipping_address": "Required for guest checkout."})
         return attrs

@@ -250,7 +250,9 @@ export default function AdminProductAddonsPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading addon links...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading addon links...
+        </p>
       ) : addons.length === 0 ? (
         <p className="text-sm text-neutral-500">No addon links yet.</p>
       ) : (

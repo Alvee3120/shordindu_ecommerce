@@ -246,7 +246,9 @@ export default function AddressesPage() {
       )}
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading addresses...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading addresses...
+        </p>
       ) : addresses.length === 0 ? (
         <p className="text-sm text-neutral-500">You haven&apos;t saved any addresses yet.</p>
       ) : (

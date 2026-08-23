@@ -31,7 +31,12 @@ export default function AdminOrderDetailPage() {
     };
   }, [id]);
 
-  if (loading) return <p className="text-sm text-neutral-500">Loading order...</p>;
+  if (loading)
+    return (
+      <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+        Loading order...
+      </p>
+    );
   if (!order) return <p className="text-sm text-neutral-500">Order not found.</p>;
 
   return (

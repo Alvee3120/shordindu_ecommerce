@@ -127,30 +127,13 @@ export default function Navbar() {
           <div className="flex flex-1 items-center">
             <ul className="hidden items-center gap-8 md:flex">
               {navLinks.map((link) => (
-                <li key={link.href} className="group relative">
+                <li key={link.href}>
                   <Link
                     href={link.href}
-                    className={`flex items-center gap-1 text-sm font-medium transition-colors ${linkColorClass}`}
+                    className={`text-sm font-medium transition-colors ${linkColorClass}`}
                   >
                     {link.label}
-                    {link.children.length > 0 && (
-                      <FiChevronDown size={14} className="transition-transform duration-200 group-hover:rotate-180" />
-                    )}
                   </Link>
-
-                  {link.children.length > 0 && (
-                    <div className="invisible absolute top-full left-0 z-50 min-w-40 translate-y-1 rounded-lg border border-neutral-100 bg-white py-2 opacity-0 shadow-lg transition-all duration-150 group-hover:visible group-hover:translate-y-2 group-hover:opacity-100">
-                      {link.children.map((child) => (
-                        <Link
-                          key={child.href}
-                          href={child.href}
-                          className="block px-4 py-2 text-sm text-neutral-600 transition-colors hover:bg-neutral-50 hover:text-(--primary)"
-                        >
-                          {child.label}
-                        </Link>
-                      ))}
-                    </div>
-                  )}
                 </li>
               ))}
             </ul>

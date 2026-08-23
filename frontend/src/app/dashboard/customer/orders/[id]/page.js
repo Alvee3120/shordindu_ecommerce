@@ -81,7 +81,11 @@ export default function OrderDetailPage() {
   }, [id, router]);
 
   if (loading) {
-    return <p className="text-sm text-neutral-500">Loading order...</p>;
+    return (
+      <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+        Loading order...
+      </p>
+    );
   }
 
   if (!order) return null;

@@ -231,9 +231,9 @@ function ShopPageContent() {
           />
         </aside>
 
-        <div className="min-w-0 flex-1">
+        <div className="sm:-mt-20 min-w-0 flex-1">
           {loading ? (
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 ">
+            <div className="grid min-h-screen grid-cols-2 gap-6 sm:grid-cols-3 ">
               {Array.from({ length: PAGE_SIZE }).map((_, i) => (
                 <div key={i} className="aspect-[4/5.6] animate-pulse rounded-3xl bg-(--primary)/10" />
               ))}

@@ -66,7 +66,9 @@ export default function AdminReviewsPage() {
       <h1 className="mb-6 text-xl font-semibold text-neutral-900">Reviews</h1>
 
       {loading ? (
-        <p className="text-sm text-neutral-500">Loading reviews...</p>
+        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+          Loading reviews...
+        </p>
       ) : reviews.length === 0 ? (
         <p className="text-sm text-neutral-500">No reviews yet.</p>
       ) : (

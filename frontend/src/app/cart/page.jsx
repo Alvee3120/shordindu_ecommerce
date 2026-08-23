@@ -86,7 +86,11 @@ export default function CartPage() {
   };
 
   if (loading) {
-    return <div className="mx-auto max-w-6xl px-6 py-16 text-sm text-neutral-500">Loading cart...</div>;
+    return (
+      <div className="mx-auto flex min-h-screen max-w-6xl items-center justify-center px-6 py-16 text-sm text-neutral-500">
+        Loading cart...
+      </div>
+    );
   }
 
   if (error) {
