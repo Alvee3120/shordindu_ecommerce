@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { FiFilter, FiX } from "react-icons/fi";
 import ProductCard from "@/components/ProductCard";
@@ -28,6 +28,10 @@ function ShopPageContent() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Set right before a clearFilters()-driven URL update, so the debounced
+  // auto-apply effect below doesn't fire on stale searchParams and stomp it
+  // (that stale-fire was how "Clear All" used to leave `search` behind).
+  const skipAutoApplyRef = useRef(false);
 
   // Draft filters (mirror URL, edited locally, committed via updateUrl/applyFilters)
   const [draftFilters, setDraftFilters] = useState({
@@ -159,8 +163,10 @@ function ShopPageContent() {
   };
 
   const clearFilters = () => {
+    skipAutoApplyRef.current = true;
     setDraftFilters({ parentCategory: "", childCategories: [], minPrice: "", maxPrice: "" });
     updateUrl({
+      search: undefined,
       category: undefined,
       subcategories: undefined,
       min_price: undefined,
@@ -172,6 +178,12 @@ function ShopPageContent() {
   // Auto-apply on desktop (no separate Apply button there)
   useEffect(() => {
     if (drawerOpen) return; // mobile applies explicitly
+    if (skipAutoApplyRef.current) {
+      // clearFilters() already pushed the correct (fully-cleared) URL directly;
+      // skip this one round so it can't re-fire off stale searchParams and undo it.
+      skipAutoApplyRef.current = false;
+      return;
+    }
     const timeout = setTimeout(() => {
       const same =
         urlParentCategory === draftFilters.parentCategory &&

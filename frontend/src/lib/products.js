@@ -6,6 +6,7 @@ export function listProducts({
   page_size,
   search,
   category,
+  visibility_type,
   min_price,
   max_price,
   ordering,
@@ -15,6 +16,7 @@ export function listProducts({
   if (page_size) params.set("page_size", page_size);
   if (search) params.set("search", search);
   if (category) params.set("category", category);
+  if (visibility_type) params.set("visibility_type", visibility_type);
   if (min_price != null && min_price !== "") params.set("min_price", min_price);
   if (max_price != null && max_price !== "") params.set("max_price", max_price);
   if (ordering) params.set("ordering", ordering);

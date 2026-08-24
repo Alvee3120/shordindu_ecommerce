@@ -14,7 +14,6 @@ import {
   FiBox,
   FiStar,
   FiSliders,
-  FiLink2,
   FiUsers,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
@@ -40,7 +39,6 @@ const roleLinks = {
     { label: "Products", href: "/dashboard/admin/products", icon: FiBox },
     { label: "Categories", href: "/dashboard/admin/categories", icon: FiGrid },
     { label: "Attributes", href: "/dashboard/admin/attributes", icon: FiSliders },
-    { label: "Product Addons", href: "/dashboard/admin/product-addons", icon: FiLink2 },
     { label: "Coupons", href: "/dashboard/admin/coupons", icon: FiTag },
     { label: "Reviews", href: "/dashboard/admin/reviews", icon: FiStar },
     { label: "Users", href: "/dashboard/admin/users", icon: FiUsers },

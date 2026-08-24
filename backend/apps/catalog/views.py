@@ -62,7 +62,10 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if self.action == "list":
+        is_staff = bool(self.request.user and self.request.user.is_authenticated and self.request.user.is_staff)
+        if self.action == "list" and not is_staff:
+            # Addon-only products aren't sold on their own, so they're hidden from the public
+            # shop listing - but staff still need to see and manage them in the admin dashboard.
             queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
         return queryset.distinct()
 

@@ -24,6 +24,7 @@ import { listAttributes } from "@/lib/attributes";
 import {
   listProductAddons,
   createProductAddon,
+  updateProductAddon,
   deleteProductAddon,
 } from "@/lib/productAddons";
 
@@ -63,6 +64,18 @@ const statusColors = {
   archived: "bg-red-100 text-red-700",
 };
 
+const visibilityLabels = {
+  standalone: "Standalone",
+  addon_only: "Addon only",
+  both: "Both",
+};
+
+const visibilityColors = {
+  standalone: "bg-neutral-100 text-neutral-600",
+  addon_only: "bg-violet-100 text-violet-700",
+  both: "bg-sky-100 text-sky-700",
+};
+
 export default function AdminProductsPage() {
   const [products, setProducts] = useState([]);
   const [allProducts, setAllProducts] = useState([]);
@@ -71,6 +84,8 @@ export default function AdminProductsPage() {
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [filterCategory, setFilterCategory] = useState("");
+  const [filterVisibility, setFilterVisibility] = useState("");
   const [loading, setLoading] = useState(true);
 
   const [editingId, setEditingId] = useState(null); // null | "new" | product id
@@ -94,6 +109,9 @@ export default function AdminProductsPage() {
   const [addonForm, setAddonForm] = useState(EMPTY_ADDON_FORM);
   const [savingAddon, setSavingAddon] = useState(false);
   const [deletingAddonId, setDeletingAddonId] = useState(null);
+  const [editingAddonId, setEditingAddonId] = useState(null);
+  const [addonEditForm, setAddonEditForm] = useState(null);
+  const [savingAddonEdit, setSavingAddonEdit] = useState(false);
 
   const [showImport, setShowImport] = useState(false);
   const [importFile, setImportFile] = useState(null);
@@ -105,7 +123,12 @@ export default function AdminProductsPage() {
     setLoading(true);
     try {
       const [productData, categoryData, allProductData, attributeData] = await Promise.all([
-        listProducts({ page, search: search || undefined }),
+        listProducts({
+          page,
+          search: search || undefined,
+          category: filterCategory || undefined,
+          visibility_type: filterVisibility || undefined,
+        }),
         categories.length ? Promise.resolve({ results: categories }) : getCategories(),
         listProducts({ page_size: 100 }),
         attributes.length ? Promise.resolve(attributes) : listAttributes(),
@@ -125,12 +148,22 @@ export default function AdminProductsPage() {
   useEffect(() => {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, filterCategory, filterVisibility]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
     setPage(1);
     load();
+  };
+
+  const handleCategoryFilterChange = (e) => {
+    setFilterCategory(e.target.value);
+    setPage(1);
+  };
+
+  const handleVisibilityFilterChange = (e) => {
+    setFilterVisibility(e.target.value);
+    setPage(1);
   };
 
   const resetEditorState = () => {
@@ -142,6 +175,8 @@ export default function AdminProductsPage() {
     setPendingImages([]);
     setProductAddons([]);
     setAddonForm(EMPTY_ADDON_FORM);
+    setEditingAddonId(null);
+    setAddonEditForm(null);
     setFieldErrors({});
     setFormError("");
   };
@@ -495,6 +530,46 @@ export default function AdminProductsPage() {
     }
   };
 
+  const startEditAddon = (addon) => {
+    setEditingAddonId(addon.id);
+    setAddonEditForm({
+      is_required: addon.is_required,
+      min_select: addon.min_select,
+      max_select: addon.max_select,
+      price_override: addon.price_override ?? "",
+    });
+  };
+
+  const cancelEditAddon = () => {
+    setEditingAddonId(null);
+    setAddonEditForm(null);
+  };
+
+  const handleAddonEditFormChange = (e) => {
+    const { name, type, checked, value } = e.target;
+    setAddonEditForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+  };
+
+  const saveAddonEdit = async (id) => {
+    setSavingAddonEdit(true);
+    try {
+      const updated = await updateProductAddon(id, {
+        is_required: addonEditForm.is_required,
+        min_select: Number(addonEditForm.min_select) || 0,
+        max_select: Number(addonEditForm.max_select) || 1,
+        price_override: addonEditForm.price_override === "" ? null : addonEditForm.price_override,
+      });
+      setProductAddons((prev) => prev.map((a) => (a.id === id ? updated : a)));
+      toast.success("Addon updated");
+      setEditingAddonId(null);
+      setAddonEditForm(null);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setSavingAddonEdit(false);
+    }
+  };
+
   // ---- Product form submit ----
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -637,6 +712,30 @@ export default function AdminProductsPage() {
               />
             </div>
           </form>
+          <select
+            value={filterCategory}
+            onChange={handleCategoryFilterChange}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+          >
+            <option value="">All Categories</option>
+            {categories.map((c) => (
+              <option key={c.id} value={c.id}>
+                {c.name}
+              </option>
+            ))}
+          </select>
+          <select
+            value={filterVisibility}
+            onChange={handleVisibilityFilterChange}
+            className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+          >
+            <option value="">All Visibility</option>
+            {Object.entries(visibilityLabels).map(([value, label]) => (
+              <option key={value} value={value}>
+                {label}
+              </option>
+            ))}
+          </select>
           {editingId === null && (
             <>
               <button
@@ -1206,33 +1305,115 @@ export default function AdminProductsPage() {
 
               {productAddons.length > 0 && (
                 <div className="mb-3 flex flex-col gap-2">
-                  {productAddons.map((addon) => (
-                    <div
-                      key={addon.id}
-                      className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2 text-sm"
-                    >
-                      <span className="font-medium text-neutral-900">
-                        {addon.addon_product_detail?.name ||
-                          allProducts.find((p) => p.id === addon.addon_product)?.name ||
-                          `Product #${addon.addon_product}`}
-                      </span>
-                      <div className="flex items-center gap-3 text-neutral-500">
-                        <span>{addon.is_required ? "Required" : "Optional"}</span>
-                        <span>
-                          {addon.min_select}/{addon.max_select}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteAddon(addon.id)}
-                          disabled={deletingAddonId === addon.id}
-                          aria-label="Remove addon"
-                          className="flex items-center justify-center rounded-md p-1 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                  {productAddons.map((addon) => {
+                    const addonName =
+                      addon.addon_product_detail?.name ||
+                      allProducts.find((p) => p.id === addon.addon_product)?.name ||
+                      `Product #${addon.addon_product}`;
+                    const isEditing = editingAddonId === addon.id;
+
+                    if (isEditing) {
+                      return (
+                        <div
+                          key={addon.id}
+                          className="flex flex-col gap-2 rounded-lg border border-(--primary) bg-(--primary)/5 px-3 py-2 text-sm"
                         >
-                          <FiTrash2 size={13} />
-                        </button>
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-neutral-900">{addonName}</span>
+                            <div className="flex items-center gap-2">
+                              <button
+                                type="button"
+                                onClick={() => saveAddonEdit(addon.id)}
+                                disabled={savingAddonEdit}
+                                aria-label="Save addon"
+                                className="flex items-center justify-center rounded-md p-1 text-neutral-500 hover:bg-neutral-100 hover:text-(--primary) disabled:opacity-50"
+                              >
+                                <FiSave size={13} />
+                              </button>
+                              <button
+                                type="button"
+                                onClick={cancelEditAddon}
+                                aria-label="Cancel edit"
+                                className="text-xs font-medium text-neutral-500 hover:text-neutral-700"
+                              >
+                                Cancel
+                              </button>
+                            </div>
+                          </div>
+                          <div className="flex flex-wrap items-center gap-2">
+                            <input
+                              type="number"
+                              name="min_select"
+                              placeholder="Min"
+                              value={addonEditForm.min_select}
+                              onChange={handleAddonEditFormChange}
+                              className="w-16 rounded-md border border-neutral-300 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-(--primary)"
+                            />
+                            <input
+                              type="number"
+                              name="max_select"
+                              placeholder="Max"
+                              value={addonEditForm.max_select}
+                              onChange={handleAddonEditFormChange}
+                              className="w-16 rounded-md border border-neutral-300 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-(--primary)"
+                            />
+                            <input
+                              type="number"
+                              step="0.01"
+                              name="price_override"
+                              placeholder="Price override"
+                              value={addonEditForm.price_override}
+                              onChange={handleAddonEditFormChange}
+                              className="w-28 rounded-md border border-neutral-300 px-2 py-1.5 text-xs outline-none focus:ring-2 focus:ring-(--primary)"
+                            />
+                            <label className="flex items-center gap-1.5 text-xs text-neutral-600">
+                              <input
+                                type="checkbox"
+                                name="is_required"
+                                checked={addonEditForm.is_required}
+                                onChange={handleAddonEditFormChange}
+                                className="h-4 w-4 rounded border-neutral-300 accent-(--primary)"
+                              />
+                              Required
+                            </label>
+                          </div>
+                        </div>
+                      );
+                    }
+
+                    return (
+                      <div
+                        key={addon.id}
+                        className="flex items-center justify-between rounded-lg border border-neutral-200 px-3 py-2 text-sm"
+                      >
+                        <span className="font-medium text-neutral-900">{addonName}</span>
+                        <div className="flex items-center gap-3 text-neutral-500">
+                          <span>{addon.is_required ? "Required" : "Optional"}</span>
+                          <span>
+                            {addon.min_select}/{addon.max_select}
+                          </span>
+                          {addon.price_override != null && <span>Override: {addon.price_override}</span>}
+                          <button
+                            type="button"
+                            onClick={() => startEditAddon(addon)}
+                            aria-label="Edit addon"
+                            className="flex items-center justify-center rounded-md p-1 text-neutral-500 hover:bg-neutral-100 hover:text-(--primary)"
+                          >
+                            <FiEdit2 size={13} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteAddon(addon.id)}
+                            disabled={deletingAddonId === addon.id}
+                            aria-label="Remove addon"
+                            className="flex items-center justify-center rounded-md p-1 text-red-500 hover:bg-red-50 disabled:opacity-50"
+                          >
+                            <FiTrash2 size={13} />
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                 </div>
               )}
 
@@ -1332,6 +1513,7 @@ export default function AdminProductsPage() {
               <tr className="border-b border-neutral-200 text-neutral-500">
                 <th className="px-5 py-3 font-medium">Name</th>
                 <th className="px-5 py-3 font-medium">Category</th>
+                <th className="px-5 py-3 font-medium">Visibility</th>
                 <th className="px-5 py-3 font-medium">Status</th>
                 <th className="px-5 py-3 font-medium">Rating</th>
                 <th className="px-5 py-3 font-medium text-right">Actions</th>
@@ -1343,6 +1525,15 @@ export default function AdminProductsPage() {
                   <td className="px-5 py-3 font-medium text-neutral-900">{product.name}</td>
                   <td className="px-5 py-3 text-neutral-500">
                     {(product.category_names || []).join(", ") || "—"}
+                  </td>
+                  <td className="px-5 py-3">
+                    <span
+                      className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold ${
+                        visibilityColors[product.visibility_type] || "bg-neutral-100 text-neutral-600"
+                      }`}
+                    >
+                      {visibilityLabels[product.visibility_type] || product.visibility_type}
+                    </span>
                   </td>
                   <td className="px-5 py-3">
                     <span

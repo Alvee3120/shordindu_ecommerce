@@ -1,23 +1,33 @@
 "use client";
 
-import { useState, useEffect, useRef, useCallback } from "react";
+import { Suspense, useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { FiSearch, FiLoader } from "react-icons/fi";
 import { listProducts, toCardProduct } from "@/lib/products";
 
 const DEBOUNCE_MS = 300;
 
-export default function SearchBar({ className = "", inputClassName = "", autoFocus = false, onNavigate }) {
+function SearchBarInner({ className = "", inputClassName = "", autoFocus = false, onNavigate }) {
   const router = useRouter();
-  const [query, setQuery] = useState("");
+  const searchParams = useSearchParams();
+  const urlSearch = searchParams.get("search") || "";
+  const [query, setQuery] = useState(urlSearch);
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
   const [open, setOpen] = useState(false);
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
   const requestIdRef = useRef(0);
+
+  // Keep the box in sync with the active search elsewhere (e.g. cleared via
+  // the shop page's "Clear All", or removed by navigating away) - but only
+  // react to actual navigation, never to the user's own in-progress typing.
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing from the URL, not from a fetch
+    setQuery(urlSearch);
+  }, [urlSearch]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
@@ -138,5 +148,15 @@ export default function SearchBar({ className = "", inputClassName = "", autoFoc
         </div>
       )}
     </div>
+  );
+}
+
+// useSearchParams() requires a Suspense boundary - wrapped here so every
+// call site (desktop/mobile, both navbars) gets it for free.
+export default function SearchBar(props) {
+  return (
+    <Suspense fallback={null}>
+      <SearchBarInner {...props} />
+    </Suspense>
   );
 }

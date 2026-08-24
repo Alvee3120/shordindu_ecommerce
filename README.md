@@ -77,3 +77,4 @@ backend/
     reviews/       # reviews
 frontend/          # Next.js app (placeholder — see frontend/README.md)
 ```
+

@@ -7,7 +7,6 @@ import {
   FiBox,
   FiGrid,
   FiSliders,
-  FiLink2,
   FiTag,
   FiStar,
   FiArrowRight,
@@ -25,7 +24,6 @@ const sections = [
   { label: "Products", href: "/dashboard/admin/products", icon: FiBox, description: "Add, edit, and organize products", statKey: "products" },
   { label: "Categories", href: "/dashboard/admin/categories", icon: FiGrid, description: "Manage product categories", statKey: "categories" },
   { label: "Attributes", href: "/dashboard/admin/attributes", icon: FiSliders, description: "Configure product attributes" },
-  { label: "Product Addons", href: "/dashboard/admin/product-addons", icon: FiLink2, description: "Manage add-on products" },
   { label: "Coupons", href: "/dashboard/admin/coupons", icon: FiTag, description: "Create and manage discount coupons", statKey: "coupons" },
   { label: "Reviews", href: "/dashboard/admin/reviews", icon: FiStar, description: "Moderate customer reviews", statKey: "reviews" },
 ];
