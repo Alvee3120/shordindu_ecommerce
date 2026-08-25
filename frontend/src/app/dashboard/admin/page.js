@@ -95,7 +95,7 @@ export default function AdminDashboardPage() {
         Here&apos;s an overview of your store.
       </p>
 
-      <div className="mb-10 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mb-10 grid grid-cols-2 gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {sections.map(({ label, href, icon: Icon, description, statKey }) => (
           <Link
             key={href}
@@ -108,7 +108,7 @@ export default function AdminDashboardPage() {
                   <Icon size={18} />
                 </div>
                 {statKey && (
-                  <span className="text-2xl font-semibold text-neutral-900">
+                  <span className="text-lg md:text-2xl font-semibold text-neutral-900">
                     {loadingStats ? "—" : counts[statKey] ?? "—"}
                   </span>
                 )}
