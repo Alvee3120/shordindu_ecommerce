@@ -326,7 +326,7 @@ export default function ProductDetailsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-7xl px-6 py-10 sm:px-8">
+    <div className="mx-auto max-w-7xl px-6 pt-20 pb-10 sm:px-8">
       <Link
         href="/"
         className="mb-6 flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-(--primary)"
@@ -429,14 +429,6 @@ export default function ProductDetailsPage() {
                 <div key={group.attribute}>
                   <div className="mb-1.5 flex items-center justify-between">
                     <p className="text-sm font-medium text-neutral-700">{group.attribute}:</p>
-                    {group.attribute.toLowerCase() === "size" && (
-                      <Link
-                        href="/footerLinks/size-guide"
-                        className="text-xs font-medium text-(--primary) underline underline-offset-2 hover:text-(--primary)/80"
-                      >
-                        Size Guide
-                      </Link>
-                    )}
                   </div>
                   <div className="flex flex-wrap gap-2">
                     {group.values.map((v) => {

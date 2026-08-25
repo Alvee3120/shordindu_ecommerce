@@ -5,10 +5,10 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { FiChevronRight } from "react-icons/fi";
 import { listOrders } from "@/lib/orders";
-import { useAuth } from "@/context/AuthContext";
 
 const STATUS_STYLES = {
   pending: "bg-amber-50 text-amber-700",
+  confirmed: "bg-cyan-50 text-cyan-700",
   processing: "bg-blue-50 text-blue-700",
   shipped: "bg-indigo-50 text-indigo-700",
   delivered: "bg-emerald-50 text-emerald-700",
@@ -34,9 +34,6 @@ function Badge({ value, styles }) {
 }
 
 export default function OrdersPage() {
-  const { user } = useAuth();
-  const isStaff = user?.role === "staff" || user?.role === "admin";
-
   const [orders, setOrders] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -49,7 +46,7 @@ export default function OrdersPage() {
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    listOrders({ page, status: statusFilter || undefined })
+    listOrders({ page, status: statusFilter || undefined, mine: true })
       .then((data) => {
         if (cancelled) return;
         setOrders(data.results);
@@ -65,9 +62,7 @@ export default function OrdersPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-neutral-900">
-          {isStaff ? "All Orders" : "My Orders"}
-        </h1>
+        <h1 className="text-xl font-semibold text-neutral-900">My Orders</h1>
 
         <select
           value={statusFilter}
@@ -79,6 +74,7 @@ export default function OrdersPage() {
         >
           <option value="">All statuses</option>
           <option value="pending">Pending</option>
+          <option value="confirmed">Confirmed</option>
           <option value="processing">Processing</option>
           <option value="shipped">Shipped</option>
           <option value="delivered">Delivered</option>

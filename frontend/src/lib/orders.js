@@ -1,7 +1,7 @@
 // lib/orders.js
 import { apiFetch } from "./api";
 
-export function listOrders({ page, status, payment_status, search, placed_after, placed_before } = {}) {
+export function listOrders({ page, status, payment_status, search, placed_after, placed_before, mine } = {}) {
   const params = new URLSearchParams();
   if (page) params.set("page", page);
   if (status) params.set("status", status);
@@ -9,6 +9,7 @@ export function listOrders({ page, status, payment_status, search, placed_after,
   if (search) params.set("search", search);
   if (placed_after) params.set("placed_after", placed_after);
   if (placed_before) params.set("placed_before", placed_before);
+  if (mine) params.set("mine", "true");
   const query = params.toString();
   return apiFetch(`/orders/${query ? `?${query}` : ""}`, { method: "GET" });
 }
@@ -30,6 +31,10 @@ export function checkout(payload) {
 // Admin-only order status transitions.
 export function confirmOrder(id) {
   return apiFetch(`/orders/${id}/confirm/`, { method: "POST" });
+}
+
+export function processOrder(id) {
+  return apiFetch(`/orders/${id}/process/`, { method: "POST" });
 }
 
 export function cancelOrder(id) {

@@ -9,6 +9,7 @@ import { getOrder } from "@/lib/orders";
 
 const STATUS_STYLES = {
   pending: "bg-amber-50 text-amber-700",
+  confirmed: "bg-cyan-50 text-cyan-700",
   processing: "bg-blue-50 text-blue-700",
   shipped: "bg-indigo-50 text-indigo-700",
   delivered: "bg-emerald-50 text-emerald-700",
@@ -143,7 +144,7 @@ export default function OrderDetailPage() {
                 </div>
               )}
               <div className="flex justify-between text-neutral-600">
-                <span>Shipping</span>
+                <span>Delivery Charge</span>
                 <span>৳{order.shipping_total}</span>
               </div>
               <div className="flex justify-between text-neutral-600">

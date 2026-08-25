@@ -49,7 +49,7 @@ export default function ProductCard({ product, tall = false }) {
 
       <div className="flex flex-1 flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-4">
         <Link href={href}>
-          <h3 className="font-sora line-clamp-1 text-sm font-semibold text-neutral-900 sm:text-base">
+          <h3 className=" line-clamp-1 text-sm font-semibold text-neutral-900 sm:text-base">
             {name}
           </h3>
         </Link>
