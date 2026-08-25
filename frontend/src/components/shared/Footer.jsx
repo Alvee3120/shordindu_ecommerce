@@ -18,6 +18,8 @@ const otherLinks = [
   { label: "Order & Delivery Process", href: "/order-delivery" },
 ];
 
+const FOOTER_CATEGORY_NAMES = ["Men", "Women", "Dress", "Saree", "Bag"];
+
 export default function Footer() {
   const [categoryLinks, setCategoryLinks] = useState([]);
 
@@ -27,8 +29,13 @@ export default function Footer() {
       .then((data) => {
         if (cancelled) return;
         const results = Array.isArray(data) ? data : data.results ?? [];
+        const filtered = results.filter((cat) =>
+          FOOTER_CATEGORY_NAMES.some(
+            (name) => name.toLowerCase() === (cat.name ?? "").trim().toLowerCase()
+          )
+        );
         setCategoryLinks(
-          results.map((cat) => ({ id: cat.id, label: cat.name, href: `/shop?category=${cat.id}` }))
+          filtered.map((cat) => ({ id: cat.id, label: cat.name, href: `/shop?category=${cat.id}` }))
         );
       })
       .catch(() => {

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
-import { FiEye } from "react-icons/fi";
+import { FiEye, FiSearch } from "react-icons/fi";
 import { listOrders } from "@/lib/orders";
 import OrderDetailModal from "@/components/admin/OrderDetailModal";
 
@@ -22,13 +22,36 @@ export default function AdminOrdersPage() {
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [status, setStatus] = useState("");
+  const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
+  const [dateFrom, setDateFrom] = useState("");
+  const [dateTo, setDateTo] = useState("");
   const [loading, setLoading] = useState(true);
   const [activeOrderId, setActiveOrderId] = useState(null);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      setSearch(searchInput.trim());
+      setPage(1);
+    }, 400);
+    return () => clearTimeout(timeout);
+  }, [searchInput]);
+
+  useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    listOrders({ page, status: status || undefined })
+    // A single filled-in date field means "that exact day", not an open-ended
+    // range — mirror it to both bounds so e.g. only From="14 Aug" doesn't also
+    // pull in every order placed after the 14th.
+    const effectiveFrom = dateFrom || dateTo || undefined;
+    const effectiveTo = dateTo || dateFrom || undefined;
+    listOrders({
+      page,
+      status: status || undefined,
+      search: search || undefined,
+      placed_after: effectiveFrom,
+      placed_before: effectiveTo,
+    })
       .then((data) => {
         if (cancelled) return;
         setOrders(data.results);
@@ -39,7 +62,15 @@ export default function AdminOrdersPage() {
     return () => {
       cancelled = true;
     };
-  }, [page, status]);
+  }, [page, status, search, dateFrom, dateTo]);
+
+  const hasDateFilter = Boolean(dateFrom || dateTo);
+
+  const resetDateFilter = () => {
+    setDateFrom("");
+    setDateTo("");
+    setPage(1);
+  };
 
   const totalPages = Math.max(1, Math.ceil(count / 20));
 
@@ -47,7 +78,21 @@ export default function AdminOrdersPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">Orders</h1>
-        <select
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative">
+            <FiSearch
+              size={16}
+              className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400"
+            />
+            <input
+              type="text"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              placeholder="Search order # or customer..."
+              className="w-64 rounded-lg border border-neutral-300 py-2 pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+            />
+          </div>
+          <select
           value={status}
           onChange={(e) => {
             setStatus(e.target.value);
@@ -60,7 +105,40 @@ export default function AdminOrdersPage() {
               {opt ? opt[0].toUpperCase() + opt.slice(1) : "All statuses"}
             </option>
           ))}
-        </select>
+          </select>
+          <div className="flex items-center gap-2">
+            <input
+              type="date"
+              value={dateFrom}
+              onChange={(e) => {
+                setDateFrom(e.target.value);
+                setPage(1);
+              }}
+              max={dateTo || undefined}
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+            />
+            <span className="text-sm text-neutral-400">to</span>
+            <input
+              type="date"
+              value={dateTo}
+              onChange={(e) => {
+                setDateTo(e.target.value);
+                setPage(1);
+              }}
+              min={dateFrom || undefined}
+              className="rounded-lg border border-neutral-300 px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+            />
+            {hasDateFilter && (
+              <button
+                type="button"
+                onClick={resetDateFilter}
+                className="rounded-lg border border-neutral-300 px-3 py-2 text-sm text-neutral-600 hover:bg-neutral-100"
+              >
+                Reset
+              </button>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">

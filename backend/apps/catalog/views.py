@@ -62,7 +62,10 @@ class ProductViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = super().get_queryset()
-        if self.action == "list":
+        # Addon-only products aren't meant to appear as standalone shop listings,
+        # but staff managing the catalog (e.g. /admin/products) still need to see
+        # every product regardless of visibility type.
+        if self.action == "list" and not self.request.user.is_staff:
             queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
         return queryset.distinct()
 

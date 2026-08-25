@@ -174,7 +174,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # CORS (Next.js frontend)
 # --------------------------------------------------------------------------
 
+# Dev tunnels terminate TLS and forward plain HTTP to the local server, so
+# without this Django thinks every request is http:// and generates mixed-
+# content media/absolute URLs and mishandles Secure-cookie/CSRF checks.
+SECURE_PROXY_SSL_HEADER = ("HTTP_X_FORWARDED_PROTO", "https")
+USE_X_FORWARDED_HOST = True
+
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=["http://localhost:3000"])
+# Lets the frontend's VS Code dev tunnel origin (a different random subdomain
+# each session) through without needing to hardcode/update it per session.
+CORS_ALLOWED_ORIGIN_REGEXES = env.list("CORS_ALLOWED_ORIGIN_REGEXES", default=[])
 CORS_ALLOW_ALL_ORIGINS = env("CORS_ALLOW_ALL_ORIGINS")
 # JWT auth cookies are httpOnly/Secure and must ride along on cross-origin
 # requests from the Next.js frontend, so credentialed CORS is required.

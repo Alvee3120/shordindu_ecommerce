@@ -118,7 +118,7 @@ export default function CartPage() {
   return (
     <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
       <Link
-        href="/"
+        href="/shop"
         className="mb-6 flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-(--primary)"
       >
         <FiChevronLeft size={16} />

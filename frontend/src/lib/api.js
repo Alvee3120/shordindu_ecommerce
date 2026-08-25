@@ -1,6 +1,25 @@
 // lib/api.js
-export const API_BASE_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+
+/**
+ * The configured API base is a fixed http://localhost:8000/api, which only
+ * resolves on the machine running the dev servers. When the app is opened
+ * through a VS Code dev tunnel, the browser is on a different host and that
+ * address is unreachable — so on a *.devtunnels.ms origin we instead swap the
+ * frontend's forwarded port (3000) for the backend's (8000) in the current
+ * tunnel hostname, e.g. abc-3000.use.devtunnels.ms -> abc-8000.use.devtunnels.ms.
+ */
+function resolveApiBaseUrl() {
+  const configured = process.env.NEXT_PUBLIC_API_BASE_URL || "http://localhost:8000/api";
+  if (typeof window === "undefined") return configured;
+
+  const { hostname, protocol } = window.location;
+  if (hostname.endsWith(".devtunnels.ms") && hostname.includes("-3000.")) {
+    return `${protocol}//${hostname.replace("-3000.", "-8000.")}/api`;
+  }
+  return configured;
+}
+
+export const API_BASE_URL = resolveApiBaseUrl();
 
 const SAFE_METHODS = ["GET", "HEAD", "OPTIONS", "TRACE"];
 // Requests to these paths must never trigger a refresh-and-retry — refreshing

@@ -9,6 +9,7 @@ from apps.core.permissions import IsStaffOnly
 from apps.users.cookies import set_auth_cookies
 from apps.users.tasks import send_account_created_email
 
+from .filters import OrderFilter
 from .models import Coupon, Order
 from .serializers import CheckoutSerializer, CouponSerializer, OrderSerializer
 from .services import CheckoutError, checkout
@@ -46,7 +47,8 @@ class CheckoutView(APIView):
 class OrderViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["status", "payment_status"]
+    filterset_class = OrderFilter
+    search_fields = ["order_number", "guest_email", "user__email", "user__name"]
 
     def get_queryset(self):
         user = self.request.user
