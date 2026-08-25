@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname, useSearchParams } from "next/navigation";
 import { FiSearch, FiLoader } from "react-icons/fi";
 import { listProducts, toCardProduct } from "@/lib/products";
 
@@ -11,6 +11,8 @@ const DEBOUNCE_MS = 300;
 
 export default function SearchBar({ className = "", inputClassName = "", autoFocus = false, onNavigate }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [query, setQuery] = useState("");
   const [results, setResults] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -18,6 +20,11 @@ export default function SearchBar({ className = "", inputClassName = "", autoFoc
   const containerRef = useRef(null);
   const debounceRef = useRef(null);
   const requestIdRef = useRef(0);
+
+  useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- keep the input in sync with the shop page's URL (e.g. when filters are cleared)
+    setQuery(pathname === "/shop" ? searchParams.get("search") || "" : "");
+  }, [pathname, searchParams]);
 
   useEffect(() => {
     const handleClickOutside = (e) => {
