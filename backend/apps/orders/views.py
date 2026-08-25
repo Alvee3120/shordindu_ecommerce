@@ -57,7 +57,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         return Order.objects.filter(user=user).order_by("-placed_at")
 
     def get_permissions(self):
-        if self.action in ("confirm", "cancel", "ship", "deliver"):
+        if self.action in ("confirm", "process", "cancel", "ship", "deliver"):
             return [IsStaffOnly()]
         return super().get_permissions()
 
@@ -69,6 +69,10 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
+        return self._set_status(Order.Status.CONFIRMED)
+
+    @action(detail=True, methods=["post"])
+    def process(self, request, pk=None):
         return self._set_status(Order.Status.PROCESSING)
 
     @action(detail=True, methods=["post"])

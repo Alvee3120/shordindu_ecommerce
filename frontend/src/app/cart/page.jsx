@@ -10,8 +10,9 @@ import { getCart, updateCartItem, deleteCartItem } from "@/lib/cart";
 import { getMe } from "@/lib/auth";
 import { listAddresses } from "@/lib/addresses";
 import { useCart } from "@/context/CartContext";
+import { getDeliveryFee } from "@/lib/districts";
 
-const ESTIMATED_SHIPPING = 120;
+const DEFAULT_ESTIMATED_SHIPPING = 120;
 
 export default function CartPage() {
   const router = useRouter();
@@ -107,7 +108,8 @@ export default function CartPage() {
   const items = cart?.items || [];
   const isEmpty = items.length === 0;
   const subtotal = Number(cart?.subtotal || 0);
-  const total = subtotal + (isEmpty ? 0 : ESTIMATED_SHIPPING);
+  const estimatedShipping = getDeliveryFee(shippingAddress?.district) ?? DEFAULT_ESTIMATED_SHIPPING;
+  const total = subtotal + (isEmpty ? 0 : estimatedShipping);
 
   // flatten each top-level item with its addon children, in display order
   const rows = items.flatMap((item) => [
@@ -246,7 +248,7 @@ export default function CartPage() {
                 </span>
               </div>
               <p className="text-right text-xs text-(--primary)">
-                * Charges may vary: ৳{ESTIMATED_SHIPPING.toFixed(2)}
+                * Charges may vary: ৳{estimatedShipping.toFixed(2)}
               </p>
             </div>
 
