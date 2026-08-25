@@ -81,7 +81,7 @@ export default function CustomerReviews() {
     <section className="w-full bg-white px-6 py-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 text-center">
-          <span className="font-sora text-2xl font-medium text-neutral-500">
+          <span className="font-sora text-2xl font-medium text-(--primary)">
             What Our Customers Say
           </span>
         </div>

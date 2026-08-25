@@ -61,7 +61,7 @@ export default function NewArrivals() {
     <section className="w-full bg-white px-6 pt-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 flex items-center justify-between gap-3">
-          <span className="font-sora text-2xl font-medium text-neutral-500">Shordindu Women</span>
+          <span className="font-sora text-2xl font-medium text-(--primary)">Shordindu Women</span>
           {!loading && categoryId != null && (
             <Link
               href={`/shop?category=${categoryId}`}
