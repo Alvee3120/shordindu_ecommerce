@@ -125,7 +125,7 @@ export default function Navbar() {
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           {/* Left: nav links (desktop) / hamburger (mobile) */}
           <div className="flex flex-1 items-center">
-            <ul className="hidden items-center gap-8 md:flex">
+            <ul className="hidden items-center gap-4 lg:gap-8 md:flex">
               {navLinks.map((link) => (
                 <li key={link.href}>
                   <Link

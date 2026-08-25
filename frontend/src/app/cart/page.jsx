@@ -116,7 +116,7 @@ export default function CartPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
+    <div className="mx-auto max-w-6xl px-6 pt-22 pb-10 sm:px-8">
       <Link
         href="/shop"
         className="mb-6 flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-(--primary)"
@@ -131,7 +131,7 @@ export default function CartPage() {
         <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">Your cart is empty.</p>
           <Link
-            href="/"
+            href="/shop"
             className="mt-4 inline-block rounded-full bg-(--primary) px-6 py-2.5 text-sm font-semibold text-white hover:bg-(--primary)/90"
           >
             Start shopping

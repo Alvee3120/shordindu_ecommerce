@@ -80,9 +80,9 @@ const DashboardLayout = ({ children }) => {
   }
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl  flex-col gap-8 px-4 py-10 sm:px-6 lg:flex-row">
-      <aside className="w-full shrink-0 lg:w-64 border-r border-r-gray-200 pr-4">
-        <div className="mb-6">
+    <div className="mx-auto flex w-full max-w-7xl flex-col gap-6 px-4 py-6 sm:gap-8 sm:px-6 sm:py-10 lg:flex-row">
+      <aside className="w-full shrink-0 border-b border-neutral-200 pb-4 lg:w-64 lg:border-r lg:border-b-0 lg:border-r-gray-200 lg:pr-4 lg:pb-0">
+        <div className="mb-4 lg:mb-6">
           <p className="text-sm text-neutral-500">Signed in as</p>
           <p className="truncate font-medium text-neutral-900">{user.name}</p>
           <p className="truncate text-sm text-neutral-500">{user.email}</p>
@@ -93,7 +93,7 @@ const DashboardLayout = ({ children }) => {
           )}
         </div>
 
-        <nav className="flex flex-row gap-1 overflow-x-auto lg:flex-col lg:overflow-visible">
+        <nav className="-mx-4 flex flex-row gap-1 overflow-x-auto px-4 pb-1 sm:-mx-6 sm:px-6 lg:mx-0 lg:flex-col lg:overflow-visible lg:px-0 lg:pb-0">
           {links.map(({ label, href, icon: Icon }) => {
             const isActive = pathname === href;
             return (

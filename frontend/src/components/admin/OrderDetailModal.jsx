@@ -223,7 +223,7 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
         </div>
 
         {order && (
-          <div className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 px-5 py-4">
             <label htmlFor="order-status-action" className="text-sm text-neutral-500">
               Update status
             </label>

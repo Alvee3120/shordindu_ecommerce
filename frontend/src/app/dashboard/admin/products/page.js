@@ -130,7 +130,7 @@ export default function AdminProductsPage() {
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">Products</h1>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-3">
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2">
               <FiSearch size={14} className="text-neutral-400" />

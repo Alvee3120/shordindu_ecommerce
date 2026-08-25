@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { FaInstagram, FaFacebookF } from "react-icons/fa";
+import { FiPhone, FiMail } from "react-icons/fi";
 import { getCategories } from "@/lib/categories";
 
 const logoSrc = "/assets/logo/logoDark.png";
@@ -124,7 +125,7 @@ export default function Footer() {
           </div>
 
           {/* Column 4: Others */}
-          <div>
+          <div className="min-w-0">
             <h4 className="mb-5 text-xs font-semibold tracking-widest text-gray-400">
               OTHERS
             </h4>
@@ -150,17 +151,19 @@ export default function Footer() {
               <li>
                 <a
                   href="tel:+8801935600400"
-                  className="text-[15px] text-gray-200 transition-colors hover:text-white"
+                  className="flex items-center gap-2 text-[15px] text-gray-200 transition-colors hover:text-white"
                 >
-                  ✆ +880 1935 600 400
+                  <FiPhone size={14} className="shrink-0" />
+                  <span>+880 1935 600 400</span>
                 </a>
               </li>
               <li>
                 <a
                   href="mailto:contact.shordindu@gmail.com"
-                  className="text-[15px] text-gray-200 transition-colors hover:text-white"
+                  className="flex items-start gap-2 text-[15px] text-gray-200 transition-colors hover:text-white"
                 >
-                  ✉ contact.shordindu@gmail.com
+                  <FiMail size={14} className="mt-0.5 shrink-0" />
+                  <span className="min-w-0 break-all">contact.shordindu@gmail.com</span>
                 </a>
               </li>
             </ul>

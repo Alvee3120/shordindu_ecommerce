@@ -122,7 +122,7 @@ export default function AdminCategoriesPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">Categories</h1>
         {editingId === null && (
           <button
