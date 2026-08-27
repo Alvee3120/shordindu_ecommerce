@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import { toast } from "sonner";
 import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiUpload, FiDownload } from "react-icons/fi";
 import { listProducts, deleteProduct, bulkImportProducts, downloadImportTemplate } from "@/lib/products";
@@ -273,7 +274,32 @@ export default function AdminProductsPage() {
             <tbody>
               {products.map((product) => (
                 <tr key={product.id} className="border-b border-neutral-100 last:border-0">
-                  <td className="px-5 py-3 font-medium text-neutral-900">{product.name}</td>
+                  <td className="px-5 py-3 font-medium text-neutral-900">
+                    <div className="flex min-w-0 items-center gap-3">
+                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100">
+                        {(() => {
+                          const image =
+                            product.images?.find((item) => item.is_primary)?.image ||
+                            product.images?.[0]?.image;
+
+                          return image ? (
+                            <Image
+                              src={image}
+                              alt={product.name}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center px-1 text-center text-[9px] font-medium leading-tight text-neutral-400">
+                              No image
+                            </div>
+                          );
+                        })()}
+                      </div>
+                      <span className="min-w-0 break-words">{product.name}</span>
+                    </div>
+                  </td>
                   <td className="px-5 py-3 text-neutral-500">
                     {(product.category_names || []).join(", ") || "—"}
                   </td>
