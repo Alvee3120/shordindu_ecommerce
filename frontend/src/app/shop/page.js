@@ -160,13 +160,8 @@ function ShopPageContent() {
 
   const clearFilters = () => {
     setDraftFilters({ parentCategory: "", childCategories: [], minPrice: "", maxPrice: "" });
-    updateUrl({
-      category: undefined,
-      subcategories: undefined,
-      min_price: undefined,
-      max_price: undefined,
-      page: 1,
-    });
+    router.push("/shop");
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   // Auto-apply on desktop (no separate Apply button there)

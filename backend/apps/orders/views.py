@@ -9,6 +9,7 @@ from apps.core.permissions import IsStaffOnly
 from apps.users.cookies import set_auth_cookies
 from apps.users.tasks import send_account_created_email
 
+from .filters import OrderFilter
 from .models import Coupon, Order
 from .serializers import CheckoutSerializer, CouponSerializer, OrderSerializer
 from .services import CheckoutError, checkout
@@ -46,7 +47,8 @@ class CheckoutView(APIView):
 class OrderViewSet(viewsets.ReadOnlyModelViewSet):
     serializer_class = OrderSerializer
     permission_classes = [permissions.IsAuthenticated]
-    filterset_fields = ["status", "payment_status"]
+    filterset_class = OrderFilter
+    search_fields = ["order_number", "guest_email", "user__email", "user__name"]
 
     def get_queryset(self):
         user = self.request.user
@@ -55,7 +57,7 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
         return Order.objects.filter(user=user).order_by("-placed_at")
 
     def get_permissions(self):
-        if self.action in ("confirm", "cancel", "ship", "deliver"):
+        if self.action in ("confirm", "process", "cancel", "ship", "deliver"):
             return [IsStaffOnly()]
         return super().get_permissions()
 
@@ -67,6 +69,10 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
 
     @action(detail=True, methods=["post"])
     def confirm(self, request, pk=None):
+        return self._set_status(Order.Status.CONFIRMED)
+
+    @action(detail=True, methods=["post"])
+    def process(self, request, pk=None):
         return self._set_status(Order.Status.PROCESSING)
 
     @action(detail=True, methods=["post"])

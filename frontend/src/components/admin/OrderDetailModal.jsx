@@ -1,12 +1,14 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import Image from "next/image";
 import { toast } from "sonner";
 import { FiX } from "react-icons/fi";
-import { getOrder, confirmOrder, cancelOrder, shipOrder, deliverOrder } from "@/lib/orders";
+import { getOrder, confirmOrder, processOrder, cancelOrder, shipOrder, deliverOrder } from "@/lib/orders";
 
 const statusColors = {
   pending: "bg-amber-100 text-amber-700",
+  confirmed: "bg-cyan-100 text-cyan-700",
   processing: "bg-blue-100 text-blue-700",
   shipped: "bg-indigo-100 text-indigo-700",
   delivered: "bg-emerald-100 text-emerald-700",
@@ -15,9 +17,13 @@ const statusColors = {
 
 // All possible status transitions — always shown minus whichever matches the
 // order's current status, so status stays changeable even from
-// cancelled/delivered (e.g. correcting a mistaken cancel).
+// cancelled/delivered (e.g. correcting a mistaken cancel). Each `value` is
+// the status that action actually results in — must line up 1:1 with
+// Order.Status on the backend so the current status always excludes the
+// matching action (e.g. a "confirmed" order never re-offers "Confirm").
 const ALL_ACTIONS = [
-  { label: "Confirm", value: "processing", action: confirmOrder },
+  { label: "Confirm", value: "confirmed", action: confirmOrder },
+  { label: "Process", value: "processing", action: processOrder },
   { label: "Ship", value: "shipped", action: shipOrder },
   { label: "Mark delivered", value: "delivered", action: deliverOrder },
   { label: "Cancel", value: "cancelled", action: cancelOrder },
@@ -180,16 +186,33 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
                 <div className="divide-y divide-neutral-100">
                   {order.items.map((item) => (
                     <div key={item.id} className="flex items-center justify-between gap-4 py-2.5">
-                      <div>
-                        <p className="text-sm font-medium text-neutral-900">
-                          {item.product_name_snapshot}
-                        </p>
+                      <div className="flex min-w-0 items-center gap-3">
+                        <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100">
+                          {item.product_image ? (
+                            <Image
+                              src={item.product_image}
+                              alt={item.product_name_snapshot}
+                              fill
+                              className="object-cover"
+                              sizes="40px"
+                            />
+                          ) : (
+                            <div className="flex h-full items-center justify-center px-1 text-center text-[9px] font-medium leading-tight text-neutral-400">
+                              No image
+                            </div>
+                          )}
+                        </div>
+                        <div className="min-w-0">
+                          <p className="break-words text-sm font-medium text-neutral-900">
+                            {item.product_name_snapshot}
+                          </p>
                         <p className="text-xs text-neutral-500">
                           {item.variation_label_snapshot} &middot; Qty {item.quantity} &middot; ৳
                           {item.unit_price} each
                         </p>
+                        </div>
                       </div>
-                      <p className="text-sm font-medium text-neutral-900">৳{item.line_total}</p>
+                      <p className="shrink-0 text-sm font-medium text-neutral-900">৳{item.line_total}</p>
                     </div>
                   ))}
                 </div>
@@ -205,7 +228,7 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
                     </div>
                   )}
                   <div className="flex justify-between text-neutral-600">
-                    <span>Shipping</span>
+                    <span>Delivery Charge</span>
                     <span>৳{order.shipping_total}</span>
                   </div>
                   <div className="flex justify-between text-neutral-600">
@@ -223,7 +246,7 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
         </div>
 
         {order && (
-          <div className="flex items-center justify-end gap-2 border-t border-neutral-200 px-5 py-4">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-neutral-200 px-5 py-4">
             <label htmlFor="order-status-action" className="text-sm text-neutral-500">
               Update status
             </label>

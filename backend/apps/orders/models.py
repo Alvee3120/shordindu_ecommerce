@@ -11,6 +11,7 @@ from apps.users.models import Address
 class Order(models.Model):
     class Status(models.TextChoices):
         PENDING = "pending", "Pending"
+        CONFIRMED = "confirmed", "Confirmed"
         PROCESSING = "processing", "Processing"
         SHIPPED = "shipped", "Shipped"
         DELIVERED = "delivered", "Delivered"

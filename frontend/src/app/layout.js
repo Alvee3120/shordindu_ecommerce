@@ -1,3 +1,4 @@
+import { Suspense } from "react";
 import localFont from "next/font/local";
 import "./globals.css";
 import NavbarSwitcher from "@/components/shared/NavbarSwitcher";
@@ -51,7 +52,9 @@ export default function RootLayout({ children }) {
           <CartProvider>
             <SmoothScroll>
               <AppLoadingShell brandText="shordindu">
-                <NavbarSwitcher />
+                <Suspense fallback={null}>
+                  <NavbarSwitcher />
+                </Suspense>
                 <main>{children}</main>
                 {/* <Footer /> */}
                 <FooterT />

@@ -58,7 +58,7 @@ export default function StoreLocator() {
     <section className="w-full bg-white px-6 py-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 text-center">
-          <h2 className="font-sora text-3xl font-medium tracking-wide text-neutral-900">
+          <h2 className="font-sora text-3xl font-medium tracking-wide text-(--primary)">
             OUR OUTLETS
           </h2>
           <div className="mx-auto mt-3 h-px w-16 bg-neutral-300" />

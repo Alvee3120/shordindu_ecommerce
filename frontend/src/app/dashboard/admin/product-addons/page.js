@@ -115,7 +115,7 @@ export default function AdminProductAddonsPage() {
 
   return (
     <div>
-      <div className="mb-6 flex items-center justify-between">
+      <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-xl font-semibold text-neutral-900">Product Addons</h1>
         {!showForm && (
           <button

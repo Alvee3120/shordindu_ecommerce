@@ -8,6 +8,7 @@ from .models import Coupon, Order, OrderCoupon, OrderItem, Payment
 
 class OrderItemSerializer(serializers.ModelSerializer):
     children = serializers.SerializerMethodField()
+    product_image = serializers.SerializerMethodField()
 
     class Meta:
         model = OrderItem
@@ -16,6 +17,7 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "product",
             "variation",
             "product_name_snapshot",
+            "product_image",
             "variation_label_snapshot",
             "quantity",
             "unit_price",
@@ -26,6 +28,18 @@ class OrderItemSerializer(serializers.ModelSerializer):
 
     def get_children(self, obj):
         return OrderItemSerializer(obj.children.all(), many=True, context=self.context).data
+
+    def get_product_image(self, obj):
+        image = (
+            obj.product.images.filter(variation=obj.variation).first()
+            or obj.product.images.filter(is_primary=True).first()
+            or obj.product.images.first()
+        )
+        if not image:
+            return None
+        request = self.context.get("request")
+        url = image.image.url
+        return request.build_absolute_uri(url) if request else url
 
 
 class PaymentSerializer(serializers.ModelSerializer):

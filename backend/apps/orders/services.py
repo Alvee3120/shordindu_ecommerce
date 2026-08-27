@@ -9,6 +9,7 @@ from apps.users.models import Address, User
 from apps.users.utils import generate_secure_password
 
 from .models import Coupon, Order, OrderCoupon, OrderItem, Payment
+from .pricing import get_delivery_fee
 from .utils import generate_order_number
 
 
@@ -88,7 +89,7 @@ def checkout(request, data):
             raise CheckoutError({"coupon_code": ["Invalid or inapplicable coupon."]})
         discount_total = coupon.compute_discount(subtotal)
 
-    shipping_total = Decimal("0.00")
+    shipping_total = get_delivery_fee(address.district)
     tax_total = Decimal("0.00")
     grand_total = subtotal - discount_total + shipping_total + tax_total
 

@@ -10,8 +10,9 @@ import { getCart, updateCartItem, deleteCartItem } from "@/lib/cart";
 import { getMe } from "@/lib/auth";
 import { listAddresses } from "@/lib/addresses";
 import { useCart } from "@/context/CartContext";
+import { getDeliveryFee } from "@/lib/districts";
 
-const ESTIMATED_SHIPPING = 120;
+const DEFAULT_ESTIMATED_SHIPPING = 120;
 
 export default function CartPage() {
   const router = useRouter();
@@ -107,7 +108,8 @@ export default function CartPage() {
   const items = cart?.items || [];
   const isEmpty = items.length === 0;
   const subtotal = Number(cart?.subtotal || 0);
-  const total = subtotal + (isEmpty ? 0 : ESTIMATED_SHIPPING);
+  const estimatedShipping = getDeliveryFee(shippingAddress?.district) ?? DEFAULT_ESTIMATED_SHIPPING;
+  const total = subtotal + (isEmpty ? 0 : estimatedShipping);
 
   // flatten each top-level item with its addon children, in display order
   const rows = items.flatMap((item) => [
@@ -116,9 +118,9 @@ export default function CartPage() {
   ]);
 
   return (
-    <div className="mx-auto max-w-6xl px-6 py-10 sm:px-8">
+    <div className="mx-auto max-w-6xl px-6 pt-22 pb-10 sm:px-8">
       <Link
-        href="/"
+        href="/shop"
         className="mb-6 flex items-center gap-1.5 text-sm font-medium text-neutral-500 hover:text-(--primary)"
       >
         <FiChevronLeft size={16} />
@@ -131,7 +133,7 @@ export default function CartPage() {
         <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center">
           <p className="text-sm text-neutral-500">Your cart is empty.</p>
           <Link
-            href="/"
+            href="/shop"
             className="mt-4 inline-block rounded-full bg-(--primary) px-6 py-2.5 text-sm font-semibold text-white hover:bg-(--primary)/90"
           >
             Start shopping
@@ -246,7 +248,7 @@ export default function CartPage() {
                 </span>
               </div>
               <p className="text-right text-xs text-(--primary)">
-                * Charges may vary: ৳{ESTIMATED_SHIPPING.toFixed(2)}
+                * Charges may vary: ৳{estimatedShipping.toFixed(2)}
               </p>
             </div>
 

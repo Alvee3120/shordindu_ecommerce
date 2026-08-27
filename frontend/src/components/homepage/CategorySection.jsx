@@ -60,7 +60,7 @@ export default function CategorySection({ categoryName, title }) {
 
   if (!loading && products.length === 0) return null;
 
-  const gridItems = loading ? Array.from({ length: 5 }) : products.slice(0, 5);
+  const gridItems = loading ? Array.from({ length: 4 }) : products.slice(0, 4);
 
   return (
     <section className="w-full bg-white px-6 pt-16 sm:px-8">
