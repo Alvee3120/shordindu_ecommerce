@@ -93,12 +93,15 @@ export default function StoreLocator() {
             })}
           </div>
 
-          <div className="relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-200 lg:w-1/2">
+          <div
+            data-lenis-prevent
+            className="relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-200 lg:w-1/2"
+          >
             <iframe
               key={active.name}
               title={active.name}
               src={mapSrc}
-              className="h-full w-full"
+              className="pointer-events-none h-full w-full"
               loading="lazy"
               referrerPolicy="no-referrer-when-downgrade"
             />
