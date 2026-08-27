@@ -8,7 +8,7 @@ import { FiMenu, FiX, FiSearch, FiChevronDown } from "react-icons/fi";
 import { FaShoppingCart, FaUser } from "react-icons/fa";
 import { useAuth } from "@/context/AuthContext";
 import { useCart } from "@/context/CartContext";
-import { getCategories, buildCategoryTree } from "@/lib/categories";
+import { getCategories } from "@/lib/categories";
 import SearchBar from "./SearchBar";
 
 const logoSrcLight = "/assets/logo/logolight.png";
@@ -18,6 +18,7 @@ const staticLinks = [
   { label: "Home", href: "/" },
   { label: "Shop", href: "/shop" },
 ];
+const NAV_CATEGORY_NAMES = ["Men", "Women", "Bag"];
 
 export default function Navbar() {
   const pathname = usePathname();
@@ -46,15 +47,16 @@ export default function Navbar() {
 
   const navLinks = [
     ...staticLinks.map((link) => ({ ...link, children: [] })),
-    ...buildCategoryTree(categories)
-      .slice(0, 4)
+    ...categories
+      .filter((cat) =>
+        NAV_CATEGORY_NAMES.some(
+          (name) => name.toLowerCase() === (cat.name ?? "").trim().toLowerCase()
+        )
+      )
       .map((cat) => ({
         label: cat.name,
         href: `/shop?category=${cat.id}`,
-        children: cat.children.map((child) => ({
-          label: child.name,
-          href: `/shop?category=${child.id}`,
-        })),
+        children: [],
       })),
   ];
 
