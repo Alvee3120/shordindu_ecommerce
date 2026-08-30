@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { FaInstagram, FaFacebookF } from "react-icons/fa";
+import { FaInstagram, FaFacebookF, FaTiktok } from "react-icons/fa";
 import { FiPhone, FiMail } from "react-icons/fi";
 import { getCategories } from "@/lib/categories";
 
@@ -89,6 +89,15 @@ export default function FooterT() {
                 className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-600 text-gray-300 transition-colors hover:border-white hover:text-white"
               >
                 <FaFacebookF size={15} />
+              </a>
+              <a
+                href="https://www.tiktok.com/@wear_shordindu"
+                target="_blank"
+                rel="noopener noreferrer"
+                aria-label="Follow us on Facebook"
+                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-600 text-gray-300 transition-colors hover:border-white hover:text-white"
+              >
+                <FaTiktok size={15} />
               </a>
             </div>
           </div>
