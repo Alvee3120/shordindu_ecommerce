@@ -17,7 +17,7 @@ function ShopPageContent() {
   const searchParams = useSearchParams();
 
   const urlSearch = searchParams.get("search") || "";
-  const urlParentCategory = searchParams.get("category") || ""; // single active parent id
+  const urlParentCategories = searchParams.get("category") || ""; // comma-separated parent ids
   const urlSubcategories = searchParams.get("subcategories") || ""; // comma-separated child ids
   const urlMinPrice = searchParams.get("min_price") || "";
   const urlMaxPrice = searchParams.get("max_price") || "";
@@ -31,7 +31,7 @@ function ShopPageContent() {
 
   // Draft filters (mirror URL, edited locally, committed via updateUrl/applyFilters)
   const [draftFilters, setDraftFilters] = useState({
-    parentCategory: urlParentCategory,
+    parentCategories: urlParentCategories ? urlParentCategories.split(",") : [],
     childCategories: urlSubcategories ? urlSubcategories.split(",") : [],
     minPrice: urlMinPrice,
     maxPrice: urlMaxPrice,
@@ -40,12 +40,12 @@ function ShopPageContent() {
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- syncing draft filters from URL params
     setDraftFilters({
-      parentCategory: urlParentCategory,
+      parentCategories: urlParentCategories ? urlParentCategories.split(",") : [],
       childCategories: urlSubcategories ? urlSubcategories.split(",") : [],
       minPrice: urlMinPrice,
       maxPrice: urlMaxPrice,
     });
-  }, [urlParentCategory, urlSubcategories, urlMinPrice, urlMaxPrice]);
+  }, [urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice]);
 
   useEffect(() => {
     getCategories()
@@ -53,16 +53,18 @@ function ShopPageContent() {
       .catch(() => setCategoryList([]));
   }, []);
 
-  // Child selections narrow the filter to exactly those children; with no
-  // child selected, an active parent expands to itself + all its children.
+  // A parent includes itself and its children. Child selections are added to
+  // that set, so shoppers can combine any number of parent and child filters.
   const resolveCategoryParam = useCallback(
-    (parentCategory, childCategories) => {
-      if (childCategories.length > 0) return childCategories.join(",");
-      if (!parentCategory) return undefined;
-      const childIds = categoryList
-        .filter((c) => String(c.parent) === String(parentCategory))
-        .map((c) => String(c.id));
-      return [parentCategory, ...childIds].join(",");
+    (parentCategories, childCategories) => {
+      const categoryIds = new Set(childCategories);
+      parentCategories.forEach((parentCategory) => {
+        categoryIds.add(parentCategory);
+        categoryList
+          .filter((c) => String(c.parent) === String(parentCategory))
+          .forEach((c) => categoryIds.add(String(c.id)));
+      });
+      return categoryIds.size > 0 ? [...categoryIds].join(",") : undefined;
     },
     [categoryList]
   );
@@ -72,7 +74,7 @@ function ShopPageContent() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- kicking off loading state for the fetch below
     setLoading(true);
     const categoryParam = resolveCategoryParam(
-      urlParentCategory,
+      urlParentCategories ? urlParentCategories.split(",") : [],
       urlSubcategories ? urlSubcategories.split(",") : []
     );
     listProducts({
@@ -101,7 +103,7 @@ function ShopPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [urlSearch, urlParentCategory, urlSubcategories, urlMinPrice, urlMaxPrice, urlPage, resolveCategoryParam]);
+  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlPage, resolveCategoryParam]);
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
@@ -121,13 +123,16 @@ function ShopPageContent() {
     [router, searchParams]
   );
 
-  // Selecting a parent sets it as the active scope and clears any child
-  // selection — child checkboxes stay unchecked until explicitly picked.
+  // Parent selection is additive, so multiple category groups can be shown
+  // together. Child selections remain independently selectable.
   const handleSelectParent = (parentId) => {
     setDraftFilters((prev) => {
       const id = String(parentId);
-      const isActive = prev.parentCategory === id;
-      return { ...prev, parentCategory: isActive ? "" : id, childCategories: [] };
+      const exists = prev.parentCategories.includes(id);
+      const parentCategories = exists
+        ? prev.parentCategories.filter((categoryId) => categoryId !== id)
+        : [...prev.parentCategories, id];
+      return { ...prev, parentCategories };
     });
   };
 
@@ -150,7 +155,7 @@ function ShopPageContent() {
 
   const applyFilters = () => {
     updateUrl({
-      category: draftFilters.parentCategory || undefined,
+      category: draftFilters.parentCategories.join(",") || undefined,
       subcategories: draftFilters.childCategories.join(",") || undefined,
       min_price: draftFilters.minPrice || undefined,
       max_price: draftFilters.maxPrice || undefined,
@@ -159,7 +164,7 @@ function ShopPageContent() {
   };
 
   const clearFilters = () => {
-    setDraftFilters({ parentCategory: "", childCategories: [], minPrice: "", maxPrice: "" });
+    setDraftFilters({ parentCategories: [], childCategories: [], minPrice: "", maxPrice: "" });
     router.push("/shop");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -169,7 +174,8 @@ function ShopPageContent() {
     if (drawerOpen) return; // mobile applies explicitly
     const timeout = setTimeout(() => {
       const same =
-        urlParentCategory === draftFilters.parentCategory &&
+        (urlParentCategories ? urlParentCategories.split(",") : []).join(",") ===
+          draftFilters.parentCategories.join(",") &&
         (urlSubcategories ? urlSubcategories.split(",") : []).join(",") ===
           draftFilters.childCategories.join(",") &&
         urlMinPrice === draftFilters.minPrice &&

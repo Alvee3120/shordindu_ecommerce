@@ -19,13 +19,13 @@ const statusColors = {
 const statusOptions = ["", "pending", "confirmed", "processing", "shipped", "delivered", "cancelled"];
 
 /**
- * The admin order-management table — status actions go through
+ * The order-management table — status actions go through
  * OrderDetailModal, the same status-transition API/UI used everywhere else.
- * Pass `mine` to scope the list to only the orders the logged-in admin
+ * Pass `mine` to scope the list to only the orders the logged-in user
  * personally placed (for /admin/my-orders); omit it for the full
  * cross-customer management view (/admin/orders).
  */
-export default function AdminOrdersTable({ title, mine = false }) {
+export default function AdminOrdersTable({ title, mine = false, ordersPath = "/dashboard/admin/orders" }) {
   const [orders, setOrders] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -181,7 +181,7 @@ export default function AdminOrdersTable({ title, mine = false }) {
                 <tr key={order.id} className="border-b border-neutral-100 last:border-0 hover:bg-neutral-50">
                   <td className="px-5 py-3 font-medium text-neutral-900">
                     <Link
-                      href={`/dashboard/admin/orders/${order.id}`}
+                      href={`${ordersPath}/${order.id}`}
                       className="hover:text-(--primary) hover:underline"
                     >
                       {order.order_number}

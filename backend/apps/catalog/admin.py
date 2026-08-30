@@ -11,6 +11,7 @@ from .models import (
     ProductAttributeValue,
     ProductImage,
     ProductVariation,
+    StockNotification,
     VariationAttributeValue,
 )
 
@@ -129,4 +130,15 @@ class InventoryLogAdmin(admin.ModelAdmin):
         return False
 
     def has_change_permission(self, request, obj=None):
+        return False
+
+
+@admin.register(StockNotification)
+class StockNotificationAdmin(admin.ModelAdmin):
+    list_display = ["product", "variation", "customer_name", "phone", "user", "created_at"]
+    list_filter = ["created_at"]
+    search_fields = ["product__name", "variation__sku", "customer_name", "phone", "user__email"]
+    readonly_fields = ["product", "variation", "user", "customer_name", "phone", "note", "created_at"]
+
+    def has_add_permission(self, request):
         return False

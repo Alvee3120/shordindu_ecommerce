@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.cart.cart_resolver import CART_COOKIE_NAME
-from apps.core.permissions import IsStaffOnly
+from apps.core.permissions import CanManageOrders, IsAdminOnly, can_manage_orders
 from apps.users.cookies import set_auth_cookies
 from apps.users.tasks import send_account_created_email
 
@@ -52,13 +52,13 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
+        if can_manage_orders(user):
             return Order.objects.all().order_by("-placed_at")
         return Order.objects.filter(user=user).order_by("-placed_at")
 
     def get_permissions(self):
         if self.action in ("confirm", "process", "cancel", "ship", "deliver"):
-            return [IsStaffOnly()]
+            return [CanManageOrders()]
         return super().get_permissions()
 
     def _set_status(self, new_status):
@@ -91,4 +91,4 @@ class OrderViewSet(viewsets.ReadOnlyModelViewSet):
 class CouponViewSet(viewsets.ModelViewSet):
     queryset = Coupon.objects.all().order_by("-id")
     serializer_class = CouponSerializer
-    permission_classes = [IsStaffOnly]
+    permission_classes = [IsAdminOnly]

@@ -17,6 +17,7 @@ import {
   FiLink2,
   FiUsers,
   FiShoppingBag,
+  FiBell,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 
@@ -29,12 +30,8 @@ const roleLinks = {
     { label: "Orders", href: "/dashboard/customer/orders", icon: FiPackage },
     { label: "Addresses", href: "/dashboard/customer/addresses", icon: FiMapPin },
   ],
-  staff: [
-    { label: "Orders", href: "/dashboard/staff/orders", icon: FiPackage },
-    { label: "Products", href: "/dashboard/staff/products", icon: FiBox },
-    { label: "Categories", href: "/dashboard/staff/categories", icon: FiGrid },
-    { label: "Coupons", href: "/dashboard/staff/coupons", icon: FiTag },
-    { label: "Reviews", href: "/dashboard/staff/reviews", icon: FiStar },
+  cce: [
+    { label: "Orders", href: "/dashboard/cce/orders", icon: FiPackage },
   ],
   admin: [
     { label: "Orders", href: "/dashboard/admin/orders", icon: FiPackage },
@@ -45,6 +42,7 @@ const roleLinks = {
     { label: "Product Addons", href: "/dashboard/admin/product-addons", icon: FiLink2 },
     { label: "Coupons", href: "/dashboard/admin/coupons", icon: FiTag },
     { label: "Reviews", href: "/dashboard/admin/reviews", icon: FiStar },
+    { label: "Stock Notifications", href: "/dashboard/admin/stock-notifications", icon: FiBell },
     { label: "Users", href: "/dashboard/admin/users", icon: FiUsers },
   ],
 };
@@ -62,6 +60,7 @@ const DashboardLayout = ({ children }) => {
   const pathname = usePathname();
 
   const role = user?.role ?? "customer";
+  const roleLabel = role === "cce" ? "CCE" : role;
   const links = getLinksForRole(role);
 
   useEffect(() => {
@@ -90,7 +89,7 @@ const DashboardLayout = ({ children }) => {
           <p className="truncate text-sm text-neutral-500">{user.email}</p>
           {role !== "customer" && (
             <span className="mt-2 inline-block rounded-full bg-(--primary)/10 px-2.5 py-1 text-xs font-semibold text-(--primary) capitalize">
-              {role}
+              {roleLabel}
             </span>
           )}
         </div>
