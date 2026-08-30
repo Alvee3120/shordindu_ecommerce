@@ -75,7 +75,7 @@ function PriceRangeSlider({ minPrice, maxPrice, onPriceChange }) {
  * Pure presentational filter panel. Shared by the desktop sticky sidebar
  * and the mobile drawer — parent owns the draft filter state.
  *
- * filters: { parentCategory: string, childCategories: string[], minPrice: string, maxPrice: string }
+ * filters: { parentCategories: string[], childCategories: string[], minPrice: string, maxPrice: string }
  */
 export default function FilterSidebar({
   categoryList = [],
@@ -108,7 +108,7 @@ export default function FilterSidebar({
         <ul className="flex flex-col gap-1">
           {tree.map((parent) => {
             const hasChildren = parent.children.length > 0;
-            const isParentActive = filters.parentCategory === String(parent.id);
+            const isParentActive = filters.parentCategories.includes(String(parent.id));
             const isOpen = expanded.has(parent.id) || isParentActive;
 
             return (

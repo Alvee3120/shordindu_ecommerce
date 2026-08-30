@@ -20,7 +20,7 @@ class UserUpdateSerializer(serializers.ModelSerializer):
 
 class AdminUserSerializer(serializers.ModelSerializer):
     """Used by the admin User Management screen: role and is_active are the
-    only fields staff can edit for another account."""
+    only fields administrators can edit for another account."""
 
     class Meta:
         model = User
@@ -28,11 +28,10 @@ class AdminUserSerializer(serializers.ModelSerializer):
         read_only_fields = ["id", "email", "name", "phone", "created_at"]
 
     def update(self, instance, validated_data):
-        # is_staff drives the actual permission checks (IsStaffOnly etc.), so
-        # it has to track role — otherwise promoting someone to staff/admin
-        # here wouldn't actually grant them anything.
+        # is_staff only controls access to Django's built-in admin. CCE users
+        # do not receive it; their limited order permissions are role-based.
         role = validated_data.get("role", instance.role)
-        instance.is_staff = role in (User.Role.STAFF, User.Role.ADMIN)
+        instance.is_staff = role == User.Role.ADMIN
         return super().update(instance, validated_data)
 
 

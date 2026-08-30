@@ -93,7 +93,7 @@ export default function ProfileFields({ user }) {
             ) : (
               <div className="flex items-center gap-2">
                 <span className="text-sm font-medium text-neutral-900 capitalize">
-                  {user[key] || "—"}
+                  {key === "role" && user[key] === "cce" ? "CCE" : user[key] || "—"}
                 </span>
                 {isEditable && (
                   <button

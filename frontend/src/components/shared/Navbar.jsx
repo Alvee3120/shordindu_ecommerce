@@ -27,7 +27,7 @@ export default function Navbar() {
   const { cartCount } = useCart();
   const dashboardHrefByRole = {
     admin: "/dashboard/admin",
-    staff: "/dashboard/staff",
+    cce: "/dashboard/cce",
     customer: "/dashboard/customer",
   };
   const accountHref = isAuthenticated

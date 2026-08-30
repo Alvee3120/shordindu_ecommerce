@@ -229,9 +229,11 @@ export default function CheckoutPage() {
         toast.success("Account created — check your email for your login password.");
       }
       refreshCart();
-      const isStaff = user?.role === "staff" || user?.role === "admin";
+      const isOrderManager = user?.role === "cce" || user?.role === "admin";
       router.push(
-        isStaff ? `/dashboard/admin/orders/${order.id}` : `/dashboard/customer/orders/${order.id}`
+        isOrderManager
+          ? `/dashboard/${user.role}/orders/${order.id}`
+          : `/dashboard/customer/orders/${order.id}`
       );
     } catch (err) {
       toast.error(err.message || "Could not place order.");

@@ -8,7 +8,7 @@ import { useAuth } from "@/context/AuthContext";
 
 const roleStyles = {
   customer: "bg-neutral-100 text-neutral-600",
-  staff: "bg-blue-50 text-blue-700",
+  cce: "bg-blue-50 text-blue-700",
   admin: "bg-(--primary)/10 text-(--primary)",
 };
 
@@ -45,7 +45,7 @@ export default function AdminUsersPage() {
     try {
       const updated = await updateUser(targetUser.id, { role });
       setUsers((prev) => prev.map((u) => (u.id === updated.id ? updated : u)));
-      toast.success(`${updated.name || updated.email} is now ${updated.role}`);
+      toast.success(`${updated.name || updated.email} is now ${updated.role === "cce" ? "CCE" : updated.role}`);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -97,7 +97,7 @@ export default function AdminUsersPage() {
         >
           <option value="">All roles</option>
           <option value="customer">Customer</option>
-          <option value="staff">Staff</option>
+          <option value="cce">CCE</option>
           <option value="admin">Admin</option>
         </select>
       </div>
@@ -142,7 +142,7 @@ export default function AdminUsersPage() {
                         }`}
                       >
                         <option value="customer">Customer</option>
-                        <option value="staff">Staff</option>
+                        <option value="cce">CCE</option>
                         <option value="admin">Admin</option>
                       </select>
                     </td>
