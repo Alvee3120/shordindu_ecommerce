@@ -4,7 +4,7 @@ from django.core.files.uploadedfile import SimpleUploadedFile
 from openpyxl import Workbook
 from rest_framework.test import APITestCase
 
-from apps.catalog.models import Category, Product, ProductAddon, ProductVariation
+from apps.catalog.models import Category, Product, ProductAddon, ProductVariation, StockNotification
 from apps.users.models import User
 
 PRODUCTS_HEADER = [
@@ -68,7 +68,7 @@ def build_upload(products=None, variations=None, addons=None):
 class BulkImportTests(APITestCase):
     def setUp(self):
         self.staff = User.objects.create_user(
-            email="staff@example.com", password="pw", name="Staff", is_staff=True
+            email="admin@example.com", password="pw", name="Admin", role=User.Role.ADMIN, is_staff=True
         )
         self.customer = User.objects.create_user(
             email="customer@example.com", password="pw", name="Customer"
@@ -205,7 +205,7 @@ class BulkImportTests(APITestCase):
 class ProductCategoryAPITests(APITestCase):
     def setUp(self):
         self.staff = User.objects.create_user(
-            email="staff2@example.com", password="pw", name="Staff", is_staff=True
+            email="admin2@example.com", password="pw", name="Admin", role=User.Role.ADMIN, is_staff=True
         )
         self.shirts = Category.objects.create(name="Shirts")
         self.headwear = Category.objects.create(name="Headwear")
@@ -265,3 +265,57 @@ class ProductCategoryAPITests(APITestCase):
         self.assertEqual(response.status_code, 200)
         names = {p["name"] for p in response.data["results"]}
         self.assertEqual(names, {"Shirt A", "Hat B"})
+
+
+class StockNotificationAPITests(APITestCase):
+    def setUp(self):
+        category = Category.objects.create(name="Dresses")
+        self.product = Product.objects.create(name="Hazel Jama", sku_prefix="HAZEL")
+        self.product.categories.add(category)
+        self.variation = ProductVariation.objects.create(
+            product=self.product, sku="HAZEL-38", price="1200.00", stock_quantity=0
+        )
+
+    def test_guest_can_request_a_notification_for_an_out_of_stock_variation(self):
+        response = self.client.post(
+            "/api/stock-notifications/",
+            {
+                "product": self.product.id,
+                "variation": self.variation.id,
+                "customer_name": "Amina",
+                "phone": "01700000000",
+                "note": "Please contact me in the evening.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        request = StockNotification.objects.get()
+        self.assertEqual(request.product, self.product)
+        self.assertEqual(request.variation, self.variation)
+        self.assertEqual(request.phone, "01700000000")
+
+    def test_logged_in_user_details_are_saved_from_their_account(self):
+        user = User.objects.create_user(
+            email="amina@example.com", password="pw", name="Amina Account", phone="01800000000"
+        )
+        self.client.force_authenticate(user)
+
+        response = self.client.post(
+            "/api/stock-notifications/",
+            {
+                "product": self.product.id,
+                "variation": self.variation.id,
+                "customer_name": "Ignored",
+                "phone": "Ignored",
+                "note": "Please notify me after restocking.",
+            },
+            format="json",
+        )
+
+        self.assertEqual(response.status_code, 201, response.data)
+        request = StockNotification.objects.get()
+        self.assertEqual(request.user, user)
+        self.assertEqual(request.customer_name, "Amina Account")
+        self.assertEqual(request.phone, "01800000000")
+        self.assertEqual(request.note, "Please notify me after restocking.")

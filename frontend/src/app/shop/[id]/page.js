@@ -12,6 +12,7 @@ import { useCart } from "@/context/CartContext";
 import ProductCard from "@/components/ProductCard";
 import ProductReviews from "@/components/ProductReviews";
 import ImageZoom from "@/components/ImageZoom";
+import NotifyMeModal from "@/components/shop/NotifyMeModal";
 
 export default function ProductDetailsPage() {
   const { id } = useParams();
@@ -32,6 +33,7 @@ export default function ProductDetailsPage() {
   const [cartDrawerOpen, setCartDrawerOpen] = useState(false);
   const [drawerCart, setDrawerCart] = useState(null);
   const [drawerUpdatingId, setDrawerUpdatingId] = useState(null);
+  const [notifyMeOpen, setNotifyMeOpen] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -154,6 +156,8 @@ export default function ProductDetailsPage() {
       ? Math.round(100 - (displayPrice / displayCompareAt) * 100)
       : null;
   const maxQuantity = displayStock > 0 ? displayStock : 1;
+  const notificationVariation = selectedVariation || variations[0];
+  const variationLabel = notificationVariation?.attribute_values?.map((value) => value.value).join(" / ") || notificationVariation?.sku;
 
   if (quantity > maxQuantity) {
     setQuantity(maxQuantity);
@@ -279,6 +283,14 @@ export default function ProductDetailsPage() {
     } finally {
       setAddingToCart(false);
     }
+  };
+
+  const handleNotifyMe = () => {
+    if (!selectedVariation && isVariable) {
+      toast.error("Please select an option first.");
+      return;
+    }
+    setNotifyMeOpen(true);
   };
 
   const loadDrawerCart = async () => {
@@ -590,14 +602,16 @@ export default function ProductDetailsPage() {
 
             <button
               type="button"
-              onClick={handleAddToCart}
-              disabled={inStock === false || addingToCart}
+              onClick={inStock === false ? handleNotifyMe : handleAddToCart}
+              disabled={inStock === null || addingToCart}
               aria-disabled={inStock === null || undefined}
               className={`h-11 flex-1 rounded-full bg-neutral-900 px-6 text-sm font-semibold tracking-wide text-white uppercase transition-colors hover:bg-(--primary) disabled:cursor-not-allowed disabled:opacity-50 ${
                 inStock === null ? "cursor-not-allowed opacity-50" : ""
               }`}
             >
-              {addingToCart
+              {inStock === false
+                ? "Notify Me"
+                : addingToCart
                 ? "Adding..."
                 : totalPrice != null
                   ? `Add to cart — ৳${totalPrice.toFixed(2)}`
@@ -756,6 +770,13 @@ export default function ProductDetailsPage() {
           </div>
         </div>
       )}
+      <NotifyMeModal
+        open={notifyMeOpen}
+        onClose={() => setNotifyMeOpen(false)}
+        product={product}
+        variation={notificationVariation}
+        variationLabel={variationLabel}
+      />
     </div>
   );
 }

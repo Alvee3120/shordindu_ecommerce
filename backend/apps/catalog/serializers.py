@@ -10,6 +10,7 @@ from .models import (
     ProductAttributeValue,
     ProductImage,
     ProductVariation,
+    StockNotification,
     VariationAttributeValue,
 )
 
@@ -114,6 +115,35 @@ class ProductVariationSerializer(serializers.ModelSerializer):
             )
         return instance
 
+
+class StockNotificationSerializer(serializers.ModelSerializer):
+    product_name = serializers.CharField(source="product.name", read_only=True)
+    variation_sku = serializers.CharField(source="variation.sku", read_only=True)
+    user_email = serializers.EmailField(source="user.email", read_only=True)
+
+    class Meta:
+        model = StockNotification
+        fields = [
+            "id",
+            "product",
+            "variation",
+            "product_name",
+            "variation_sku",
+            "user",
+            "user_email",
+            "customer_name",
+            "phone",
+            "note",
+            "created_at",
+        ]
+        read_only_fields = ["id", "created_at"]
+
+    def validate(self, attrs):
+        if attrs["variation"].product_id != attrs["product"].id:
+            raise serializers.ValidationError({"variation": "This variation does not belong to the selected product."})
+        if attrs["variation"].stock_quantity > 0:
+            raise serializers.ValidationError({"variation": "This variation is currently in stock."})
+        return attrs
 
 class ProductSerializer(serializers.ModelSerializer):
     categories = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True)

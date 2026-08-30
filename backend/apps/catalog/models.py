@@ -200,3 +200,24 @@ class InventoryLog(models.Model):
 
     def __str__(self):
         return f"{self.variation.sku} {self.change_qty:+d} ({self.reason})"
+
+
+class StockNotification(models.Model):
+    """A customer's request to be contacted when a variation is restocked."""
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="stock_notifications")
+    variation = models.ForeignKey(ProductVariation, on_delete=models.CASCADE, related_name="stock_notifications")
+    user = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="stock_notifications"
+    )
+    customer_name = models.CharField(max_length=255)
+    phone = models.CharField(max_length=32)
+    note = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        db_table = "stock_notifications"
+        ordering = ["-created_at"]
+
+    def __str__(self):
+        return f"{self.product.name} ({self.variation.sku}) — {self.phone}"

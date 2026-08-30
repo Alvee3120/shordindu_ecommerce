@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FiArrowLeft } from "react-icons/fi";
 import { getOrder } from "@/lib/orders";
+import { useAuth } from "@/context/AuthContext";
 
 const statusColors = {
   pending: "bg-amber-100 text-amber-700",
@@ -18,6 +19,7 @@ const statusColors = {
 export default function AdminOrderDetailPage() {
   const { id } = useParams();
   const router = useRouter();
+  const { user } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
 
@@ -44,7 +46,7 @@ export default function AdminOrderDetailPage() {
     <div>
       <button
         type="button"
-        onClick={() => router.push("/dashboard/admin/orders")}
+        onClick={() => router.push(`/dashboard/${user?.role === "cce" ? "cce" : "admin"}/orders`)}
         className="mb-6 flex items-center gap-1.5 text-sm font-medium text-neutral-600 hover:text-(--primary)"
       >
         <FiArrowLeft size={16} />

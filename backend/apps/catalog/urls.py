@@ -13,5 +13,6 @@ router.register(
     "product-attribute-values", views.ProductAttributeValueViewSet, basename="product-attribute-value"
 )
 router.register("product-addons", views.ProductAddonViewSet, basename="product-addon")
+router.register("stock-notifications", views.StockNotificationViewSet, basename="stock-notification")
 
 urlpatterns = router.urls

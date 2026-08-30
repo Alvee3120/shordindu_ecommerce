@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.cart.cart_resolver import CART_COOKIE_NAME
 from apps.cart.services import merge_guest_cart
-from apps.core.permissions import IsStaffOnly
+from apps.core.permissions import IsAdminOnly
 
 from .cookies import clear_auth_cookies, set_auth_cookies
 from .models import Address, User
@@ -142,7 +142,7 @@ class UserManagementViewSet(viewsets.ModelViewSet):
 
     queryset = User.objects.all().order_by("-created_at")
     serializer_class = AdminUserSerializer
-    permission_classes = [IsStaffOnly]
+    permission_classes = [IsAdminOnly]
     http_method_names = ["get", "patch", "delete", "head", "options"]
     filterset_fields = ["role", "is_active"]
 
