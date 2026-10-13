@@ -10,6 +10,7 @@ export function listProducts({
   max_price,
   ordering,
   status,
+  discount,
 } = {}) {
   const params = new URLSearchParams();
   if (page) params.set("page", page);
@@ -20,8 +21,33 @@ export function listProducts({
   if (max_price != null && max_price !== "") params.set("max_price", max_price);
   if (ordering) params.set("ordering", ordering);
   if (status) params.set("status", status);
+  if (discount) params.set("discount", discount);
   const query = params.toString();
   return apiFetch(`/products/${query ? `?${query}` : ""}`, { method: "GET" });
+}
+
+/** "20% OFF" / "৳300 OFF" for an automatic discount (API `discount` object). */
+export function discountLabel(discount) {
+  if (!discount) return null;
+  const value = Number(discount.value);
+  const shown = Number.isInteger(value) ? value : value.toFixed(2);
+  return discount.type === "percent" ? `${shown}% OFF` : `৳${shown} OFF`;
+}
+
+/**
+ * What a customer pays for a variation right now. `variation.price` is the
+ * base price; the backend adds `effective_price` + `discount` when an
+ * automatic discount is live (it re-prices again at checkout).
+ * Returns { price, originalPrice (null unless discounted), discountLabel }.
+ */
+export function variationPricing(variation) {
+  if (!variation) return { price: null, originalPrice: null, discountLabel: null };
+  const discounted = Boolean(variation.discount);
+  return {
+    price: variation.effective_price ?? variation.price,
+    originalPrice: discounted ? variation.price : null,
+    discountLabel: discountLabel(variation.discount),
+  };
 }
 
 /** Flattens a raw API product into the shape ProductCard/SearchBar expect. */
@@ -29,12 +55,17 @@ export function toCardProduct(product) {
   const primaryImage =
     product.images?.find((i) => i.is_primary)?.image || product.images?.[0]?.image || null;
   const firstVariation = product.variations?.[0];
+  const pricing = variationPricing(firstVariation);
   return {
     id: product.id,
     name: product.name,
     description: product.description,
     image: primaryImage,
-    price: firstVariation?.price ?? null,
+    price: pricing.price,
+    originalPrice: pricing.originalPrice,
+    discountLabel: pricing.discountLabel,
+    discountId: firstVariation?.discount?.id ?? null,
+    discountName: firstVariation?.discount?.name ?? null,
     rating: product.average_rating ?? 0,
     reviewCount: product.review_count ?? 0,
     variationId: firstVariation?.id ?? null,

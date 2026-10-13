@@ -5,6 +5,7 @@ import NewArrivals from "@/components/homepage/NewArrivals";
 import Saree from "@/components/homepage/Saree";
 import Men from "@/components/homepage/Men";
 import Bag from "@/components/homepage/Bag";
+import DiscountShowcases from "@/components/homepage/DiscountShowcases";
 import CustomerReviews from "@/components/homepage/CustomerReviews";
 import StoreLocator from "@/components/homepage/StoreLocator";
 
@@ -13,9 +14,11 @@ export default function Home() {
   <div className="">
     <Banner />
     <CategoryShowcase />
-    <CampaignBanner />
+    {/* One section per live automatic discount (admin-managed). */}
+    <DiscountShowcases />
     <NewArrivals />
     <Saree />
+    <CampaignBanner />
     <Men />
     <Bag />
     <StoreLocator />

@@ -6,7 +6,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus, FiTruck, FiShield, FiMaximize2, FiX } from "react-icons/fi";
-import { getProduct, getProductAddons, listProducts, toCardProduct } from "@/lib/products";
+import { getProduct, getProductAddons, listProducts, toCardProduct, variationPricing } from "@/lib/products";
 import { addCartItem, addCartItemAddon, getCart, updateCartItem, deleteCartItem } from "@/lib/cart";
 import { useCart } from "@/context/CartContext";
 import ProductCard from "@/components/ProductCard";
@@ -147,14 +147,19 @@ export default function ProductDetailsPage() {
   const images = product.images?.length ? product.images : [];
   const variations = product.variations || [];
   const isVariable = product.product_type === "variable" && variations.length >= 1;
-  const displayPrice = selectedVariation?.price ?? variations[0]?.price;
-  const displayCompareAt = selectedVariation?.compare_at_price ?? variations[0]?.compare_at_price;
+  // Automatic discounts (from the backend) take over the "was" price + badge;
+  // otherwise the variation's own compare-at price is shown as before.
+  const pricing = variationPricing(selectedVariation ?? variations[0]);
+  const displayPrice = pricing.price;
+  const displayCompareAt =
+    pricing.originalPrice ?? selectedVariation?.compare_at_price ?? variations[0]?.compare_at_price;
   const displayStock = selectedVariation?.stock_quantity ?? variations[0]?.stock_quantity ?? 0;
   const inStock = isVariable ? (selectedVariation ? displayStock > 0 : null) : displayStock > 0;
   const discountPct =
-    displayCompareAt && displayPrice && displayCompareAt > displayPrice
+    displayCompareAt && displayPrice && Number(displayCompareAt) > Number(displayPrice)
       ? Math.round(100 - (displayPrice / displayCompareAt) * 100)
       : null;
+  const priceBadge = pricing.discountLabel ?? (discountPct != null ? `${discountPct}% off` : null);
   const maxQuantity = displayStock > 0 ? displayStock : 1;
   const notificationVariation = selectedVariation || variations[0];
   const variationLabel = notificationVariation?.attribute_values?.map((value) => value.value).join(" / ") || notificationVariation?.sku;
@@ -223,7 +228,9 @@ export default function ProductDetailsPage() {
   };
 
   const addonUnitPrice = (addonLink) =>
-    addonLink.price_override ?? getAddonVariation(addonLink)?.price ?? getAddonVariations(addonLink)[0]?.price ?? 0;
+    addonLink.price_override ??
+    variationPricing(getAddonVariation(addonLink) ?? getAddonVariations(addonLink)[0]).price ??
+    0;
 
   const addonsTotal = addons
     .filter((a) => selectedAddonIds.has(a.id))
@@ -422,9 +429,9 @@ export default function ProductDetailsPage() {
             {displayCompareAt && (
               <span className="text-base text-neutral-400 line-through">৳{displayCompareAt}</span>
             )}
-            {discountPct != null && (
+            {priceBadge && (
               <span className="rounded-full bg-emerald-100 px-2.5 py-1 text-xs font-semibold text-emerald-700">
-                {discountPct}% off
+                {priceBadge}
               </span>
             )}
           </div>

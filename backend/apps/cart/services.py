@@ -51,14 +51,9 @@ def merge_guest_cart(request, user):
     guest_cart.delete()
 
 
-def addon_unit_price(parent_product_id, variation, engine, override=None, lookup=True):
+def addon_unit_price(variation, engine, override=None):
     """Price of an add-on line: the addon link's price_override when one is
     set, otherwise the variation's current (possibly discounted) price."""
-    if lookup:
-        link = ProductAddon.objects.filter(
-            parent_product_id=parent_product_id, addon_product_id=variation.product_id
-        ).first()
-        override = link.price_override if link else None
     return override if override is not None else engine.price(variation)
 
 
@@ -85,7 +80,7 @@ def reprice_cart(cart, engine=None):
     for item in items:
         if item.parent_cart_item_id:
             key = (item.parent_cart_item.product_id, item.variation.product_id)
-            price = addon_unit_price(None, item.variation, engine, override=overrides.get(key), lookup=False)
+            price = addon_unit_price(item.variation, engine, override=overrides.get(key))
         else:
             price = engine.price(item.variation)
         if price != item.unit_price_snapshot:

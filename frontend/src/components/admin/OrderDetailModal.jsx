@@ -5,6 +5,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { FiX } from "react-icons/fi";
 import { getOrder, ORDER_STATUS_ACTIONS } from "@/lib/orders";
+import OrderItemDiscount from "@/components/shared/OrderItemDiscount";
 
 const statusColors = {
   pending: "bg-amber-100 text-amber-700",
@@ -205,6 +206,7 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
                           {item.variation_label_snapshot} &middot; Qty {item.quantity} &middot; ৳
                           {item.unit_price} each
                         </p>
+                        <OrderItemDiscount item={item} />
                         </div>
                       </div>
                       <p className="shrink-0 text-sm font-medium text-neutral-900">৳{item.line_total}</p>

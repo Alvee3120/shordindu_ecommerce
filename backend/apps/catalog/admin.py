@@ -5,6 +5,7 @@ from .models import (
     Attribute,
     AttributeValue,
     Category,
+    Discount,
     InventoryLog,
     Product,
     ProductAddon,
@@ -142,3 +143,11 @@ class StockNotificationAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(Discount)
+class DiscountAdmin(admin.ModelAdmin):
+    list_display = ["name", "type", "value", "target_type", "category", "starts_at", "ends_at", "is_active"]
+    list_filter = ["type", "target_type", "is_active"]
+    search_fields = ["name"]
+    filter_horizontal = ["products"]

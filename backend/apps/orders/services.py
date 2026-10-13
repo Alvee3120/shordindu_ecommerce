@@ -5,7 +5,9 @@ from django.db import IntegrityError, transaction
 from django.db.models import F, Sum
 
 from apps.cart.cart_resolver import resolve_cart
+from apps.cart.services import reprice_cart
 from apps.catalog.models import InventoryLog, Product, ProductVariation
+from apps.catalog.pricing import PricingEngine
 from apps.users.models import Address, User
 from apps.users.utils import generate_secure_password
 
@@ -181,6 +183,8 @@ def _create_order(*, lines, address, user, guest_email, coupon_code, **order_fie
             variation_label_snapshot=line["variation"].sku,
             quantity=line["quantity"],
             unit_price=line["unit_price"],
+            original_unit_price=line.get("original_unit_price"),
+            discount_name_snapshot=line.get("discount_name", ""),
             line_total=_line_total(line),
             parent_order_item=parent,
         )
@@ -199,19 +203,31 @@ def _create_order(*, lines, address, user, guest_email, coupon_code, **order_fie
     return order
 
 
-def _cart_line(item):
+def _discount_fields(quote):
+    """Order-line snapshot of an applied automatic discount (if any)."""
+    if quote is None or quote.discount is None:
+        return {}
+    return {"original_unit_price": quote.base_price, "discount_name": quote.discount.name}
+
+
+def _cart_line(item, quote=None):
+    # unit_price_snapshot has just been refreshed by reprice_cart().
     return {
         "product": item.product,
         "variation": item.variation,
         "quantity": item.quantity,
         "unit_price": item.unit_price_snapshot,
         "children": [],
+        **_discount_fields(quote),
     }
 
 
 @transaction.atomic
 def checkout(request, data):
     cart, _ = resolve_cart(request)
+    # Never trust stored cart prices: re-price every line at today's prices
+    # (a discount may have started or ended since the item was added).
+    engine = reprice_cart(cart)
     top_level_items = list(
         cart.items.filter(parent_cart_item__isnull=True)
         .select_related("product", "variation")
@@ -264,7 +280,7 @@ def checkout(request, data):
 
     lines = []
     for item in top_level_items:
-        line = _cart_line(item)
+        line = _cart_line(item, engine.quote(item.variation))
         line["children"] = [_cart_line(child) for child in item.children.all()]
         lines.append(line)
 
@@ -293,7 +309,12 @@ def _manual_lines(items):
     for item in items:
         quantities[item["variation"].pk] += item["quantity"]
 
-    variations = ProductVariation.objects.select_related("product").in_bulk(list(quantities))
+    variations = (
+        ProductVariation.objects.select_related("product")
+        .prefetch_related("product__categories")
+        .in_bulk(list(quantities))
+    )
+    engine = PricingEngine()
     lines, errors = [], []
     for variation_id, quantity in quantities.items():
         variation = variations[variation_id]
@@ -303,13 +324,15 @@ def _manual_lines(items):
             errors.append(f"{label} is not available for sale.")
         elif variation.stock_quantity < quantity:
             errors.append(f"Not enough stock for {label}: {variation.stock_quantity} available, {quantity} requested.")
+        quote = engine.quote(variation)
         lines.append(
             {
                 "product": product,
                 "variation": variation,
                 "quantity": quantity,
-                "unit_price": variation.price,
+                "unit_price": quote.final_price,
                 "children": [],
+                **_discount_fields(quote),
             }
         )
     if errors:
@@ -343,6 +366,8 @@ def quote_manual_order(data):
                 "product_name": line["product"].name,
                 "sku": line["variation"].sku,
                 "unit_price": line["unit_price"],
+                "original_unit_price": line.get("original_unit_price"),
+                "discount_name": line.get("discount_name"),
                 "quantity": line["quantity"],
                 "line_total": _line_total(line),
                 "available_stock": line["variation"].stock_quantity,

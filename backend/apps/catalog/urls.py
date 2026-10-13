@@ -1,3 +1,4 @@
+from django.urls import path
 from rest_framework.routers import DefaultRouter
 
 from . import views
@@ -16,4 +17,6 @@ router.register("product-addons", views.ProductAddonViewSet, basename="product-a
 router.register("discounts", views.DiscountViewSet, basename="discount")
 router.register("stock-notifications", views.StockNotificationViewSet, basename="stock-notification")
 
-urlpatterns = router.urls
+urlpatterns = [
+    path("discount-showcases/", views.DiscountShowcaseView.as_view(), name="discount-showcases"),
+] + router.urls

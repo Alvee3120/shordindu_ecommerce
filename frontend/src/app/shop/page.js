@@ -21,6 +21,7 @@ function ShopPageContent() {
   const urlSubcategories = searchParams.get("subcategories") || ""; // comma-separated child ids
   const urlMinPrice = searchParams.get("min_price") || "";
   const urlMaxPrice = searchParams.get("max_price") || "";
+  const urlDiscount = searchParams.get("discount") || ""; // "View All" from a homepage discount section
   const urlPage = Number(searchParams.get("page") || "1");
 
   const [categoryList, setCategoryList] = useState([]);
@@ -84,6 +85,7 @@ function ShopPageContent() {
       category: categoryParam,
       min_price: urlMinPrice || undefined,
       max_price: urlMaxPrice || undefined,
+      discount: urlDiscount || undefined,
     })
       .then((data) => {
         if (cancelled) return;
@@ -103,7 +105,16 @@ function ShopPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlPage, resolveCategoryParam]);
+  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlDiscount, urlPage, resolveCategoryParam]);
+
+  // The discount's name, read from the products' own pricing info — no extra request.
+  const discountName = useMemo(() => {
+    if (!urlDiscount) return null;
+    for (const product of products) {
+      if (product.discountId != null && String(product.discountId) === urlDiscount) return product.discountName;
+    }
+    return null;
+  }, [products, urlDiscount]);
 
   const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
 
@@ -188,8 +199,9 @@ function ShopPageContent() {
 
   const heading = useMemo(() => {
     if (urlSearch) return `Search results for “${urlSearch}”`;
+    if (discountName) return discountName;
     return "Shop";
-  }, [urlSearch]);
+  }, [urlSearch, discountName]);
 
   return (
     <div className="mx-auto max-w-7xl px-4 pt-28 sm:pt-24 pb-16 sm:px-6">
@@ -207,6 +219,17 @@ function ShopPageContent() {
           Filter
         </button>
       </div>
+
+      {urlDiscount && (
+        <button
+          type="button"
+          onClick={() => updateUrl({ discount: undefined, page: 1 })}
+          className="mr-2 mb-6 inline-flex items-center gap-1.5 rounded-full bg-(--primary) px-3 py-1.5 text-xs font-medium text-white hover:bg-(--primary)/90"
+        >
+          {discountName || "Discount offer"}
+          <FiX size={12} />
+        </button>
+      )}
 
       {urlSearch && (
         <button

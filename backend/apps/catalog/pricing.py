@@ -153,6 +153,40 @@ class PricingEngine:
         return self.quote(variation).final_price
 
 
+def discounted_product_ids(discount, engine):
+    """Ids of storefront products whose price this discount sets right now.
+
+    "Storefront" = active, not add-on-only (the shop listing's rules). A
+    product counts only if at least one active variation is priced by *this*
+    discount — e.g. a product whose own product-specific discount overrides a
+    category discount appears under the product discount, not the category one.
+    Newest products first, like the shop.
+    """
+    from .models import Discount, Product
+
+    products = Product.objects.filter(status=Product.Status.ACTIVE).exclude(
+        visibility_type=Product.VisibilityType.ADDON_ONLY
+    )
+    if discount.target_type == Discount.Target.PRODUCTS:
+        products = products.filter(pk__in=discount.products.values("pk"))
+    elif discount.category_id:
+        products = products.filter(categories__in=category_with_descendants(discount.category_id))
+    else:
+        return []
+    products = products.distinct().order_by("-created_at").prefetch_related("variations", "categories")
+
+    ids = []
+    for product in products:
+        for variation in product.variations.all():
+            if not variation.is_active:
+                continue
+            applied = engine.quote(variation).discount
+            if applied is not None and applied.pk == discount.pk:
+                ids.append(product.pk)
+                break
+    return ids
+
+
 def pricing_engine_for(context):
     """One shared engine per serializer context (i.e. per API response)."""
     if context is None:

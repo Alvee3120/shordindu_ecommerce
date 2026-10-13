@@ -1,8 +1,9 @@
 // lib/categories.js
 import { apiFetch } from "./api";
 
-export function getCategories() {
-  return apiFetch("/categories/", { method: "GET" });
+export function getCategories({ pageSize } = {}) {
+  const query = pageSize ? `?page_size=${pageSize}` : "";
+  return apiFetch(`/categories/${query}`, { method: "GET" });
 }
 
 export function getCategory(id) {

@@ -1,14 +1,16 @@
 from django.http import HttpResponse
 from django.utils import timezone
-from rest_framework import permissions, status, viewsets
+from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
 from apps.core.permissions import IsAdminOnly, IsAdminOrReadOnly, is_admin
 
 from . import imports as bulk_imports
 from .filters import ProductFilter
+from .pricing import PricingEngine, discounted_product_ids
 from .models import (
     Attribute,
     AttributeValue,
@@ -217,3 +219,51 @@ class DiscountViewSet(viewsets.ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(created_by=self.request.user)
+
+
+class DiscountShowcaseView(APIView):
+    """Public: every live discount with the products it currently prices, for
+    the homepage — one section per discount, titled with the discount's name.
+
+    One request for all sections; one pricing engine prices every product.
+    Discounts with no eligible products are left out.
+    """
+
+    permission_classes = [permissions.AllowAny]
+    PRODUCTS_PER_SECTION = 8
+
+    def get(self, request):
+        engine = PricingEngine()
+        context = {"request": request, "pricing_engine": engine}
+        datetime_field = serializers.DateTimeField()  # project timezone, like every other API date
+        sections = []
+        for discount in Discount.objects.live(engine.now).select_related("category").order_by("-starts_at", "-id"):
+            ids = discounted_product_ids(discount, engine)
+            if not ids:
+                continue
+            shown = ids[: self.PRODUCTS_PER_SECTION]
+            products = {
+                p.pk: p
+                for p in Product.objects.filter(pk__in=shown).prefetch_related(
+                    "categories", "images", "variations__images", "variations__variation_attribute_values"
+                )
+            }
+            sections.append(
+                {
+                    "id": discount.id,
+                    "name": discount.name,
+                    "type": discount.type,
+                    "value": str(discount.value),
+                    "target_type": discount.target_type,
+                    "category": (
+                        {"id": discount.category_id, "name": discount.category.name} if discount.category_id else None
+                    ),
+                    "starts_at": datetime_field.to_representation(discount.starts_at),
+                    "ends_at": datetime_field.to_representation(discount.ends_at),
+                    "product_count": len(ids),
+                    "products": ProductSerializer(
+                        [products[pk] for pk in shown if pk in products], many=True, context=context
+                    ).data,
+                }
+            )
+        return Response(sections)

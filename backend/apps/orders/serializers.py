@@ -30,6 +30,8 @@ class OrderItemSerializer(serializers.ModelSerializer):
             "variation_label_snapshot",
             "quantity",
             "unit_price",
+            "original_unit_price",
+            "discount_name_snapshot",
             "line_total",
             "parent_order_item",
             "children",

@@ -25,6 +25,7 @@ import {
   FiTruck,
   FiExternalLink,
   FiImage,
+  FiPercent,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { AnalyticsRangeProvider } from "@/components/admin/analytics/AnalyticsRangeContext";
@@ -54,6 +55,7 @@ const roleLinks = {
     { label: "Categories", href: "/dashboard/admin/categories", icon: FiGrid },
     { label: "Attributes", href: "/dashboard/admin/attributes", icon: FiSliders },
     { label: "Product Addons", href: "/dashboard/admin/product-addons", icon: FiLink2 },
+    { label: "Discounts", href: "/dashboard/admin/discounts", icon: FiPercent },
     { label: "Coupons", href: "/dashboard/admin/coupons", icon: FiTag },
     { label: "Delivery Charges", href: "/dashboard/admin/delivery-charges", icon: FiTruck },
     { label: "Campaign Banner", href: "/dashboard/admin/campaign-banner", icon: FiImage },

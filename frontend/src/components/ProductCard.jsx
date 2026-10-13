@@ -6,11 +6,12 @@ import Link from "next/link";
 import { FiHeart } from "react-icons/fi";
 
 /**
- * product: { id, name, description, image, price, href }
+ * product: { id, name, description, image, price, href,
+ *            originalPrice?, discountLabel? }  (set when an automatic discount is live)
  */
 export default function ProductCard({ product, tall = false }) {
   const [wishlisted, setWishlisted] = useState(false);
-  const { name, description, image, price, href = "#" } = product;
+  const { name, description, image, price, originalPrice, discountLabel, href = "#" } = product;
 
   return (
     <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm transition-shadow hover:shadow-lg sm:rounded-3xl">
@@ -32,6 +33,11 @@ export default function ProductCard({ product, tall = false }) {
           <div className="flex h-full items-center justify-center text-xs text-neutral-400 sm:text-sm">
             No image
           </div>
+        )}
+        {discountLabel && (
+          <span className="absolute top-2 left-2 rounded-full bg-(--primary) px-2 py-0.5 text-[9px] font-semibold tracking-wide text-white sm:top-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-[11px]">
+            {discountLabel}
+          </span>
         )}
       </Link>
 
@@ -59,8 +65,13 @@ export default function ProductCard({ product, tall = false }) {
         )}
 
         <div className="mt-1 flex items-center justify-between gap-1 sm:mt-2 sm:gap-2">
-          <span className="text-[10px] font-bold text-neutral-900 sm:text-lg">
-            {price != null ? `৳ ${price}` : "—"}
+          <span className="flex flex-wrap items-baseline gap-x-1.5">
+            <span className="text-[10px] font-bold text-neutral-900 sm:text-lg">
+              {price != null ? `৳ ${price}` : "—"}
+            </span>
+            {originalPrice != null && (
+              <span className="text-[9px] text-neutral-400 line-through sm:text-sm">৳ {originalPrice}</span>
+            )}
           </span>
           <Link
             href={href}

@@ -76,6 +76,11 @@ class OrderItem(models.Model):
     quantity = models.PositiveIntegerField()
     unit_price = models.DecimalField(max_digits=10, decimal_places=2)
     line_total = models.DecimalField(max_digits=10, decimal_places=2)
+    # Snapshot of an automatic discount applied when the order was placed:
+    # the pre-discount price and the discount's name. Empty when none applied.
+    # Later edits to the discount or product never change these.
+    original_unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    discount_name_snapshot = models.CharField(max_length=120, blank=True)
     parent_order_item = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
     )

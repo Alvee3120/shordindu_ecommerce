@@ -419,6 +419,25 @@ the three amounts (each `>= 0`). Dhaka addresses must carry a `zone`
 outside Dhaka. Checkout accepts `shipping_zone` alongside `shipping_district`, and always computes
 the fee itself — any delivery amount sent by the client is ignored.
 
+### Automatic discounts
+`/api/discounts/` — **admin only** (read and write). `{name, type: percent|fixed, value,
+target_type: category|products, category | products: [ids], starts_at, ends_at, is_active}`;
+responses add `status` (`active|scheduled|expired|inactive`), `category_name`, `product_count`
+(and `product_details` on retrieve). Filters: `?search=`, `?status=`, `?type=`, `?target_type=`.
+
+Prices are never modified: every product variation now also returns `effective_price` and
+`discount` (`{id, name, type, value, amount, ends_at}` or `null`) next to the unchanged base
+`price`. One discount applies per variation — product-specific beats category, otherwise the
+biggest saving wins; a category discount covers its sub-categories. The cart is re-priced on every
+read and at checkout (cart items gain `original_unit_price` / `discount`), and order items store
+`original_unit_price` + `discount_name_snapshot`. Coupons still apply afterwards to the subtotal.
+
+`GET /api/discount-showcases/` (public) — the homepage sections: every live discount
+`{id, name, type, value, target_type, category, starts_at, ends_at, product_count, products: [...]}`
+with up to 8 products (normal product objects, effective prices included). A product is listed
+under the discount that actually prices it; discounts with no eligible products are omitted.
+`GET /api/products/?discount=<id>` lists all of a live discount's products ("View All").
+
 ### Campaign banner
 `GET /api/campaign-banner/` (public) — `{"active": true, "banner": {image_mode, desktop_image_url,
 mobile_image_url, image_alt, eyebrow, heading, description, button_enabled, button_label,
@@ -482,6 +501,8 @@ product** (a second `POST` for the same product returns `400 non_field_errors`).
 | GET | `/api/customer-lookup/` | CCE/admin |
 | GET/POST/PATCH/DELETE | `/api/coupons/[:id/]` | read: CCE/admin, write: admin |
 | GET/PUT | `/api/delivery-charges/` | read: —, write: admin |
+| GET/POST/PATCH/DELETE | `/api/discounts/[:id/]` | admin only |
+| GET | `/api/discount-showcases/` | — |
 | GET | `/api/campaign-banner/` | — |
 | GET/PUT/PATCH | `/api/campaign-banner/manage/` | admin only |
 | GET/POST/PATCH/DELETE | `/api/reviews/[:id/]` | read: —, write: ✓ (own only) |

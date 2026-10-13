@@ -86,11 +86,12 @@ export default function CampaignBannerView({ banner, variant = "responsive", con
     <section
       aria-label={alt || "Campaign"}
       className={`relative flex ${s.height} items-center overflow-hidden bg-neutral-200 ${
-        contained ? "w-full" : "left-1/2 right-1/2 mx-[-50vw] w-screen"
+        // mt-16 matches the pt-16 gap the homepage product sections leave above themselves.
+        contained ? "w-full" : "left-1/2 right-1/2 mx-[-50vw] mt-16 w-screen"
       }`}
     >
       {/* Background image — only one layer is visible per screen size */}
-      <div className={`${s.desktopLayer} absolute inset-0 z-0`}>
+      <div className={`${s.desktopLayer}  absolute inset-0 z-0`}>
         <BannerImage src={images.desktop} alt={alt} priority={priority} className="object-cover object-center" />
       </div>
       <div className={`${s.mobileLayer} absolute inset-0 z-0`}>

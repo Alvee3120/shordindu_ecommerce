@@ -123,6 +123,11 @@ export default function SearchBar({ className = "", inputClassName = "", autoFoc
                         <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
                         <p className="text-sm font-semibold text-(--primary)">
                           {product.price != null ? `৳ ${product.price}` : "—"}
+                          {product.originalPrice != null && (
+                            <span className="ml-1.5 text-xs font-normal text-neutral-400 line-through">
+                              ৳ {product.originalPrice}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </Link>

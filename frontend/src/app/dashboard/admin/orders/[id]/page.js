@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FiArrowLeft } from "react-icons/fi";
 import { getOrder, orderCustomerName, ORDER_STATUS_ACTIONS } from "@/lib/orders";
+import OrderItemDiscount from "@/components/shared/OrderItemDiscount";
 import { useAuth } from "@/context/AuthContext";
 
 const statusColors = {
@@ -120,6 +121,7 @@ export default function AdminOrderDetailPage() {
                   <p className="font-medium text-neutral-900">{item.product_name_snapshot}</p>
                   <p className="text-sm text-neutral-500">{item.variation_label_snapshot}</p>
                   <p className="text-xs text-neutral-400">Qty {item.quantity} × ৳{item.unit_price}</p>
+                  <OrderItemDiscount item={item} />
                 </div>
                 <p className="font-medium text-neutral-900">৳{item.line_total}</p>
               </div>

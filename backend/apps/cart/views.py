@@ -84,9 +84,7 @@ class CartItemViewSet(CartMixin, viewsets.ModelViewSet):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        unit_price = addon_unit_price(
-            None, variation, PricingEngine(), override=addon_link.price_override, lookup=False
-        )
+        unit_price = addon_unit_price(variation, PricingEngine(), override=addon_link.price_override)
         item = CartItem.objects.create(
             cart=cart, product=product, variation=variation, quantity=quantity,
             unit_price_snapshot=unit_price, parent_cart_item=parent_item,

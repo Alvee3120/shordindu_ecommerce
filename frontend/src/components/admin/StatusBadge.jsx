@@ -20,6 +20,7 @@ const STATUS_STYLES = {
   live: "bg-emerald-100 text-emerald-700",
   ended: "bg-neutral-100 text-neutral-500",
   disabled: "bg-neutral-100 text-neutral-500",
+  inactive: "bg-neutral-100 text-neutral-500",
 };
 
 const PAYMENT_STYLES = {

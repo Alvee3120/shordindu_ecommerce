@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { FiChevronLeft, FiChevronRight } from "react-icons/fi";
 import ProductCard from "@/components/ProductCard";
-import { listProducts } from "@/lib/products";
+import { listProducts, toCardProduct } from "@/lib/products";
 import { getCategories, buildCategoryTree } from "@/lib/categories";
 
 const WOMEN_CATEGORY_NAME = "women";
@@ -90,23 +90,10 @@ export default function NewArrivals() {
               className="flex snap-x snap-mandatory gap-3 overflow-x-auto pb-1 [scrollbar-width:none] [-ms-overflow-style:none] sm:grid sm:grid-cols-3 sm:gap-5 sm:overflow-visible sm:pb-0 lg:grid-cols-4 [&::-webkit-scrollbar]:hidden"
             >
               {products.map((product) => {
-                const primaryImage =
-                  product.images?.find((img) => img.is_primary)?.image ||
-                  product.images?.[0]?.image ||
-                  null;
-                const price = product.variations?.[0]?.price;
-
+                const card = toCardProduct(product);
                 return (
                   <div key={product.id} data-card className="w-[47%] shrink-0 snap-start sm:w-auto sm:shrink">
-                    <ProductCard
-                      product={{
-                        name: product.name,
-                        description: product.description,
-                        image: primaryImage,
-                        price: price ?? "—",
-                        href: `/shop/${product.id}`,
-                      }}
-                    />
+                    <ProductCard product={{ ...card, price: card.price ?? "—" }} />
                   </div>
                 );
               })}

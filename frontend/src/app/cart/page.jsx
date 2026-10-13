@@ -193,6 +193,11 @@ export default function CartPage() {
                     </td>
                     <td className="px-3 py-3 whitespace-nowrap text-neutral-600">
                       ৳{Number(row.unit_price_snapshot).toFixed(2)}
+                      {row.original_unit_price && (
+                        <span className="block text-xs text-neutral-400 line-through">
+                          ৳{Number(row.original_unit_price).toFixed(2)}
+                        </span>
+                      )}
                     </td>
                     <td className="px-3 py-3">
                       {row.isAddon ? (

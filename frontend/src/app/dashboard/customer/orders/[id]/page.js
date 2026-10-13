@@ -7,6 +7,7 @@ import Image from "next/image";
 import { toast } from "sonner";
 import { FiArrowLeft } from "react-icons/fi";
 import { getOrder } from "@/lib/orders";
+import OrderItemDiscount from "@/components/shared/OrderItemDiscount";
 
 const STATUS_STYLES = {
   pending: "bg-amber-50 text-amber-700",
@@ -67,6 +68,7 @@ function ItemRow({ item, depth = 0 }) {
               {item.variation_label_snapshot} &middot; Qty {item.quantity} &middot; ৳
               {item.unit_price} each
             </p>
+            <OrderItemDiscount item={item} />
           </div>
         </div>
         <p className="shrink-0 text-sm font-medium text-neutral-900">৳{item.line_total}</p>

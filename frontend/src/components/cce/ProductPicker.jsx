@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { FiBox, FiChevronDown, FiPlus, FiSearch } from "react-icons/fi";
+import { FiBox, FiCheck, FiChevronDown, FiPlus, FiSearch } from "react-icons/fi";
 import { getProduct, listProducts } from "@/lib/products";
 import { formatBDT } from "@/lib/format";
 
@@ -36,18 +36,33 @@ function toLine(product, variation) {
     variationLabel: product.product_type === "variable" ? variationLabel(variation) : "",
     sku: variation.sku,
     image: primaryImage(product, variation.id),
-    unitPrice: Number(variation.price),
+    // Current price incl. any live automatic discount (re-checked by the backend).
+    unitPrice: Number(variation.effective_price ?? variation.price),
     stock: variation.stock_quantity,
   };
 }
 
 /**
- * Debounced product search for order entry: name / SKU (and exact product
- * ID when the query is a number). Variable products expand so the CCE picks
- * the exact variation. Only active products are offered; prices and stock
- * shown here are re-validated by the backend when the order is placed.
+ * Debounced product search: name / SKU (and exact product ID when the query
+ * is a number), with image, price and stock for each result.
+ *
+ * Two modes:
+ * - Order entry (`onAdd`, `quantityInOrder`): variable products expand so the
+ *   exact variation is picked; only active products are offered.
+ * - Product selection (`onSelectProduct`, `isProductSelected`): clicking a
+ *   result selects the whole product (e.g. as a discount target).
+ *
+ * `status` filters by product status ("active" by default; null for all).
+ * Prices and stock shown here are always re-validated by the backend.
  */
-export default function ProductPicker({ onAdd, quantityInOrder }) {
+export default function ProductPicker({
+  onAdd,
+  quantityInOrder = () => 0,
+  onSelectProduct,
+  isProductSelected = () => false,
+  status = "active",
+}) {
+  const selectMode = Boolean(onSelectProduct);
   const [query, setQuery] = useState("");
   const [limit, setLimit] = useState(INITIAL_RESULTS);
   const [results, setResults] = useState([]);
@@ -74,11 +89,11 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
     const timeout = setTimeout(() => {
       setLoading(true);
       const byId = /^\d+$/.test(term) ? getProduct(term).catch(() => null) : Promise.resolve(null);
-      Promise.all([listProducts({ search: term, page_size: limit, status: "active" }), byId])
+      Promise.all([listProducts({ search: term, page_size: limit, status: status || undefined }), byId])
         .then(([data, exact]) => {
           if (cancelled) return;
           let list = data.results;
-          if (exact && exact.status === "active" && !list.some((p) => p.id === exact.id)) {
+          if (exact && (!status || exact.status === status) && !list.some((p) => p.id === exact.id)) {
             list = [exact, ...list];
           }
           setResults(list);
@@ -93,9 +108,13 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [term, limit]);
+  }, [term, limit, status]);
 
   const handleProductClick = (product) => {
+    if (selectMode) {
+      onSelectProduct(product);
+      return;
+    }
     const variations = sellableVariations(product);
     if (variations.length === 1) {
       onAdd(toLine(product, variations[0]));
@@ -129,13 +148,15 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
           ) : error ? (
             <p className="px-3 py-4 text-center text-sm text-red-600">{error}</p>
           ) : results.length === 0 ? (
-            <p className="px-3 py-4 text-center text-sm text-neutral-500">No active products match “{term}”.</p>
+            <p className="px-3 py-4 text-center text-sm text-neutral-500">
+              No {status ? `${status} ` : ""}products match “{term}”.
+            </p>
           ) : (
             <ul className={`divide-y divide-neutral-100 ${pending ? "opacity-60" : ""}`}>
               {results.map((product) => {
                 const variations = sellableVariations(product);
                 const totalStock = variations.reduce((s, v) => s + v.stock_quantity, 0);
-                const prices = variations.map((v) => Number(v.price));
+                const prices = variations.map((v) => Number(v.effective_price ?? v.price));
                 const priceText = prices.length
                   ? Math.min(...prices) === Math.max(...prices)
                     ? formatBDT(prices[0])
@@ -143,7 +164,10 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
                   : "—";
                 const single = variations.length === 1 ? variations[0] : null;
                 const singleAtLimit = single && (quantityInOrder(single.id) >= single.stock_quantity);
-                const disabled = variations.length === 0 || totalStock === 0 || singleAtLimit;
+                const selected = selectMode && isProductSelected(product);
+                const disabled = selectMode
+                  ? selected
+                  : variations.length === 0 || totalStock === 0 || singleAtLimit;
                 const image = primaryImage(product);
                 return (
                   <li key={product.id}>
@@ -165,6 +189,7 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
                         <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
                         <p className="truncate text-xs text-neutral-500">
                           #{product.id} · {single ? single.sku : `${variations.length} variations`}
+                          {product.status !== "active" && <span className="capitalize"> · {product.status}</span>}
                         </p>
                       </div>
                       <div className="shrink-0 text-right">
@@ -173,7 +198,13 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
                           {totalStock > 0 ? `${totalStock} in stock` : "Out of stock"}
                         </p>
                       </div>
-                      {single ? (
+                      {selectMode ? (
+                        selected ? (
+                          <FiCheck size={16} className="shrink-0 text-(--primary)" aria-label="Selected" />
+                        ) : (
+                          <FiPlus size={16} className="shrink-0 text-(--primary)" />
+                        )
+                      ) : single ? (
                         <FiPlus size={16} className="shrink-0 text-(--primary)" />
                       ) : (
                         <FiChevronDown
@@ -183,7 +214,7 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
                       )}
                     </button>
 
-                    {expandedId === product.id && variations.length > 1 && (
+                    {!selectMode && expandedId === product.id && variations.length > 1 && (
                       <div className="grid gap-1.5 bg-neutral-50 px-3 py-2 sm:grid-cols-2">
                         {variations.map((variation) => {
                           const atLimit = quantityInOrder(variation.id) >= variation.stock_quantity;
@@ -200,7 +231,9 @@ export default function ProductPicker({ onAdd, quantityInOrder }) {
                                 <span className="block truncate text-xs text-neutral-500">{variation.sku}</span>
                               </span>
                               <span className="shrink-0 text-right">
-                                <span className="block font-semibold text-neutral-900">{formatBDT(variation.price)}</span>
+                                <span className="block font-semibold text-neutral-900">
+                                  {formatBDT(variation.effective_price ?? variation.price)}
+                                </span>
                                 <span className={`block text-xs ${variation.stock_quantity > 0 ? "text-emerald-600" : "text-red-600"}`}>
                                   {variation.stock_quantity > 0 ? `${variation.stock_quantity} left` : "Out of stock"}
                                 </span>
