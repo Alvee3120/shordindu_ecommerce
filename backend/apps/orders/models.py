@@ -47,6 +47,10 @@ class Order(models.Model):
 
     class Meta:
         db_table = "orders"
+        indexes = [
+            models.Index(fields=["placed_at", "status"], name="order_placed_status_idx"),
+            models.Index(fields=["payment_status"], name="order_payment_idx"),
+        ]
 
     def __str__(self):
         return self.order_number
@@ -67,6 +71,9 @@ class OrderItem(models.Model):
 
     class Meta:
         db_table = "order_items"
+        indexes = [
+            models.Index(fields=["order", "product"], name="orderitem_order_product_idx"),
+        ]
 
     def __str__(self):
         return f"{self.product_name_snapshot} x{self.quantity}"

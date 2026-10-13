@@ -29,7 +29,13 @@ export default function AdminOrdersTable({ title, mine = false, ordersPath = "/d
   const [orders, setOrders] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
-  const [status, setStatus] = useState("");
+  // Deep-link support: /dashboard/admin/orders?status=shipped pre-selects the
+  // status filter (used by the dashboards' order-status charts).
+  const [status, setStatus] = useState(() => {
+    if (typeof window === "undefined") return "";
+    const initial = new URLSearchParams(window.location.search).get("status");
+    return initial && statusOptions.includes(initial) ? initial : "";
+  });
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [dateFrom, setDateFrom] = useState("");

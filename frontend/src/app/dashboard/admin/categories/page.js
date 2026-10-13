@@ -9,10 +9,26 @@ import {
   updateCategory,
   deleteCategory,
 } from "@/lib/categories";
+import { getCategorySales } from "@/lib/analytics";
+import { formatBDT } from "@/lib/format";
+import RangeFilter from "@/components/admin/analytics/RangeFilter";
+import ChartCard from "@/components/admin/analytics/ChartCard";
+import { CategoryBarChart } from "@/components/admin/analytics/charts";
+import { useAnalyticsRange } from "@/components/admin/analytics/AnalyticsRangeContext";
+import { useAnalyticsResource } from "@/components/admin/analytics/useAnalyticsResource";
 
 const EMPTY_FORM = { name: "", parent: "", description: "" };
 
 export default function AdminCategoriesPage() {
+  const { query, label, isReady } = useAnalyticsRange();
+  const [catSort, setCatSort] = useState("revenue");
+  const catKey = JSON.stringify(query);
+  const performance = useAnalyticsResource(
+    () => getCategorySales(query, { sort: catSort }),
+    [catKey, catSort],
+    { enabled: isReady }
+  );
+
   const [categories, setCategories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null);
@@ -123,17 +139,84 @@ export default function AdminCategoriesPage() {
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-neutral-900">Categories</h1>
-        {editingId === null && (
-          <button
-            type="button"
-            onClick={openNewForm}
-            className="flex items-center gap-1.5 rounded-lg bg-(--primary) px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--primary)/90"
-          >
-            <FiPlus size={16} />
-            Add Category
-          </button>
-        )}
+        <div>
+          <h1 className="text-xl font-semibold text-neutral-900">Categories</h1>
+          <p className="mt-1 text-sm text-neutral-500">Performance for {label}</p>
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <RangeFilter />
+          {editingId === null && (
+            <button
+              type="button"
+              onClick={openNewForm}
+              className="flex items-center gap-1.5 rounded-lg bg-(--primary) px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-(--primary)/90"
+            >
+              <FiPlus size={16} />
+              Add Category
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="mb-8 grid gap-5 lg:grid-cols-2">
+        <ChartCard
+          title="Category Revenue"
+          subtitle="Net sales by category"
+          loading={performance.loading}
+          error={performance.error}
+          onRetry={performance.reload}
+          isEmpty={!(performance.data?.results ?? []).length}
+          height={280}
+        >
+          <CategoryBarChart data={performance.data?.results} />
+        </ChartCard>
+
+        <div className="rounded-xl border border-neutral-200 bg-white p-5">
+          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+            <h3 className="font-semibold text-neutral-900">Category Performance</h3>
+            <select
+              value={catSort}
+              onChange={(event) => setCatSort(event.target.value)}
+              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+            >
+              <option value="revenue">Net sales</option>
+              <option value="units">Units sold</option>
+              <option value="orders">Orders</option>
+            </select>
+          </div>
+          {performance.loading ? (
+            <p className="py-6 text-center text-sm text-neutral-500">Loading…</p>
+          ) : performance.error ? (
+            <p className="py-6 text-center text-sm text-red-600">{performance.error}</p>
+          ) : (performance.data?.results ?? []).length === 0 ? (
+            <p className="py-6 text-center text-sm text-neutral-500">No category sales in this period.</p>
+          ) : (
+            <div className="max-h-[220px] overflow-y-auto">
+              <table className="w-full text-left text-sm">
+                <thead className="sticky top-0 bg-white">
+                  <tr className="border-b border-neutral-200 text-neutral-500">
+                    <th className="px-3 py-2 font-medium">Category</th>
+                    <th className="px-3 py-2 font-medium">Units</th>
+                    <th className="px-3 py-2 font-medium">Orders</th>
+                    <th className="px-3 py-2 font-medium">Net</th>
+                    <th className="px-3 py-2 font-medium">Share</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {performance.data.results.map((category) => (
+                    <tr key={category.id} className="border-b border-neutral-100 last:border-0">
+                      <td className="px-3 py-2 font-medium text-neutral-900">{category.name}</td>
+                      <td className="px-3 py-2 text-neutral-600">{category.units_sold}</td>
+                      <td className="px-3 py-2 text-neutral-600">{category.orders}</td>
+                      <td className="px-3 py-2 font-medium text-neutral-900">{formatBDT(category.net_sales)}</td>
+                      <td className="px-3 py-2 text-neutral-600">{category.contribution_pct}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
       </div>
 
       {editingId !== null && (

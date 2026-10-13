@@ -5,6 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import {
   FiUser,
+  FiUserCheck,
   FiLock,
   FiLogOut,
   FiMapPin,
@@ -18,8 +19,10 @@ import {
   FiUsers,
   FiShoppingBag,
   FiBell,
+  FiBarChart2,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
+import { AnalyticsRangeProvider } from "@/components/admin/analytics/AnalyticsRangeContext";
 
 // Change Password link every logged-in user gets, regardless of role
 const changePasswordLink = { label: "Change Password", href: "/dashboard/change-password", icon: FiLock };
@@ -35,6 +38,8 @@ const roleLinks = {
   ],
   admin: [
     { label: "Orders", href: "/dashboard/admin/orders", icon: FiPackage },
+    { label: "Sales Analytics", href: "/dashboard/admin/sales", icon: FiBarChart2 },
+    { label: "Customers", href: "/dashboard/admin/customers", icon: FiUserCheck },
     { label: "My Orders", href: "/dashboard/admin/my-orders", icon: FiShoppingBag },
     { label: "Products", href: "/dashboard/admin/products", icon: FiBox },
     { label: "Categories", href: "/dashboard/admin/categories", icon: FiGrid },
@@ -44,14 +49,19 @@ const roleLinks = {
     { label: "Reviews", href: "/dashboard/admin/reviews", icon: FiStar },
     { label: "Stock Notifications", href: "/dashboard/admin/stock-notifications", icon: FiBell },
     { label: "Users", href: "/dashboard/admin/users", icon: FiUsers },
+    { label: "My Profile", href: "/dashboard/admin/profile", icon: FiUser },
   ],
 };
 
 function getLinksForRole(role) {
   const middle = roleLinks[role] ?? roleLinks.customer;
-  const profileLink = { label: "Profile", href: `/dashboard/${role}`, icon: FiUser };
-  // Profile first, role-specific links in the middle, Change Password last
-  return [profileLink, ...middle, changePasswordLink];
+  // The admin landing page is the analytics Overview; other roles get a profile.
+  const firstLink =
+    role === "admin"
+      ? { label: "Overview", href: `/dashboard/${role}`, icon: FiGrid }
+      : { label: "Profile", href: `/dashboard/${role}`, icon: FiUser };
+  // Overview/Profile first, role-specific links in the middle, Change Password last
+  return [firstLink, ...middle, changePasswordLink];
 }
 
 const DashboardLayout = ({ children }) => {
@@ -123,7 +133,9 @@ const DashboardLayout = ({ children }) => {
         </nav>
       </aside>
 
-      <div className="min-w-0 flex-1">{children}</div>
+      <AnalyticsRangeProvider>
+        <div className="min-w-0 flex-1">{children}</div>
+      </AnalyticsRangeProvider>
     </div>
   );
 };

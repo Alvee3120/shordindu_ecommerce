@@ -1,0 +1,27 @@
+# Taste
+- Wants a codebase audit first (project structure, existing frontend/backend, DB schema, auth, existing APIs and access control) followed by a concise implementation plan before any code is written, then phase-by-phase implementation. Confidence: 0.9
+- Structures work in explicit phases (audit → business rules → backend → frontend → testing → final report). Confidence: 0.85
+- Expects a final report listing: files created/modified, APIs created/updated, metrics and formulas implemented, components reused, tests performed and their results, incomplete features / data limitations, and any required DB migrations. Confidence: 0.85
+- Never claim tests pass unless they were actually executed. Confidence: 0.95
+- When building on an existing project, implement as a real feature of that project — not a standalone demo. Confidence: 0.9
+- Inspect and reuse the existing architecture, components, APIs, and database models wherever possible; do not rebuild existing functionality or create duplicate APIs, tables, or models. Confidence: 0.95
+- Do not delete working features, redesign unrelated pages, or introduce unnecessary dependencies. Confidence: 0.9
+- Reuse the existing project's design system and theme rather than inventing a new look. Confidence: 0.9
+- Use a library already installed in the project; only if none exists, pick one compatible with the current stack. Confidence: 0.9
+- Preserve existing business logic and backward compatibility when extending a system. Confidence: 0.85
+- All data must come from the real backend — no hardcoded or demo data. Confidence: 0.9
+- Do not fabricate or invent data the database cannot provide; document the limitation instead (e.g. report a metric as 0 with an explanatory tooltip rather than guessing). Confidence: 0.9
+- Define business rules/formulas once as a single source of truth so metrics stay consistent across cards, charts, tables, and reports. Confidence: 0.9
+- Prioritize accurate business calculations (clear documented formulas, no double-counting, correct exclusion of cancelled/pending orders, historical prices over current prices). Confidence: 0.9
+- Do aggregation/filtering/pagination on the server; avoid fetching every record into frontend memory, and avoid N+1 queries. Confidence: 0.85
+- Protect admin/sensitive endpoints with the existing authentication and authorization; only authorized administrators access sensitive customer data. Confidence: 0.85
+- Do not show misleading metrics (e.g. suppress percentage change when the previous period is zero/unavailable rather than showing a fake value). Confidence: 0.85
+- Expects loading/skeleton states, clear empty states, and error messages with retry actions in data-driven UIs. Confidence: 0.85
+- Expects fully responsive layouts (desktop/tablet/mobile) and accessible controls. Confidence: 0.85
+- Format currency as BDT (৳) when that matches the existing application. Confidence: 0.8
+- Prefers avoiding cluttered dashboards: show the most important metrics first, keep the layout compact with minimal whitespace and consistent card heights/spacing, prioritize useful information above the fold, and move secondary detail to dedicated pages. Confidence: 0.9
+- Each chart/visualization should answer a different business question; do not reuse the same chart across pages with only a different title. Overview gets a few high-level snapshot charts, while a dedicated analytics page gets detailed, purpose-built charts. Confidence: 0.8
+- When simplifying or reorganizing a UI, change only the presentation — keep the underlying metrics, calculations, and APIs even if their cards/sections are removed; never hardcode displayed values. Confidence: 0.8
+- Wants edge cases tested: every date filter incl. custom ranges, empty/zero-sales periods, cancelled/returned orders, discounts and delivery charges, date/timezone boundaries, unauthorized access, and large-dataset performance. Confidence: 0.8
+- Expects verification that dashboard metrics reconcile with the underlying source records/pages. Confidence: 0.8
+- Prioritizes accurate calculations, secure access, maintainability, performance, and UX above speed of delivery. Confidence: 0.8

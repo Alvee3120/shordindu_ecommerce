@@ -2,28 +2,38 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { toast } from "sonner";
-import { FiPlus, FiEdit2, FiTrash2, FiSearch, FiUpload, FiDownload } from "react-icons/fi";
-import { listProducts, deleteProduct, bulkImportProducts, downloadImportTemplate } from "@/lib/products";
+import {
+  FiPlus,
+  FiEdit2,
+  FiTrash2,
+  FiSearch,
+  FiUpload,
+  FiDownload,
+  FiBox,
+  FiCheckCircle,
+  FiAlertTriangle,
+  FiXCircle,
+} from "react-icons/fi";
+import { deleteProduct, bulkImportProducts, downloadImportTemplate } from "@/lib/products";
+import { getProductPerformance, getSummary } from "@/lib/analytics";
+import { formatBDT } from "@/lib/format";
+import StatusBadge from "@/components/admin/StatusBadge";
+import RangeFilter from "@/components/admin/analytics/RangeFilter";
+import KpiCard from "@/components/admin/analytics/KpiCard";
+import { useAnalyticsRange } from "@/components/admin/analytics/AnalyticsRangeContext";
+import { useAnalyticsResource } from "@/components/admin/analytics/useAnalyticsResource";
 
-const statusColors = {
-  draft: "bg-neutral-100 text-neutral-600",
-  active: "bg-emerald-100 text-emerald-700",
-  archived: "bg-red-100 text-red-700",
-};
-
-const visibilityLabels = {
-  standalone: "Standalone",
-  addon_only: "Addon only",
-  both: "Both",
-};
+const PAGE_SIZE = 20;
 
 export default function AdminProductsPage() {
+  const { query, label, isReady } = useAnalyticsRange();
+
   const [products, setProducts] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
+  const [searchInput, setSearchInput] = useState("");
   const [loading, setLoading] = useState(true);
   const [deletingId, setDeletingId] = useState(null);
 
@@ -33,12 +43,21 @@ export default function AdminProductsPage() {
   const [importResult, setImportResult] = useState(null);
   const [downloadingTemplate, setDownloadingTemplate] = useState(false);
 
-  const load = async () => {
+  const key = JSON.stringify(query);
+  const summary = useAnalyticsResource(() => getSummary(query), [key], { enabled: isReady });
+
+  const load = async (p = page, s = search) => {
+    if (!isReady) return;
     setLoading(true);
     try {
-      const productData = await listProducts({ page, search: search || undefined });
-      setProducts(productData.results);
-      setCount(productData.count);
+      const data = await getProductPerformance({
+        ...query,
+        page: p,
+        page_size: PAGE_SIZE,
+        search: s || undefined,
+      });
+      setProducts(data.results);
+      setCount(data.count);
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -47,14 +66,19 @@ export default function AdminProductsPage() {
   };
 
   useEffect(() => {
-    load();
+    load(page, search);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page]);
+  }, [page, search, key, isReady]);
 
   const handleSearchSubmit = (e) => {
     e.preventDefault();
+    const next = searchInput.trim();
+    if (page === 1 && next === search) {
+      load(1, next);
+      return;
+    }
+    setSearch(next);
     setPage(1);
-    load();
   };
 
   // ---- Bulk import ----
@@ -99,7 +123,7 @@ export default function AdminProductsPage() {
           `${result.created.products} product(s) created, ${result.updated.products} updated`
         );
         setPage(1);
-        await load();
+        await load(1, search);
       }
       if (result.errors.length > 0) {
         toast.error(`${result.errors.length} row(s) had errors - see details below`);
@@ -118,6 +142,7 @@ export default function AdminProductsPage() {
       await deleteProduct(id);
       toast.success("Product deleted");
       setProducts((prev) => prev.filter((p) => p.id !== id));
+      setCount((c) => Math.max(0, c - 1));
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -125,25 +150,30 @@ export default function AdminProductsPage() {
     }
   };
 
-  const totalPages = Math.max(1, Math.ceil(count / 20));
+  const totalPages = Math.max(1, Math.ceil(count / PAGE_SIZE));
+  const business = summary.data?.business;
 
   return (
-    <div>
+    <div className="pb-10">
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-neutral-900">Products</h1>
+        <div>
+          <h1 className="text-xl font-semibold text-neutral-900">Products</h1>
+          <p className="mt-1 text-sm text-neutral-500">Performance for {label}</p>
+        </div>
         <div className="flex flex-wrap items-center gap-3">
           <form onSubmit={handleSearchSubmit} className="flex items-center gap-2">
             <div className="flex items-center gap-2 rounded-lg border border-neutral-300 px-3 py-2">
               <FiSearch size={14} className="text-neutral-400" />
               <input
                 type="text"
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
+                value={searchInput}
+                onChange={(e) => setSearchInput(e.target.value)}
                 placeholder="Search products"
                 className="w-40 bg-transparent text-sm outline-none"
               />
             </div>
           </form>
+          <RangeFilter />
           <button
             type="button"
             onClick={() => setShowImport((v) => !v)}
@@ -160,6 +190,19 @@ export default function AdminProductsPage() {
             Add Product
           </Link>
         </div>
+      </div>
+
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <KpiCard label="Total Products" icon={FiBox} loading={summary.loading} value={business?.total_products?.value ?? "—"} />
+        <KpiCard label="Active Products" icon={FiCheckCircle} loading={summary.loading} value={business?.active_products?.value ?? "—"} />
+        <KpiCard
+          label="Low-Stock Products"
+          icon={FiAlertTriangle}
+          loading={summary.loading}
+          value={business?.low_stock_products?.value ?? "—"}
+          tooltip="Products with 1–5 total units in stock (dashboard threshold)."
+        />
+        <KpiCard label="Out-of-Stock Products" icon={FiXCircle} loading={summary.loading} value={business?.out_of_stock_products?.value ?? "—"} />
       </div>
 
       {showImport && (
@@ -254,7 +297,7 @@ export default function AdminProductsPage() {
       )}
 
       {loading ? (
-        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
+        <p className="flex min-h-[40vh] items-center justify-center text-sm text-neutral-500">
           Loading products...
         </p>
       ) : products.length === 0 ? (
@@ -264,10 +307,13 @@ export default function AdminProductsPage() {
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-500">
-                <th className="px-5 py-3 font-medium">Name</th>
+                <th className="px-5 py-3 font-medium">Product</th>
+                <th className="px-5 py-3 font-medium">SKU</th>
                 <th className="px-5 py-3 font-medium">Category</th>
                 <th className="px-5 py-3 font-medium">Status</th>
-                <th className="px-5 py-3 font-medium">Visibility Type</th>
+                <th className="px-5 py-3 font-medium">Stock</th>
+                <th className="px-5 py-3 font-medium">Units Sold</th>
+                <th className="px-5 py-3 font-medium">Revenue</th>
                 <th className="px-5 py-3 font-medium text-right">Actions</th>
               </tr>
             </thead>
@@ -276,45 +322,29 @@ export default function AdminProductsPage() {
                 <tr key={product.id} className="border-b border-neutral-100 last:border-0">
                   <td className="px-5 py-3 font-medium text-neutral-900">
                     <div className="flex min-w-0 items-center gap-3">
-                      <div className="relative h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100">
-                        {(() => {
-                          const image =
-                            product.images?.find((item) => item.is_primary)?.image ||
-                            product.images?.[0]?.image;
-
-                          return image ? (
-                            <Image
-                              src={image}
-                              alt={product.name}
-                              fill
-                              className="object-cover"
-                              sizes="40px"
-                            />
-                          ) : (
-                            <div className="flex h-full items-center justify-center px-1 text-center text-[9px] font-medium leading-tight text-neutral-400">
-                              No image
-                            </div>
-                          );
-                        })()}
+                      <div className="h-10 w-10 shrink-0 overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                        {product.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={product.image} alt={product.name} className="h-full w-full object-cover" />
+                        ) : (
+                          <div className="flex h-full items-center justify-center text-[9px] text-neutral-400">
+                            No image
+                          </div>
+                        )}
                       </div>
                       <span className="min-w-0 break-words">{product.name}</span>
                     </div>
                   </td>
+                  <td className="px-5 py-3 text-neutral-500">{product.sku || "—"}</td>
                   <td className="px-5 py-3 text-neutral-500">
-                    {(product.category_names || []).join(", ") || "—"}
+                    {(product.categories || []).join(", ") || "—"}
                   </td>
                   <td className="px-5 py-3">
-                    <span
-                      className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${
-                        statusColors[product.status] || "bg-neutral-100 text-neutral-600"
-                      }`}
-                    >
-                      {product.status}
-                    </span>
+                    <StatusBadge value={product.status} />
                   </td>
-                  <td className="px-5 py-3 text-neutral-500">
-                    {visibilityLabels[product.visibility_type] || product.visibility_type}
-                  </td>
+                  <td className="px-5 py-3 text-neutral-600">{product.stock_quantity}</td>
+                  <td className="px-5 py-3 text-neutral-600">{product.units_sold}</td>
+                  <td className="px-5 py-3 font-medium text-neutral-900">{formatBDT(product.revenue)}</td>
                   <td className="px-5 py-3">
                     <div className="flex justify-end gap-4">
                       <Link
