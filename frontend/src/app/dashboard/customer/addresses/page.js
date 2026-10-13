@@ -9,10 +9,14 @@ import {
   updateAddress,
   deleteAddress,
 } from "@/lib/addresses";
+import { isDhaka } from "@/lib/delivery";
+import DhakaZoneSelect from "@/components/shared/DhakaZoneSelect";
+import { useDeliveryCharges } from "@/components/shared/useDeliveryCharges";
 
-const EMPTY_FORM = { name: "", phone: "", address: "", district: "", is_default: false };
+const EMPTY_FORM = { name: "", phone: "", address: "", district: "", zone: "", is_default: false };
 
 export default function AddressesPage() {
+  const { config: deliveryConfig } = useDeliveryCharges();
   const [addresses, setAddresses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [editingId, setEditingId] = useState(null); // null = closed, "new" = create, or an address id
@@ -51,6 +55,7 @@ export default function AddressesPage() {
       phone: addr.phone,
       address: addr.address,
       district: addr.district,
+      zone: addr.zone || "",
       is_default: addr.is_default,
     });
     setFieldErrors({});
@@ -67,7 +72,12 @@ export default function AddressesPage() {
 
   const handleChange = (e) => {
     const { name, type, checked, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: type === "checkbox" ? checked : value }));
+    setForm((prev) => ({
+      ...prev,
+      [name]: type === "checkbox" ? checked : value,
+      // a zone belongs to the district it was chosen for
+      ...(name === "district" && value !== prev.district ? { zone: "" } : {}),
+    }));
     setFieldErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
@@ -215,6 +225,23 @@ export default function AddressesPage() {
             )}
           </div>
 
+          {isDhaka(deliveryConfig, form.district) && (
+            <div>
+              <label htmlFor="zone" className="mb-1.5 block text-sm font-medium text-neutral-700">
+                Zone
+              </label>
+              <DhakaZoneSelect
+                config={deliveryConfig}
+                value={form.zone}
+                onChange={(zone) => {
+                  setForm((prev) => ({ ...prev, zone }));
+                  setFieldErrors((prev) => ({ ...prev, zone: undefined }));
+                }}
+                error={fieldErrors.zone?.[0]}
+              />
+            </div>
+          )}
+
           <label className="flex items-center gap-2 text-sm text-neutral-700">
             <input
               type="checkbox"
@@ -272,7 +299,10 @@ export default function AddressesPage() {
               </div>
 
               <p className="text-sm text-neutral-600">{addr.address}</p>
-              <p className="text-sm text-neutral-500">{addr.district}</p>
+              <p className="text-sm text-neutral-500">
+                {addr.zone ? `${addr.zone}, ` : ""}
+                {addr.district}
+              </p>
 
               <div className="mt-2 flex items-center gap-4 border-t border-neutral-100 pt-3 text-sm">
                 <button

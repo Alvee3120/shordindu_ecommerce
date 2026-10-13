@@ -40,6 +40,17 @@ class CanManageOrders(BasePermission):
         return can_manage_orders(request.user)
 
 
+class IsAdminOrOrderManagerReadOnly(BasePermission):
+    """CCE and administrators can read; only administrators can write.
+
+    Customers get no access at all, for reads or writes."""
+
+    def has_permission(self, request, view):
+        if request.method in SAFE_METHODS:
+            return can_manage_orders(request.user)
+        return is_admin(request.user)
+
+
 class IsOwnerOrReadOnly(BasePermission):
     """Anyone can read; only the object's own author (or an admin) can write."""
 

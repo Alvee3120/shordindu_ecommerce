@@ -10,9 +10,8 @@ import { getCart, updateCartItem, deleteCartItem } from "@/lib/cart";
 import { getMe } from "@/lib/auth";
 import { listAddresses } from "@/lib/addresses";
 import { useCart } from "@/context/CartContext";
-import { getDeliveryFee } from "@/lib/districts";
-
-const DEFAULT_ESTIMATED_SHIPPING = 120;
+import { resolveDeliveryCharge } from "@/lib/delivery";
+import { useDeliveryCharges } from "@/components/shared/useDeliveryCharges";
 
 export default function CartPage() {
   const router = useRouter();
@@ -22,6 +21,7 @@ export default function CartPage() {
   const [error, setError] = useState("");
   const [updatingItemId, setUpdatingItemId] = useState(null);
   const [shippingAddress, setShippingAddress] = useState(null);
+  const { config: deliveryConfig } = useDeliveryCharges();
 
   const loadCart = async () => {
     try {
@@ -108,8 +108,12 @@ export default function CartPage() {
   const items = cart?.items || [];
   const isEmpty = items.length === 0;
   const subtotal = Number(cart?.subtotal || 0);
-  const estimatedShipping = getDeliveryFee(shippingAddress?.district) ?? DEFAULT_ESTIMATED_SHIPPING;
-  const total = subtotal + (isEmpty ? 0 : estimatedShipping);
+  // Estimate only — checkout prices the actual address. Without a priceable
+  // saved address, fall back to the configured outside-Dhaka charge.
+  const estimatedShipping =
+    resolveDeliveryCharge(deliveryConfig, shippingAddress?.district, shippingAddress?.zone)?.fee ??
+    (deliveryConfig ? Number(deliveryConfig.outside_dhaka) : null);
+  const total = subtotal + (isEmpty ? 0 : estimatedShipping ?? 0);
 
   // flatten each top-level item with its addon children, in display order
   const rows = items.flatMap((item) => [
@@ -248,7 +252,9 @@ export default function CartPage() {
                 </span>
               </div>
               <p className="text-right text-xs text-(--primary)">
-                * Charges may vary: ৳{estimatedShipping.toFixed(2)}
+                {estimatedShipping != null
+                  ? `* Charges may vary: ৳${estimatedShipping.toFixed(2)}`
+                  : "* Calculated at checkout"}
               </p>
             </div>
 

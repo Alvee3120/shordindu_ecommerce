@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FiArrowLeft } from "react-icons/fi";
-import { getOrder } from "@/lib/orders";
+import { getOrder, orderCustomerName, ORDER_STATUS_ACTIONS } from "@/lib/orders";
 import { useAuth } from "@/context/AuthContext";
 
 const statusColors = {
@@ -22,6 +22,7 @@ export default function AdminOrderDetailPage() {
   const { user } = useAuth();
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [updating, setUpdating] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -33,6 +34,22 @@ export default function AdminOrderDetailPage() {
       cancelled = true;
     };
   }, [id]);
+
+  const handleStatusAction = async (e) => {
+    const opt = ORDER_STATUS_ACTIONS.find((o) => o.value === e.target.value);
+    if (!opt || updating) return;
+    if (opt.value === "cancelled" && !confirm("Cancel this order? Its items go back into stock.")) return;
+    setUpdating(true);
+    try {
+      const updated = await opt.action(order.id);
+      setOrder(updated);
+      toast.success(`Order marked as ${updated.status}.`);
+    } catch (err) {
+      toast.error(err.message);
+    } finally {
+      setUpdating(false);
+    }
+  };
 
   if (loading)
     return (
@@ -58,9 +75,10 @@ export default function AdminOrderDetailPage() {
           <h1 className="text-xl font-semibold text-neutral-900">{order.order_number}</h1>
           <p className="text-sm text-neutral-500">
             Placed {new Date(order.placed_at).toLocaleString()}
+            {order.created_by_name && <> · entered by {order.created_by_name}</>}
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           <span
             className={`rounded-full px-3 py-1 text-xs font-semibold capitalize ${
               statusColors[order.status] || "bg-neutral-100 text-neutral-600"
@@ -71,6 +89,24 @@ export default function AdminOrderDetailPage() {
           <span className="rounded-full bg-neutral-100 px-3 py-1 text-xs font-semibold text-neutral-600 capitalize">
             {order.payment_status}
           </span>
+          {(user?.role === "cce" || user?.role === "admin") && (
+            <select
+              value=""
+              onChange={handleStatusAction}
+              disabled={updating}
+              aria-label="Update order status"
+              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-700 outline-none focus:ring-2 focus:ring-(--primary) disabled:cursor-not-allowed disabled:opacity-50"
+            >
+              <option value="" disabled>
+                {updating ? "Updating..." : "Update status"}
+              </option>
+              {ORDER_STATUS_ACTIONS.filter((opt) => opt.value !== order.status).map((opt) => (
+                <option key={opt.value} value={opt.value}>
+                  {opt.label}
+                </option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
@@ -122,10 +158,25 @@ export default function AdminOrderDetailPage() {
                 <p className="font-medium text-neutral-900">{order.shipping_address_detail.name}</p>
                 <p>{order.shipping_address_detail.phone}</p>
                 <p>{order.shipping_address_detail.address}</p>
-                <p>{order.shipping_address_detail.district}</p>
+                <p>
+                  {order.shipping_address_detail.zone ? `${order.shipping_address_detail.zone}, ` : ""}
+                  {order.shipping_address_detail.district}
+                </p>
               </div>
             ) : (
               <p className="text-sm text-neutral-500">—</p>
+            )}
+          </div>
+
+          <div className="rounded-xl border border-neutral-200 bg-white p-5 text-sm text-neutral-600">
+            <h2 className="mb-3 text-sm font-semibold text-neutral-900">Customer</h2>
+            <p className="font-medium text-neutral-900">{orderCustomerName(order)}</p>
+            <p>{order.user ? "Registered customer" : "Guest order"}</p>
+            {order.guest_email && <p>{order.guest_email}</p>}
+            {order.note && (
+              <p className="mt-3 rounded-lg bg-neutral-50 px-3 py-2 text-neutral-700">
+                <span className="font-medium">Note:</span> {order.note}
+              </p>
             )}
           </div>
 

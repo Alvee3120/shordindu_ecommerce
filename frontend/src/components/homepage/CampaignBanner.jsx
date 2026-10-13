@@ -1,61 +1,14 @@
-import Image from "next/image";
-import Link from "next/link";
+import CampaignBannerView from "@/components/homepage/CampaignBannerView";
+import { getActiveCampaignBanner } from "@/lib/campaignBanner";
 
-const campaignImage = "/assets/banner/banner.jpeg";
-const campaignImageMobile = "/assets/banner/bannerM.jpeg";
-const campaignUrl = "/shop";
-
-export default function CampaignBanner() {
-  return (
-    <section className="relative left-1/2 right-1/2 mx-[-50vw] flex h-[420px] w-screen items-center overflow-hidden bg-neutral-200 sm:h-[420px] lg:h-[560px]">
-      {/* Background image */}
-      <div className="hidden sm:block absolute inset-0 z-0">
-        <Image
-          src={campaignImage}
-          alt="Mid Year Clearance Sale"
-          fill
-          priority
-          className="object-cover object-center"
-        />
-      </div>
-      <div className="block sm:hidden absolute inset-0 z-0">
-        <Image
-          src={campaignImageMobile}
-          alt="Mid Year Clearance Sale"
-          fill
-          priority
-          className="object-cover object-[75%_center]"
-        />
-      </div>
-
-      {/* Left text content */}
-      <div className="relative z-10 mx-auto w-full max-w-7xl px-6 sm:px-8">
-        <div className="max-w-md">
-          <p className="font-sora mb-3 text-xs font-semibold tracking-[0.2em] text-white/70 sm:text-sm">
-            SEASONAL OFFER
-          </p>
-
-          <h2 className="font-sora mb-4 text-4xl leading-[1.05] font-extrabold tracking-tight text-white sm:text-5xl lg:text-6xl">
-            Mid Year
-            <br />
-            Clearance
-            <br />
-            Sale
-          </h2>
-
-          <p className="mb-6 max-w-xs text-sm leading-relaxed text-white/70 sm:text-base">
-            Up to 40% off on selected styles. Refresh your wardrobe before the
-            season ends.
-          </p>
-
-          <Link
-            href={campaignUrl}
-            className="inline-block rounded-md bg-(--primary) transition-transform hover:scale-105 px-6 py-3 text-xs font-semibold tracking-wide text-white uppercase sm:text-sm"
-          >
-            Explore Collection
-          </Link>
-        </div>
-      </div>
-    </section>
-  );
+/**
+ * Homepage campaign banner. Content, images, link and schedule are managed
+ * by admins at /dashboard/admin/campaign-banner. Rendered on the server, so
+ * the banner arrives with the page (no loading flash or layout shift); when
+ * it's disabled, out of schedule or the API is down, nothing is rendered.
+ */
+export default async function CampaignBanner() {
+  const banner = await getActiveCampaignBanner();
+  if (!banner) return null;
+  return <CampaignBannerView banner={banner} priority />;
 }

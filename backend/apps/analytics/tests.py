@@ -84,9 +84,14 @@ class AnalyticsTestCase(TestCase):
         c = self.client.get("/api/analytics/summary/?range=today")
         self.assertEqual(c.status_code, 403)
 
+        # CCE gets the sales overview (minus admin business totals) but none
+        # of the admin-only product/customer analytics or exports.
         self.auth(self.cce)
         cce = self.client.get("/api/analytics/summary/?range=today")
-        self.assertEqual(cce.status_code, 403)
+        self.assertEqual(cce.status_code, 200)
+        self.assertNotIn("business", cce.data)
+        self.assertEqual(self.client.get("/api/analytics/top-products/?range=today").status_code, 403)
+        self.assertEqual(self.client.get("/api/analytics/customers/?range=today").status_code, 403)
 
         self.auth(self.admin)
         ok = self.client.get("/api/analytics/summary/?range=today")

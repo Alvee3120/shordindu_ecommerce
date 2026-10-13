@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
 import { FiX } from "react-icons/fi";
-import { getOrder, confirmOrder, processOrder, cancelOrder, shipOrder, deliverOrder } from "@/lib/orders";
+import { getOrder, ORDER_STATUS_ACTIONS } from "@/lib/orders";
 
 const statusColors = {
   pending: "bg-amber-100 text-amber-700",
@@ -17,17 +17,8 @@ const statusColors = {
 
 // All possible status transitions — always shown minus whichever matches the
 // order's current status, so status stays changeable even from
-// cancelled/delivered (e.g. correcting a mistaken cancel). Each `value` is
-// the status that action actually results in — must line up 1:1 with
-// Order.Status on the backend so the current status always excludes the
-// matching action (e.g. a "confirmed" order never re-offers "Confirm").
-const ALL_ACTIONS = [
-  { label: "Confirm", value: "confirmed", action: confirmOrder },
-  { label: "Process", value: "processing", action: processOrder },
-  { label: "Ship", value: "shipped", action: shipOrder },
-  { label: "Mark delivered", value: "delivered", action: deliverOrder },
-  { label: "Cancel", value: "cancelled", action: cancelOrder },
-];
+// cancelled/delivered (e.g. correcting a mistaken cancel).
+const ALL_ACTIONS = ORDER_STATUS_ACTIONS;
 
 export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
   const [order, setOrder] = useState(null);
@@ -176,7 +167,11 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
                     </p>
                     <p>{order.shipping_address_detail.phone}</p>
                     <p className="mt-1">{order.shipping_address_detail.address}</p>
-                    <p>{order.shipping_address_detail.district}</p>
+                    <p>
+                      {order.shipping_address_detail.zone ? `${order.shipping_address_detail.zone}, ` : ""}
+                      {order.shipping_address_detail.district}
+                    </p>
+                    {order.note && <p className="mt-2 text-xs text-neutral-500">Note: {order.note}</p>}
                   </div>
                 </div>
               )}

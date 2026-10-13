@@ -10,9 +10,12 @@ import { getCart } from "@/lib/cart";
 import { getMe } from "@/lib/auth";
 import { listAddresses, updateAddress, deleteAddress } from "@/lib/addresses";
 import { checkout } from "@/lib/orders";
-import { getDeliveryFee } from "@/lib/districts";
+import { isDhaka, resolveDeliveryCharge } from "@/lib/delivery";
+import { formatBDT } from "@/lib/format";
 import { useCart } from "@/context/CartContext";
 import DistrictSelect from "@/components/shared/DistrictSelect";
+import DhakaZoneSelect from "@/components/shared/DhakaZoneSelect";
+import { useDeliveryCharges } from "@/components/shared/useDeliveryCharges";
 
 const PHONE_RE = /^(?:\+?880|0)1[3-9]\d{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -23,12 +26,14 @@ const EMPTY_GUEST_FORM = {
   shipping_phone: "",
   shipping_address: "",
   shipping_district: "",
+  shipping_zone: "",
   order_note: "",
 };
 
 export default function CheckoutPage() {
   const router = useRouter();
   const { refreshCart } = useCart();
+  const delivery = useDeliveryCharges();
   const [cart, setCart] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -91,11 +96,22 @@ export default function CheckoutPage() {
     if (formErrors[name]) setFormErrors((prev) => ({ ...prev, [name]: undefined }));
   };
 
+  // A zone only belongs to the district it was picked for, so changing the
+  // district always clears it (and hides the zone field outside Dhaka).
   const handleDistrictChange = (district) => {
-    setGuestForm((prev) => ({ ...prev, shipping_district: district }));
-    if (formErrors.shipping_district) {
-      setFormErrors((prev) => ({ ...prev, shipping_district: undefined }));
+    setGuestForm((prev) => ({
+      ...prev,
+      shipping_district: district,
+      shipping_zone: district === prev.shipping_district ? prev.shipping_zone : "",
+    }));
+    if (formErrors.shipping_district || formErrors.shipping_zone) {
+      setFormErrors((prev) => ({ ...prev, shipping_district: undefined, shipping_zone: undefined }));
     }
+  };
+
+  const handleZoneChange = (zone) => {
+    setGuestForm((prev) => ({ ...prev, shipping_zone: zone }));
+    if (formErrors.shipping_zone) setFormErrors((prev) => ({ ...prev, shipping_zone: undefined }));
   };
 
   const openEditAddress = (addr) => {
@@ -105,6 +121,7 @@ export default function CheckoutPage() {
       phone: addr.phone || "",
       address: addr.address,
       district: addr.district,
+      zone: addr.zone || "",
       is_default: addr.is_default,
     });
     setEditFieldErrors({});
@@ -180,6 +197,8 @@ export default function CheckoutPage() {
     }
     if (!guestForm.shipping_district) {
       errors.shipping_district = "Please select a district.";
+    } else if (isDhaka(delivery.config, guestForm.shipping_district) && !guestForm.shipping_zone) {
+      errors.shipping_zone = "Please select a Dhaka zone.";
     }
     if (!guestForm.shipping_address.trim()) {
       errors.shipping_address = "Street address / house details are required.";
@@ -203,7 +222,12 @@ export default function CheckoutPage() {
         payload.shipping_phone = guestForm.shipping_phone;
         payload.shipping_address = guestForm.shipping_address;
         payload.shipping_district = guestForm.shipping_district;
+        payload.shipping_zone = guestForm.shipping_zone;
       } else {
+        if (selectedAddressNeedsZone) {
+          toast.error("Edit the selected address to choose its Dhaka zone.");
+          return;
+        }
         payload.shipping_address_id = Number(selectedAddressId);
       }
     } else {
@@ -219,7 +243,9 @@ export default function CheckoutPage() {
       payload.shipping_phone = guestForm.shipping_phone;
       payload.shipping_address = guestForm.shipping_address;
       payload.shipping_district = guestForm.shipping_district;
+      payload.shipping_zone = guestForm.shipping_zone;
     }
+    if (usingInlineAddress && guestForm.order_note.trim()) payload.order_note = guestForm.order_note.trim();
 
     setPlacingOrder(true);
     try {
@@ -244,7 +270,17 @@ export default function CheckoutPage() {
 
   const selectedAddress = addresses.find((a) => String(a.id) === String(selectedAddressId));
   const activeDistrict = usingInlineAddress ? guestForm.shipping_district : selectedAddress?.district;
-  const deliveryFee = getDeliveryFee(activeDistrict);
+  const activeZone = usingInlineAddress ? guestForm.shipping_zone : selectedAddress?.zone;
+  const deliveryCharge = resolveDeliveryCharge(delivery.config, activeDistrict, activeZone);
+  const deliveryFee = deliveryCharge?.fee ?? null;
+  // Saved Dhaka addresses from before zones existed can't be priced yet.
+  const selectedAddressNeedsZone =
+    !usingInlineAddress && isDhaka(delivery.config, selectedAddress?.district) && !deliveryCharge;
+  const deliveryPrompt = delivery.error
+    ? "Could not load delivery charges"
+    : isDhaka(delivery.config, activeDistrict)
+      ? "Select a zone"
+      : "Select a district";
 
   if (loading) {
     return (
@@ -324,13 +360,33 @@ export default function CheckoutPage() {
                           )}
                         </div>
                       </div>
-                      <div>
-                        <label className="mb-1 block text-xs font-medium text-neutral-700">District</label>
-                        <DistrictSelect
-                          value={editForm.district}
-                          onChange={(district) => setEditForm((prev) => ({ ...prev, district }))}
-                          error={editFieldErrors.district?.[0]}
-                        />
+                      <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                          <label className="mb-1 block text-xs font-medium text-neutral-700">District</label>
+                          <DistrictSelect
+                            value={editForm.district}
+                            onChange={(district) =>
+                              setEditForm((prev) => ({
+                                ...prev,
+                                district,
+                                zone: district === prev.district ? prev.zone : "",
+                              }))
+                            }
+                            error={editFieldErrors.district?.[0]}
+                          />
+                        </div>
+                        {isDhaka(delivery.config, editForm.district) && (
+                          <div>
+                            <label className="mb-1 block text-xs font-medium text-neutral-700">Zone</label>
+                            <DhakaZoneSelect
+                              id="edit_zone"
+                              config={delivery.config}
+                              value={editForm.zone}
+                              onChange={(zone) => setEditForm((prev) => ({ ...prev, zone }))}
+                              error={editFieldErrors.zone?.[0]}
+                            />
+                          </div>
+                        )}
                       </div>
                       <div>
                         <label className="mb-1 block text-xs font-medium text-neutral-700">Address</label>
@@ -383,7 +439,8 @@ export default function CheckoutPage() {
                         <span>
                           <span className="block font-medium text-neutral-800">{addr.name}</span>
                           <span className="block text-neutral-500">
-                            {addr.address}, {addr.district}
+                            {addr.address}, {addr.zone ? `${addr.zone}, ` : ""}
+                            {addr.district}
                           </span>
                           {addr.phone && <span className="block text-neutral-500">{addr.phone}</span>}
                         </span>
@@ -409,6 +466,12 @@ export default function CheckoutPage() {
                       </div>
                     </div>
                   )
+                )}
+                {selectedAddressNeedsZone && (
+                  <p className="rounded-lg bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    This Dhaka address has no zone yet. Edit it and choose a zone to calculate the
+                    delivery charge.
+                  </p>
                 )}
                 <button
                   type="button"
@@ -490,15 +553,27 @@ export default function CheckoutPage() {
                       onChange={handleDistrictChange}
                       error={formErrors.shipping_district}
                     />
-                    <p className="mt-1 text-xs text-neutral-500">
-                      {deliveryFee != null
-                        ? `Delivery charge: ৳${deliveryFee} (${
-                            guestForm.shipping_district === "Dhaka" ? "inside Dhaka" : "outside Dhaka"
-                          })`
-                        : "Select a district to calculate delivery charge"}
-                    </p>
                   </div>
+                  {isDhaka(delivery.config, guestForm.shipping_district) && (
+                    <div>
+                      <label htmlFor="shipping_zone" className="mb-1 block text-xs font-medium text-neutral-700">
+                        Zone <span className="text-red-500">*</span>
+                      </label>
+                      <DhakaZoneSelect
+                        id="shipping_zone"
+                        config={delivery.config}
+                        value={guestForm.shipping_zone}
+                        onChange={handleZoneChange}
+                        error={formErrors.shipping_zone}
+                      />
+                    </div>
+                  )}
                 </div>
+                <p className="-mt-1 text-xs text-neutral-500">
+                  {deliveryCharge
+                    ? `Delivery charge: ${formatBDT(deliveryCharge.fee)} (${deliveryCharge.label})`
+                    : `${deliveryPrompt} to calculate the delivery charge.`}
+                </p>
                 <div>
                   <label htmlFor="shipping_address" className="mb-1 block text-xs font-medium text-neutral-700">
                     Full street address / house details <span className="text-red-500">*</span>
@@ -617,7 +692,7 @@ export default function CheckoutPage() {
             <span className="text-neutral-500">Delivery charge</span>
             <span className="font-medium text-(--primary)">
               {deliveryFee != null ? `৳${deliveryFee.toFixed(2)}` : (
-                <span className="text-xs font-normal text-neutral-400">Select a district</span>
+                <span className="text-xs font-normal text-neutral-400">{deliveryPrompt}</span>
               )}
             </span>
           </div>

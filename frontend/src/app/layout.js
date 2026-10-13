@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import NavbarSwitcher from "@/components/shared/NavbarSwitcher";
 import Footer from "@/components/shared/Footer";
-import FooterT from "@/components/shared/FooterT";
+import FooterSwitcher from "@/components/shared/FooterSwitcher";
 import SmoothScroll from "@/components/shared/SmoothScroll";
 import AppLoadingShell from "./AppLoadingShell";
 import { Toaster } from "sonner";
@@ -46,7 +46,10 @@ export const metadata = {
 export default function RootLayout({ children }) {
   return (
     <html lang="en" className={` ${myFonts.variable} ${myFontsT.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col">
+      {/* suppressHydrationWarning: browser extensions (e.g. ColorZilla's
+          cz-shortcut-listen) add attributes to <body> before React hydrates.
+          It only covers this element's own attributes, not its children. */}
+      <body className="min-h-full flex flex-col" suppressHydrationWarning>
         <Toaster position="top-center" richColors />
         <AuthProvider>
           <CartProvider>
@@ -57,7 +60,7 @@ export default function RootLayout({ children }) {
                 </Suspense>
                 <main>{children}</main>
                 {/* <Footer /> */}
-                <FooterT />
+                <FooterSwitcher />
               </AppLoadingShell>
             </SmoothScroll>
           </CartProvider>

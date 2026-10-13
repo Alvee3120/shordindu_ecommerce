@@ -12,6 +12,14 @@ const STATUS_STYLES = {
   active: "bg-emerald-100 text-emerald-700",
   draft: "bg-neutral-100 text-neutral-600",
   archived: "bg-neutral-100 text-neutral-500",
+  // coupon statuses (derived server-side from dates and usage)
+  scheduled: "bg-blue-100 text-blue-700",
+  expired: "bg-neutral-100 text-neutral-500",
+  exhausted: "bg-orange-100 text-orange-700",
+  // campaign banner statuses
+  live: "bg-emerald-100 text-emerald-700",
+  ended: "bg-neutral-100 text-neutral-500",
+  disabled: "bg-neutral-100 text-neutral-500",
 };
 
 const PAYMENT_STYLES = {

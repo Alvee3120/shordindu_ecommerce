@@ -7,7 +7,7 @@ from rest_framework.decorators import action
 from rest_framework.exceptions import ValidationError
 from rest_framework.response import Response
 
-from apps.core.permissions import IsAdminOnly
+from apps.core.permissions import CanManageOrders, IsAdminOnly, is_admin
 from apps.orders.models import Order
 
 from . import services
@@ -31,9 +31,19 @@ def _int_param(request, name, default=None, minimum=None, maximum=None):
 
 
 class AnalyticsViewSet(viewsets.GenericViewSet):
-    """Read-only, admin-only analytics endpoints. See ``services`` for formulas."""
+    """Read-only analytics endpoints. See ``services`` for formulas.
+
+    Everything is admin-only except the sales-overview endpoints the CCE
+    dashboard uses (same numbers and rules as the admin Overview).
+    """
 
     permission_classes = [IsAdminOnly]
+    ORDER_MANAGER_ACTIONS = ("summary", "sales_trend", "order_status", "recent_orders")
+
+    def get_permissions(self):
+        if self.action in self.ORDER_MANAGER_ACTIONS:
+            return [CanManageOrders()]
+        return super().get_permissions()
 
     def resolve(self):
         params = self.request.query_params
@@ -41,7 +51,11 @@ class AnalyticsViewSet(viewsets.GenericViewSet):
 
     @action(detail=False, methods=["get"])
     def summary(self, request):
-        return Response(services.sales_summary(self.resolve()))
+        data = services.sales_summary(self.resolve())
+        if not is_admin(request.user):
+            # Catalog/customer-base totals are admin information.
+            data.pop("business", None)
+        return Response(data)
 
     @action(detail=False, methods=["get"], url_path="sales-trend")
     def sales_trend(self, request):

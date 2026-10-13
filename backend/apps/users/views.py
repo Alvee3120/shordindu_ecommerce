@@ -1,5 +1,5 @@
 from django.conf import settings
-from django.db.models import ProtectedError
+from django.db.models import Prefetch, ProtectedError, Q
 from kombu.exceptions import OperationalError as BrokerOperationalError
 from rest_framework import generics, permissions, serializers, status, viewsets
 from rest_framework.response import Response
@@ -10,7 +10,7 @@ from rest_framework_simplejwt.tokens import RefreshToken
 
 from apps.cart.cart_resolver import CART_COOKIE_NAME
 from apps.cart.services import merge_guest_cart
-from apps.core.permissions import IsAdminOnly
+from apps.core.permissions import CanManageOrders, IsAdminOnly
 
 from .cookies import clear_auth_cookies, set_auth_cookies
 from .models import Address, User
@@ -18,6 +18,7 @@ from .serializers import (
     AddressSerializer,
     AdminUserSerializer,
     ChangePasswordSerializer,
+    CustomerLookupSerializer,
     SigninSerializer,
     SignupSerializer,
     UserSerializer,
@@ -158,6 +159,31 @@ class UserManagementViewSet(viewsets.ModelViewSet):
         if instance == self.request.user:
             raise serializers.ValidationError("You can't delete your own account.")
         instance.delete()
+
+
+class CustomerLookupView(generics.ListAPIView):
+    """Search existing customers (name / phone / email) while a CCE enters an
+    order. Customers only, a short unpaginated list, no account-management
+    fields — CCE users still can't reach the admin User Management API."""
+
+    serializer_class = CustomerLookupSerializer
+    permission_classes = [CanManageOrders]
+    pagination_class = None
+    filter_backends = []
+    MAX_RESULTS = 8
+
+    def get_queryset(self):
+        term = self.request.query_params.get("search", "").strip()
+        if len(term) < 2:
+            return User.objects.none()
+        return (
+            User.objects.filter(role=User.Role.CUSTOMER, is_active=True)
+            .filter(Q(name__icontains=term) | Q(phone__icontains=term) | Q(email__icontains=term))
+            .prefetch_related(
+                Prefetch("addresses", queryset=Address.objects.order_by("-is_default", "-id"))
+            )
+            .order_by("name")[: self.MAX_RESULTS]
+        )
 
 
 class AddressViewSet(viewsets.ModelViewSet):

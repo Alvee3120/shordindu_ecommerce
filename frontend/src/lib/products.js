@@ -9,6 +9,7 @@ export function listProducts({
   min_price,
   max_price,
   ordering,
+  status,
 } = {}) {
   const params = new URLSearchParams();
   if (page) params.set("page", page);
@@ -18,6 +19,7 @@ export function listProducts({
   if (min_price != null && min_price !== "") params.set("min_price", min_price);
   if (max_price != null && max_price !== "") params.set("max_price", max_price);
   if (ordering) params.set("ordering", ordering);
+  if (status) params.set("status", status);
   const query = params.toString();
   return apiFetch(`/products/${query ? `?${query}` : ""}`, { method: "GET" });
 }

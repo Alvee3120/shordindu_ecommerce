@@ -17,3 +17,8 @@ export function updateUser(id, data) {
 export function deleteUser(id) {
   return apiFetch(`/users/${id}/`, { method: "DELETE" });
 }
+
+/** CCE/admin: search existing customers by name, phone or email (min 2 chars). */
+export function lookupCustomers(search) {
+  return apiFetch(`/customer-lookup/?search=${encodeURIComponent(search)}`, { method: "GET" });
+}

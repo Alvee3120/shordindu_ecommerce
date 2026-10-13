@@ -72,6 +72,9 @@ class Address(models.Model):
     phone = models.CharField(max_length=32, blank=True)
     address = models.TextField()
     district = models.CharField(max_length=100)
+    # Only set for Dhaka-district addresses (Dhaka Sadar, Savar, ...) — it
+    # decides which delivery-charge tier applies (see apps.orders.pricing).
+    zone = models.CharField(max_length=100, blank=True)
     is_default = models.BooleanField(default=False)
 
     class Meta:

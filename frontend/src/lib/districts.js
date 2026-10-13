@@ -12,12 +12,4 @@ export const BD_DISTRICTS = [
   "Thakurgaon",
 ];
 
-const DHAKA = "Dhaka";
-const DHAKA_DELIVERY_FEE = 70;
-const OUTSIDE_DHAKA_DELIVERY_FEE = 120;
-
-/** Returns the delivery fee for a district, or null if no district is selected. */
-export function getDeliveryFee(district) {
-  if (!district) return null;
-  return district === DHAKA ? DHAKA_DELIVERY_FEE : OUTSIDE_DHAKA_DELIVERY_FEE;
-}
+// Delivery fees are admin-configurable — see lib/delivery.js.

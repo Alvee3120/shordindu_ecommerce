@@ -82,4 +82,25 @@ class ChangePasswordSerializer(serializers.Serializer):
 class AddressSerializer(serializers.ModelSerializer):
     class Meta:
         model = Address
-        fields = ["id", "name", "phone", "address", "district", "is_default"]
+        fields = ["id", "name", "phone", "address", "district", "zone", "is_default"]
+
+    def validate(self, attrs):
+        # Imported here: apps.orders imports this module at load time.
+        from apps.orders.pricing import DHAKA_ZONES, is_dhaka, normalize_zone
+
+        district = attrs.get("district", getattr(self.instance, "district", ""))
+        zone = attrs.get("zone", getattr(self.instance, "zone", ""))
+        if is_dhaka(district) and (zone or "").strip() not in DHAKA_ZONES:
+            raise serializers.ValidationError({"zone": ["Select a Dhaka zone."]})
+        attrs["zone"] = normalize_zone(district, zone)
+        return attrs
+
+
+class CustomerLookupSerializer(serializers.ModelSerializer):
+    """Minimal customer card for CCE order entry — no role/admin fields."""
+
+    addresses = AddressSerializer(many=True, read_only=True)
+
+    class Meta:
+        model = User
+        fields = ["id", "name", "email", "phone", "addresses"]

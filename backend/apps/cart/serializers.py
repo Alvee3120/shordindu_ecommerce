@@ -3,6 +3,7 @@ from decimal import Decimal
 from rest_framework import serializers
 
 from apps.catalog.models import Product, ProductVariation
+from apps.catalog.pricing import pricing_engine_for
 
 from .models import Cart, CartItem
 
@@ -13,6 +14,9 @@ class CartItemSerializer(serializers.ModelSerializer):
     variation_label = serializers.SerializerMethodField()
     product_image = serializers.SerializerMethodField()
     line_total = serializers.SerializerMethodField()
+    # Set only when an automatic discount lowers this line's price.
+    original_unit_price = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
     children = serializers.SerializerMethodField()
 
     class Meta:
@@ -27,11 +31,31 @@ class CartItemSerializer(serializers.ModelSerializer):
             "variation_label",
             "quantity",
             "unit_price_snapshot",
+            "original_unit_price",
+            "discount",
             "line_total",
             "parent_cart_item",
             "children",
         ]
         read_only_fields = ["unit_price_snapshot", "parent_cart_item"]
+
+    def _quote(self, obj):
+        # Add-on lines follow addon pricing (price_override), not discounts.
+        if obj.parent_cart_item_id:
+            return None
+        quote = pricing_engine_for(self.context).quote(obj.variation)
+        return quote if quote.discount and quote.final_price == obj.unit_price_snapshot else None
+
+    def get_original_unit_price(self, obj):
+        quote = self._quote(obj)
+        return str(quote.base_price) if quote else None
+
+    def get_discount(self, obj):
+        quote = self._quote(obj)
+        if not quote:
+            return None
+        info = quote.discount_info()
+        return {**info, "value": str(info["value"]), "amount": str(info["amount"])}
 
     def get_line_total(self, obj):
         return obj.unit_price_snapshot * obj.quantity

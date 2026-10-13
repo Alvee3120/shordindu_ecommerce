@@ -1,10 +1,13 @@
-from django.db.models import Avg
+from decimal import Decimal
+
+from django.db.models import Avg, Min
 from rest_framework import serializers
 
 from .models import (
     Attribute,
     AttributeValue,
     Category,
+    Discount,
     Product,
     ProductAddon,
     ProductAttributeValue,
@@ -13,6 +16,7 @@ from .models import (
     StockNotification,
     VariationAttributeValue,
 )
+from .pricing import category_with_descendants, pricing_engine_for
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -79,6 +83,10 @@ class ProductVariationSerializer(serializers.ModelSerializer):
         queryset=AttributeValue.objects.all(), many=True, write_only=True, required=False
     )
     images = ProductImageSerializer(many=True, read_only=True)
+    # `price` is always the base price (what admins edit). These two are the
+    # price customers pay right now, after any live automatic discount.
+    effective_price = serializers.SerializerMethodField()
+    discount = serializers.SerializerMethodField()
 
     class Meta:
         model = ProductVariation
@@ -88,12 +96,32 @@ class ProductVariationSerializer(serializers.ModelSerializer):
             "sku",
             "price",
             "compare_at_price",
+            "effective_price",
+            "discount",
             "stock_quantity",
             "is_active",
             "attribute_values",
             "attribute_value_ids",
             "images",
         ]
+
+    def _quote(self, obj):
+        cache = self.context.setdefault("price_quotes", {}) if self.context is not None else {}
+        if obj.pk not in cache:
+            cache[obj.pk] = pricing_engine_for(self.context).quote(obj)
+        return cache[obj.pk]
+
+    def get_effective_price(self, obj):
+        return serializers.DecimalField(max_digits=10, decimal_places=2).to_representation(
+            self._quote(obj).final_price
+        )
+
+    def get_discount(self, obj):
+        info = self._quote(obj).discount_info()
+        if info is None:
+            return None
+        money = serializers.DecimalField(max_digits=10, decimal_places=2)
+        return {**info, "value": money.to_representation(info["value"]), "amount": money.to_representation(info["amount"])}
 
     def create(self, validated_data):
         attribute_values = validated_data.pop("attribute_value_ids", [])
@@ -258,3 +286,147 @@ class ProductAddonSerializer(serializers.ModelSerializer):
             "price_override",
             "sort_order",
         ]
+
+
+class DiscountSerializer(serializers.ModelSerializer):
+    """Admin CRUD for automatic discounts. The backend is the final authority
+    on every rule here — the dashboard form only mirrors these checks."""
+
+    value = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0.01"))
+    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True)
+    products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), many=True, required=False)
+    category_name = serializers.CharField(source="category.name", read_only=True, default=None)
+    product_count = serializers.SerializerMethodField()
+    product_details = serializers.SerializerMethodField()
+    status = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Discount
+        fields = [
+            "id",
+            "name",
+            "type",
+            "value",
+            "target_type",
+            "category",
+            "category_name",
+            "products",
+            "product_count",
+            "product_details",
+            "starts_at",
+            "ends_at",
+            "is_active",
+            "status",
+            "created_at",
+            "updated_at",
+        ]
+        read_only_fields = ["created_at", "updated_at"]
+
+    def get_status(self, obj):
+        return obj.status_at()
+
+    def get_product_count(self, obj):
+        return len(obj.products.all())
+
+    def get_product_details(self, obj):
+        # Only on the detail view (the editor needs names/images to show).
+        if self.context.get("view") is not None and getattr(self.context["view"], "action", None) != "retrieve":
+            return None
+        request = self.context.get("request")
+        details = []
+        for product in obj.products.all():
+            images = list(product.images.all())
+            image = next((img for img in images if img.is_primary), images[0] if images else None)
+            variations = list(product.variations.all())
+            details.append(
+                {
+                    "id": product.id,
+                    "name": product.name,
+                    "status": product.status,
+                    "sku": variations[0].sku if len(variations) == 1 else product.sku_prefix or None,
+                    "image": request.build_absolute_uri(image.image.url) if image and request else None,
+                    "min_price": str(min((v.price for v in variations), default=Decimal("0"))),
+                }
+            )
+        return details
+
+    def validate_name(self, value):
+        value = value.strip()
+        if not value:
+            raise serializers.ValidationError("Give the discount a name.")
+        return value
+
+    def validate(self, attrs):
+        instance = self.instance
+
+        def final(name, default=None):
+            if name in attrs:
+                return attrs[name]
+            if instance is None:
+                return default
+            if name == "products":
+                return list(instance.products.all())
+            return getattr(instance, name)
+
+        errors = {}
+        discount_type = final("type")
+        value = final("value")
+        if discount_type == Discount.Type.PERCENT and value is not None and value > 100:
+            errors["value"] = ["A percentage discount can't be more than 100%."]
+
+        starts_at, ends_at = final("starts_at"), final("ends_at")
+        if starts_at and ends_at and ends_at <= starts_at:
+            errors["ends_at"] = ["The end must be after the start."]
+
+        target_type = final("target_type")
+        category = final("category")
+        products = final("products", [])
+        if target_type == Discount.Target.CATEGORY:
+            if not category:
+                errors["category"] = ["Choose a category."]
+            attrs["products"] = []
+        elif target_type == Discount.Target.PRODUCTS:
+            if not products:
+                errors["products"] = ["Choose at least one product."]
+            attrs["category"] = None
+
+        if errors:
+            raise serializers.ValidationError(errors)
+
+        if discount_type == Discount.Type.FIXED:
+            self._check_fixed_amount(value, target_type, category, products)
+        return attrs
+
+    @staticmethod
+    def _check_fixed_amount(value, target_type, category, products):
+        """A fixed discount must not exceed the price of anything it targets."""
+        variations = ProductVariation.objects.filter(is_active=True)
+        if target_type == Discount.Target.CATEGORY:
+            variations = variations.filter(product__categories__in=category_with_descendants(category.pk))
+        else:
+            variations = variations.filter(product__in=products)
+        cheapest = variations.aggregate(price=Min("price"))["price"]
+        if cheapest is not None and value > cheapest:
+            raise serializers.ValidationError(
+                {
+                    "value": [
+                        f"৳{value} is more than the cheapest targeted item (৳{cheapest}) — "
+                        "its price would go below zero."
+                    ]
+                }
+            )
+
+    def create(self, validated_data):
+        products = validated_data.pop("products", [])
+        discount = Discount.objects.create(**validated_data)
+        discount.products.set(products)
+        return discount
+
+    def update(self, instance, validated_data):
+        products = validated_data.pop("products", None)
+        for field, value in validated_data.items():
+            setattr(instance, field, value)
+        instance.save()
+        if products is not None:
+            instance.products.set(products)
+        return instance

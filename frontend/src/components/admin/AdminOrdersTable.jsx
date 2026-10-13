@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { FiEye, FiSearch } from "react-icons/fi";
-import { listOrders } from "@/lib/orders";
+import { listOrders, orderCustomerName } from "@/lib/orders";
 import OrderDetailModal from "@/components/admin/OrderDetailModal";
 
 const statusColors = {
@@ -23,9 +23,15 @@ const statusOptions = ["", "pending", "confirmed", "processing", "shipped", "del
  * OrderDetailModal, the same status-transition API/UI used everywhere else.
  * Pass `mine` to scope the list to only the orders the logged-in user
  * personally placed (for /admin/my-orders); omit it for the full
- * cross-customer management view (/admin/orders).
+ * cross-customer management view (/admin/orders). `headerAction` renders
+ * next to the title (e.g. an "Add Order" button).
  */
-export default function AdminOrdersTable({ title, mine = false, ordersPath = "/dashboard/admin/orders" }) {
+export default function AdminOrdersTable({
+  title,
+  mine = false,
+  ordersPath = "/dashboard/admin/orders",
+  headerAction = null,
+}) {
   const [orders, setOrders] = useState([]);
   const [count, setCount] = useState(0);
   const [page, setPage] = useState(1);
@@ -92,9 +98,12 @@ export default function AdminOrdersTable({ title, mine = false, ordersPath = "/d
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-xl font-semibold text-neutral-900">{title}</h1>
         <div className="flex flex-wrap items-center gap-3">
-          <div className="relative">
+          <h1 className="text-xl font-semibold text-neutral-900">{title}</h1>
+          {headerAction}
+        </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-full sm:w-auto">
             <FiSearch
               size={16}
               className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-neutral-400"
@@ -103,8 +112,9 @@ export default function AdminOrdersTable({ title, mine = false, ordersPath = "/d
               type="text"
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              placeholder="Search order # or customer..."
-              className="w-64 rounded-lg border border-neutral-300 py-2 pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
+              placeholder="Search order #, customer or phone..."
+              aria-label="Search orders"
+              className="w-full rounded-lg sm:w-64 border border-neutral-300 py-2 pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
             />
           </div>
           <select
@@ -193,9 +203,7 @@ export default function AdminOrdersTable({ title, mine = false, ordersPath = "/d
                       {order.order_number}
                     </Link>
                   </td>
-                  <td className="px-5 py-3 text-neutral-600">
-                    {order.user_name || order.guest_email || "—"}
-                  </td>
+                  <td className="px-5 py-3 text-neutral-600">{orderCustomerName(order)}</td>
                   <td className="px-5 py-3">
                     <span
                       className={`inline-block rounded-full px-2.5 py-1 text-xs font-semibold capitalize ${

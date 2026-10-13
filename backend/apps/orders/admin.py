@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Coupon, Order, OrderCoupon, OrderItem, Payment
+from .models import Coupon, DeliveryChargeSettings, Order, OrderCoupon, OrderItem, Payment
 
 
 class OrderItemInline(admin.TabularInline):
@@ -41,7 +41,7 @@ class OrderAdmin(admin.ModelAdmin):
     ]
     list_filter = ["status", "payment_status"]
     search_fields = ["order_number", "guest_email", "user__email"]
-    readonly_fields = ["order_number", "placed_at"]
+    readonly_fields = ["order_number", "placed_at", "created_by"]
     inlines = [OrderItemInline, PaymentInline, OrderCouponInline]
 
 
@@ -56,3 +56,15 @@ class PaymentAdmin(admin.ModelAdmin):
     list_display = ["order", "method", "amount", "status", "paid_at"]
     list_filter = ["method", "status"]
     search_fields = ["order__order_number", "transaction_id"]
+
+
+@admin.register(DeliveryChargeSettings)
+class DeliveryChargeSettingsAdmin(admin.ModelAdmin):
+    list_display = ["__str__", "inside_dhaka", "dhaka_outer_zones", "outside_dhaka", "updated_at", "updated_by"]
+    readonly_fields = ["updated_at", "updated_by"]
+
+    def has_add_permission(self, request):
+        return not DeliveryChargeSettings.objects.exists()
+
+    def has_delete_permission(self, request, obj=None):
+        return False

@@ -69,8 +69,9 @@ Status codes: `400` validation, `401` not authenticated, `403` authenticated but
 | Categories, Attributes, Products, Addons | anyone | staff only |
 | Cart | anyone (guest or logged in) | anyone (scoped to their own cart) |
 | Addresses | owner only | owner only |
-| Orders | owner only (staff see all) | system-created only (via checkout) |
-| Coupons | staff only | staff only |
+| Orders | owner only (CCE/admin see all) | via checkout, or CCE/admin "Add Order" |
+| Coupons | CCE + admin | admin only |
+| Delivery charges | anyone | admin only |
 | Reviews | anyone | logged-in users (own review only to edit/delete) |
 
 ---
@@ -385,12 +386,51 @@ created, cart is untouched, safe to let the user fix the code and resubmit.
 `payment_status`: `unpaid` | `paid` | `refunded`.
 
 ### Order history
-`GET /api/orders/` (auth required) — the caller's own orders (staff accounts see everyone's).
-Filterable: `?status=pending`, `?payment_status=unpaid`. `GET /api/orders/{id}/` for one order.
+`GET /api/orders/` (auth required) — the caller's own orders (CCE/admin accounts see everyone's).
+Filterable: `?status=pending`, `?payment_status=unpaid`, `?placed_after=`/`?placed_before=` (dates);
+`?search=` matches order number, customer name/email and delivery name/phone.
+`GET /api/orders/{id}/` for one order.
+
+Status actions (CCE/admin): `POST /api/orders/{id}/confirm|process|ship|deliver|cancel/`.
+Cancelling returns the order's stock; moving a cancelled order back to an active status
+reserves it again (`400` if the stock is no longer there).
+
+### Dashboard orders (CCE/admin "Add Order")
+`POST /api/orders/manual/` — `{customer?, name, phone, email?, address, district, zone?, note?,
+items: [{variation, quantity}], coupon_code?, client_request_id}`. Prices, stock, delivery charge
+and discount are all recalculated server-side. Repeating a `client_request_id` returns the first
+order (`200`) instead of creating a duplicate. `POST /api/orders/quote/` takes the same items /
+district / zone / coupon and returns the server-calculated totals without writing anything.
+
+`GET /api/customer-lookup/?search=` (CCE/admin) — up to 8 matching customer accounts with their
+saved addresses, for prefilling an order.
 
 ### Coupons
-`/api/coupons/` — **staff only**, both read and write (customers never browse available coupons;
-they just type a code at checkout and the checkout endpoint validates it).
+`/api/coupons/` — **CCE and admin can read** (`?search=` code, `?type=`, `?status=active|scheduled|
+expired|exhausted`; each coupon includes `usage_count` and derived `status`). **Only admins can
+create/edit/delete.** Customers have no access — they type a code at checkout and the checkout
+endpoint validates it.
+
+### Delivery charges
+`GET /api/delivery-charges/` (public) — `{inside_dhaka, dhaka_outer_zones, outside_dhaka,
+dhaka_district, dhaka_zones: [{name, tier}], tier_labels, updated_at}`. `PUT` (admin only) with
+the three amounts (each `>= 0`). Dhaka addresses must carry a `zone`
+(`Dhaka Sadar` → inside Dhaka, the other zones → outer zones); every other district is
+outside Dhaka. Checkout accepts `shipping_zone` alongside `shipping_district`, and always computes
+the fee itself — any delivery amount sent by the client is ignored.
+
+### Campaign banner
+`GET /api/campaign-banner/` (public) — `{"active": true, "banner": {image_mode, desktop_image_url,
+mobile_image_url, image_alt, eyebrow, heading, description, button_enabled, button_label,
+button_url, updated_at}}`, or `{"active": false, "banner": null}` when it's disabled or outside its
+start/end dates (Asia/Dhaka). `heading` uses `
+` for line breaks.
+
+`/api/campaign-banner/manage/` (admin only) — `GET` the full config (adds `is_enabled`,
+`starts_at`, `ends_at`, `status`: `live|scheduled|ended|disabled`). `PUT`/`PATCH` as
+`multipart/form-data`: the text fields, optional `desktop_image` / `mobile_image` files (JPEG, PNG
+or WebP, max 5 MB) and `remove_desktop_image` / `remove_mobile_image` flags. `button_url` must be a
+site path (`/shop`) or an `http(s)://` URL.
 
 ---
 
@@ -438,7 +478,12 @@ product** (a second `POST` for the same product returns `400 non_field_errors`).
 | POST | `/api/cart/items/:id/addons/` | — |
 | POST | `/api/checkout/` | — |
 | GET | `/api/orders/[:id/]` | ✓ |
-| GET/POST/PATCH/DELETE | `/api/coupons/[:id/]` | staff only |
+| POST | `/api/orders/manual/`, `/api/orders/quote/` | CCE/admin |
+| GET | `/api/customer-lookup/` | CCE/admin |
+| GET/POST/PATCH/DELETE | `/api/coupons/[:id/]` | read: CCE/admin, write: admin |
+| GET/PUT | `/api/delivery-charges/` | read: —, write: admin |
+| GET | `/api/campaign-banner/` | — |
+| GET/PUT/PATCH | `/api/campaign-banner/manage/` | admin only |
 | GET/POST/PATCH/DELETE | `/api/reviews/[:id/]` | read: —, write: ✓ (own only) |
 
 ("—" = no auth needed; "✓" = must be logged in)

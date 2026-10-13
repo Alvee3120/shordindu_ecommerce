@@ -42,7 +42,8 @@ class CceOrderPermissionsTests(APITestCase):
         self.client.force_authenticate(self.cce)
 
         self.assertEqual(self.client.post("/api/categories/", {"name": "New"}, format="json").status_code, 403)
-        self.assertEqual(self.client.get("/api/coupons/").status_code, 403)
+        # Coupons are read-only for CCE (see CouponPermissionTests).
+        self.assertEqual(self.client.post("/api/coupons/", {}, format="json").status_code, 403)
         self.assertEqual(self.client.get("/api/users/").status_code, 403)
 
     def test_customer_cannot_change_order_status(self):

@@ -7,6 +7,8 @@ from django.utils import timezone
 from apps.catalog.models import Product, ProductVariation
 from apps.users.models import Address
 
+from .pricing import DEFAULT_CHARGES, DHAKA_OUTER_ZONES, INSIDE_DHAKA, OUTSIDE_DHAKA
+
 
 class Order(models.Model):
     class Status(models.TextChoices):
@@ -43,6 +45,15 @@ class Order(models.Model):
         Address, on_delete=models.SET_NULL, null=True, blank=True, related_name="billing_orders"
     )
     payment_status = models.CharField(max_length=20, choices=PaymentStatus.choices, default=PaymentStatus.UNPAID)
+    note = models.TextField(blank=True)
+    # The CCE/admin who entered the order from the dashboard; null for
+    # orders customers placed themselves through checkout.
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="created_orders"
+    )
+    # Client-generated key for dashboard-created orders, so a double-click or
+    # retried request returns the first order instead of creating a duplicate.
+    client_request_id = models.UUIDField(null=True, blank=True, unique=True, editable=False)
     placed_at = models.DateTimeField(auto_now_add=True)
 
     class Meta:
@@ -140,6 +151,45 @@ class Coupon(models.Model):
         else:
             discount = subtotal * self.value / Decimal("100")
         return min(discount, subtotal)
+
+
+class DeliveryChargeSettings(models.Model):
+    """Singleton (always pk=1): the admin-configured delivery fee per tier.
+
+    Only the *current* amounts live here. Each order stores the fee actually
+    applied in ``Order.shipping_total``, so changing these never alters
+    historical orders.
+    """
+
+    inside_dhaka = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_CHARGES[INSIDE_DHAKA])
+    dhaka_outer_zones = models.DecimalField(
+        max_digits=10, decimal_places=2, default=DEFAULT_CHARGES[DHAKA_OUTER_ZONES]
+    )
+    outside_dhaka = models.DecimalField(max_digits=10, decimal_places=2, default=DEFAULT_CHARGES[OUTSIDE_DHAKA])
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL, on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    class Meta:
+        db_table = "delivery_charge_settings"
+        verbose_name_plural = "delivery charge settings"
+
+    def __str__(self):
+        return "Delivery charges"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        settings_row, _ = cls.objects.get_or_create(pk=1)
+        return settings_row
+
+    def amount_for(self, tier):
+        # Tier keys (apps.orders.pricing) are exactly these field names.
+        return getattr(self, tier)
 
 
 class OrderCoupon(models.Model):

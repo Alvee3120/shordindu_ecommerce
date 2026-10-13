@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 from django.utils.text import slugify
 
 
@@ -200,6 +201,75 @@ class InventoryLog(models.Model):
 
     def __str__(self):
         return f"{self.variation.sku} {self.change_qty:+d} ({self.reason})"
+
+
+class DiscountQuerySet(models.QuerySet):
+    def live(self, now=None):
+        """Discounts that apply right now: switched on and inside their window."""
+        now = now or timezone.now()
+        return self.filter(is_active=True, starts_at__lte=now, ends_at__gte=now)
+
+
+class Discount(models.Model):
+    """An automatic, time-boxed price reduction for a category or chosen products.
+
+    A rule only — product prices are never modified. The current price is
+    worked out from the variation's base price + the live rules
+    (see ``apps.catalog.pricing``). Separate from coupons, which are codes a
+    customer applies to a whole order.
+    """
+
+    class Type(models.TextChoices):
+        PERCENT = "percent", "Percentage"
+        FIXED = "fixed", "Fixed amount"
+
+    class Target(models.TextChoices):
+        CATEGORY = "category", "Category"
+        PRODUCTS = "products", "Specific products"
+
+    class Status(models.TextChoices):
+        ACTIVE = "active", "Active"
+        SCHEDULED = "scheduled", "Scheduled"
+        EXPIRED = "expired", "Expired"
+        INACTIVE = "inactive", "Inactive"
+
+    name = models.CharField(max_length=120)
+    type = models.CharField(max_length=10, choices=Type.choices)
+    value = models.DecimalField(max_digits=10, decimal_places=2)
+    target_type = models.CharField(max_length=10, choices=Target.choices)
+    # SET_NULL: deleting a category leaves the (now targetless) rule on record.
+    category = models.ForeignKey(
+        Category, on_delete=models.SET_NULL, null=True, blank=True, related_name="discounts"
+    )
+    products = models.ManyToManyField(Product, blank=True, related_name="discounts")
+    starts_at = models.DateTimeField()
+    ends_at = models.DateTimeField()
+    is_active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    created_by = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    objects = DiscountQuerySet.as_manager()
+
+    class Meta:
+        db_table = "discounts"
+        ordering = ["-starts_at", "-id"]
+        indexes = [models.Index(fields=["is_active", "starts_at", "ends_at"], name="discount_live_idx")]
+
+    def __str__(self):
+        return self.name
+
+    def status_at(self, now=None):
+        now = now or timezone.now()
+        if not self.is_active:
+            return self.Status.INACTIVE
+        if now < self.starts_at:
+            return self.Status.SCHEDULED
+        if now > self.ends_at:
+            return self.Status.EXPIRED
+        return self.Status.ACTIVE
 
 
 class StockNotification(models.Model):

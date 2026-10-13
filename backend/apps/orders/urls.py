@@ -9,4 +9,5 @@ router.register("coupons", views.CouponViewSet, basename="coupon")
 
 urlpatterns = router.urls + [
     path("checkout/", views.CheckoutView.as_view(), name="checkout"),
+    path("delivery-charges/", views.DeliveryChargeView.as_view(), name="delivery-charges"),
 ]

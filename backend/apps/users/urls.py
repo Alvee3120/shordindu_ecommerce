@@ -14,5 +14,6 @@ urlpatterns = [
     path("auth/token/refresh/", views.CookieTokenRefreshView.as_view(), name="token-refresh"),
     path("auth/change-password/", views.ChangePasswordView.as_view(), name="change-password"),
     path("auth/me/", views.MeView.as_view(), name="me"),
+    path("customer-lookup/", views.CustomerLookupView.as_view(), name="customer-lookup"),
     path("", include(router.urls)),
 ]

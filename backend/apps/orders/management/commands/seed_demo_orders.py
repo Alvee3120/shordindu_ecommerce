@@ -24,7 +24,7 @@ from django.utils import timezone
 
 from apps.catalog.models import Product, ProductVariation
 from apps.orders.models import Coupon, Order, OrderCoupon, OrderItem, Payment
-from apps.orders.pricing import get_delivery_fee
+from apps.orders.pricing import DHAKA_ZONES, get_delivery_fee, is_dhaka
 from apps.orders.utils import generate_order_number
 from apps.users.models import Address, User
 
@@ -153,6 +153,7 @@ class Command(BaseCommand):
                 is_guest = random.random() < 0.15
                 customer = None if is_guest else random.choice(customers)
                 district = random.choice(DISTRICTS)
+                zone = random.choice(list(DHAKA_ZONES)) if is_dhaka(district) else ""
 
                 items = random.sample(variations, k=min(random.randint(1, 3), len(variations)))
                 line_specs = []
@@ -166,7 +167,7 @@ class Command(BaseCommand):
 
                 coupon = random.choice(coupons) if random.random() < 0.35 else None
                 discount_total = coupon.compute_discount(subtotal) if coupon else Decimal("0.00")
-                shipping_total = get_delivery_fee(district)
+                shipping_total = get_delivery_fee(district, zone)
                 grand_total = subtotal - discount_total + shipping_total
 
                 status = self._weighted_status()
@@ -178,7 +179,7 @@ class Command(BaseCommand):
                     minutes=random.randint(0, 59),
                 )
 
-                address = self._address_for(customer, district)
+                address = self._address_for(customer, district, zone)
 
                 order = Order.objects.create(
                     order_number=generate_order_number(),
@@ -226,7 +227,7 @@ class Command(BaseCommand):
 
         return stats
 
-    def _address_for(self, customer, district):
+    def _address_for(self, customer, district, zone):
         if customer:
             address = customer.addresses.first()
             if address:
@@ -237,6 +238,7 @@ class Command(BaseCommand):
             phone=customer.phone if customer else self._phone(),
             address=self._street(),
             district=district,
+            zone=zone,
         )
 
     def _weighted_status(self):

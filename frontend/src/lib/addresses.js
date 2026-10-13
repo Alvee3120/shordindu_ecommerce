@@ -6,17 +6,17 @@ export async function listAddresses() {
   return data.results;
 }
 
-export function createAddress({ name, phone, address, district, is_default }) {
+export function createAddress({ name, phone, address, district, zone, is_default }) {
   return apiFetch("/addresses/", {
     method: "POST",
-    body: { name, phone, address, district, is_default },
+    body: { name, phone, address, district, zone: zone ?? "", is_default },
   });
 }
 
-export function updateAddress(id, { name, phone, address, district, is_default }) {
+export function updateAddress(id, { name, phone, address, district, zone, is_default }) {
   return apiFetch(`/addresses/${id}/`, {
     method: "PATCH",
-    body: { name, phone, address, district, is_default },
+    body: { name, phone, address, district, zone: zone ?? "", is_default },
   });
 }
 

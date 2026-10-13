@@ -1,4 +1,5 @@
 from django.http import HttpResponse
+from django.utils import timezone
 from rest_framework import permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.permissions import SAFE_METHODS
@@ -12,6 +13,7 @@ from .models import (
     Attribute,
     AttributeValue,
     Category,
+    Discount,
     Product,
     ProductAddon,
     ProductAttributeValue,
@@ -24,6 +26,7 @@ from .serializers import (
     AttributeValueSerializer,
     CategoryDetailSerializer,
     CategorySerializer,
+    DiscountSerializer,
     ProductAddonSerializer,
     ProductAttributeValueSerializer,
     ProductImageSerializer,
@@ -60,7 +63,7 @@ class ProductViewSet(viewsets.ModelViewSet):
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrReadOnly]
     filterset_class = ProductFilter
-    search_fields = ["name", "description", "sku_prefix"]
+    search_fields = ["name", "description", "sku_prefix", "variations__sku"]
     ordering_fields = ["name", "created_at"]
 
     def get_queryset(self):
@@ -175,3 +178,42 @@ class StockNotificationViewSet(viewsets.GenericViewSet):
         else:
             serializer.save()
         return Response(serializer.data, status=status.HTTP_201_CREATED)
+
+
+class DiscountViewSet(viewsets.ModelViewSet):
+    """Automatic category/product discounts — administrators only (read and write).
+
+    Filters: ?search= (name), ?status=active|scheduled|expired|inactive,
+    ?type=percent|fixed, ?target_type=category|products.
+    """
+
+    serializer_class = DiscountSerializer
+    permission_classes = [IsAdminOnly]
+    search_fields = ["name"]
+    filterset_fields = ["type", "target_type"]
+    ordering_fields = ["name", "starts_at", "ends_at", "value", "created_at"]
+
+    def get_queryset(self):
+        queryset = (
+            Discount.objects.select_related("category")
+            .prefetch_related("products__images", "products__variations")
+            .order_by("-starts_at", "-id")
+        )
+        return self._filter_status(queryset, self.request.query_params.get("status"))
+
+    @staticmethod
+    def _filter_status(queryset, value):
+        # Same rules as Discount.status_at, expressed as a query.
+        now = timezone.now()
+        if value == "inactive":
+            return queryset.filter(is_active=False)
+        if value == "scheduled":
+            return queryset.filter(is_active=True, starts_at__gt=now)
+        if value == "expired":
+            return queryset.filter(is_active=True, ends_at__lt=now)
+        if value == "active":
+            return queryset.live(now)
+        return queryset
+
+    def perform_create(self, serializer):
+        serializer.save(created_by=self.request.user)

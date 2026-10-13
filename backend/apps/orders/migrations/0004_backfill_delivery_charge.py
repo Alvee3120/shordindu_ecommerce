@@ -2,7 +2,18 @@ from decimal import Decimal
 
 from django.db import migrations
 
-from apps.orders.pricing import get_delivery_fee
+# Frozen copy of the fee schedule as it was when this migration was written.
+# Migrations must not import live app code: delivery fees are now admin-
+# configurable (see 0006), and that table doesn't exist yet at this point.
+_HISTORICAL_DHAKA_FEE = Decimal("70.00")
+_HISTORICAL_OUTSIDE_DHAKA_FEE = Decimal("120.00")
+
+
+def get_delivery_fee(district):
+    if not district:
+        return Decimal("0.00")
+    is_dhaka = district.strip().lower() == "dhaka"
+    return _HISTORICAL_DHAKA_FEE if is_dhaka else _HISTORICAL_OUTSIDE_DHAKA_FEE
 
 
 def backfill_delivery_charge(apps, schema_editor):

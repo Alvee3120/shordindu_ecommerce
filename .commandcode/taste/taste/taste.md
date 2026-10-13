@@ -25,3 +25,4 @@
 - Wants edge cases tested: every date filter incl. custom ranges, empty/zero-sales periods, cancelled/returned orders, discounts and delivery charges, date/timezone boundaries, unauthorized access, and large-dataset performance. Confidence: 0.8
 - Expects verification that dashboard metrics reconcile with the underlying source records/pages. Confidence: 0.8
 - Prioritizes accurate calculations, secure access, maintainability, performance, and UX above speed of delivery. Confidence: 0.8
+- When requesting demo/sample data, expects it seeded into the real backend as actual records via a reusable, parameterized command (count, date range, reproducible seed, reset-safe, environment-guarded) rather than hardcoded or mocked data in the frontend. Confidence: 0.65

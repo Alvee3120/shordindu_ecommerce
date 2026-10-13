@@ -28,7 +28,7 @@ export function checkout(payload) {
   return apiFetch("/checkout/", { method: "POST", body: payload });
 }
 
-// Admin-only order status transitions.
+// Order status transitions (CCE and admin).
 export function confirmOrder(id) {
   return apiFetch(`/orders/${id}/confirm/`, { method: "POST" });
 }
@@ -47,4 +47,37 @@ export function shipOrder(id) {
 
 export function deliverOrder(id) {
   return apiFetch(`/orders/${id}/deliver/`, { method: "POST" });
+}
+
+/**
+ * Every status action, keyed by the status it results in (must match
+ * Order.Status on the backend). Shared by the order modal and details page.
+ * Cancelling releases the order's stock; moving a cancelled order back to an
+ * active status re-reserves it (the backend rejects it if stock ran out).
+ */
+export const ORDER_STATUS_ACTIONS = [
+  { label: "Confirm", value: "confirmed", action: confirmOrder },
+  { label: "Process", value: "processing", action: processOrder },
+  { label: "Ship", value: "shipped", action: shipOrder },
+  { label: "Mark delivered", value: "delivered", action: deliverOrder },
+  { label: "Cancel", value: "cancelled", action: cancelOrder },
+];
+
+/** Name to show for an order: account name, else the delivery name, else the guest email. */
+export function orderCustomerName(order) {
+  return order.user_name || order.shipping_address_detail?.name || order.guest_email || "Guest";
+}
+
+/**
+ * CCE/admin "Add Order". Prices, stock, delivery and discount are all
+ * recalculated server-side; `client_request_id` makes retries/double-clicks
+ * return the first order instead of creating another.
+ */
+export function createManualOrder(payload) {
+  return apiFetch("/orders/manual/", { method: "POST", body: payload });
+}
+
+/** Server-calculated totals for a draft dashboard order (writes nothing). */
+export function quoteManualOrder(payload) {
+  return apiFetch("/orders/quote/", { method: "POST", body: payload });
 }
