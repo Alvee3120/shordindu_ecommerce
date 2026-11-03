@@ -11,6 +11,7 @@ from apps.core.permissions import IsAdminOnly, IsAdminOrReadOnly, is_admin
 from . import imports as bulk_imports
 from .filters import ProductFilter
 from .pricing import PricingEngine, discounted_product_ids
+from .promotions import promotion_product_ids
 from .models import (
     Attribute,
     AttributeValue,
@@ -197,8 +198,7 @@ class DiscountViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         queryset = (
-            Discount.objects.select_related("category")
-            .prefetch_related("products__images", "products__variations")
+            Discount.objects.prefetch_related("categories", "products__images", "products__variations")
             .order_by("-starts_at", "-id")
         )
         return self._filter_status(queryset, self.request.query_params.get("status"))
@@ -237,8 +237,14 @@ class DiscountShowcaseView(APIView):
         context = {"request": request, "pricing_engine": engine}
         datetime_field = serializers.DateTimeField()  # project timezone, like every other API date
         sections = []
-        for discount in Discount.objects.live(engine.now).select_related("category").order_by("-starts_at", "-id"):
-            ids = discounted_product_ids(discount, engine)
+        for discount in Discount.objects.live(engine.now).prefetch_related("categories").order_by("-starts_at", "-id"):
+            # Per-item rules price the product directly; basket offers list every
+            # product they target (the saving happens in the cart).
+            ids = (
+                promotion_product_ids(discount)
+                if discount.is_basket
+                else discounted_product_ids(discount, engine)
+            )
             if not ids:
                 continue
             shown = ids[: self.PRODUCTS_PER_SECTION]
@@ -253,11 +259,15 @@ class DiscountShowcaseView(APIView):
                     "id": discount.id,
                     "name": discount.name,
                     "type": discount.type,
-                    "value": str(discount.value),
+                    "is_basket": discount.is_basket,
+                    "label": discount.label() if discount.is_basket else None,
+                    "value": str(discount.value) if discount.value is not None else None,
+                    "min_quantity": discount.min_quantity,
+                    "percent_off": str(discount.percent_off) if discount.percent_off is not None else None,
+                    "free_quantity": discount.free_quantity,
+                    "bundle_price": str(discount.bundle_price) if discount.bundle_price is not None else None,
                     "target_type": discount.target_type,
-                    "category": (
-                        {"id": discount.category_id, "name": discount.category.name} if discount.category_id else None
-                    ),
+                    "categories": [{"id": c.id, "name": c.name} for c in discount.categories.all()],
                     "starts_at": datetime_field.to_representation(discount.starts_at),
                     "ends_at": datetime_field.to_representation(discount.ends_at),
                     "product_count": len(ids),

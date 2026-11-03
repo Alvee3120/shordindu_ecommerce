@@ -45,6 +45,7 @@ export default function RegisterPage() {
       } else {
         setFormError(err.message);
       }
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }

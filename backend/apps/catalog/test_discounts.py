@@ -36,19 +36,20 @@ class DiscountFixtures:
     def variation(self, product):
         return ProductVariation.objects.select_related("product").get(product=product)
 
-    def discount(self, *, products=None, category=None, type="percent", value="20", start=-1, end=1, active=True, name=None):
+    def discount(self, *, products=None, categories=None, type="percent", value="20", start=-1, end=1, active=True, name=None):
         discount = Discount.objects.create(
             name=name or f"{type} {value}",
             type=type,
             value=Decimal(value),
             target_type="products" if products is not None else "category",
-            category=category,
             starts_at=now() + timedelta(days=start),
             ends_at=now() + timedelta(days=end),
             is_active=active,
         )
         if products:
             discount.products.set(products)
+        if categories:
+            discount.categories.set(categories)
         return discount
 
 
@@ -83,18 +84,24 @@ class PricingEngineTests(DiscountFixtures, TestCase):
         self.assertIsNone(self.price(self.serum).discount)
 
     def test_category_discount_includes_sub_categories_only(self):
-        self.discount(category=self.parent, value="10")
+        self.discount(categories=[self.parent], value="10")
         self.assertEqual(self.price(self.serum).final_price, Decimal("1800.00"))  # child of Skincare
         self.assertEqual(self.price(self.cream).final_price, Decimal("900.00"))
         self.assertEqual(self.price(self.bag).final_price, Decimal("500.00"))
 
         Discount.objects.all().delete()
-        self.discount(category=self.child, value="10")  # child-only discount doesn't reach parent products
+        self.discount(categories=[self.child], value="10")  # child-only discount doesn't reach parent products
         self.assertIsNone(self.price(self.cream).discount)
         self.assertIsNotNone(self.price(self.serum).discount)
 
+    def test_multiple_categories_price_products_from_each(self):
+        self.discount(categories=[self.parent, self.other], value="10")
+        self.assertEqual(self.price(self.serum).final_price, Decimal("1800.00"))  # Skincare › Serums
+        self.assertEqual(self.price(self.cream).final_price, Decimal("900.00"))  # Skincare
+        self.assertEqual(self.price(self.bag).final_price, Decimal("450.00"))  # Bags
+
     def test_product_discount_beats_category_even_if_smaller(self):
-        self.discount(category=self.parent, value="50", name="Category 50%")
+        self.discount(categories=[self.parent], value="50", name="Category 50%")
         product_discount = self.discount(products=[self.serum], value="5", name="Product 5%")
         quote = self.price(self.serum)
         self.assertEqual(quote.discount, product_discount)
@@ -102,14 +109,14 @@ class PricingEngineTests(DiscountFixtures, TestCase):
         self.assertEqual(self.price(self.cream).final_price, Decimal("500.00"))  # category still applies
 
     def test_within_a_tier_the_bigger_saving_wins_without_stacking(self):
-        self.discount(category=self.parent, value="10")
-        best = self.discount(category=self.child, type="fixed", value="500")
+        self.discount(categories=[self.parent], value="10")
+        best = self.discount(categories=[self.child], type="fixed", value="500")
         quote = self.price(self.serum)
         self.assertEqual(quote.discount, best)
         self.assertEqual(quote.final_price, Decimal("1500.00"))
 
     def test_fixed_discount_bigger_than_price_does_not_apply(self):
-        self.discount(category=self.parent, type="fixed", value="1500")
+        self.discount(categories=[self.parent], type="fixed", value="1500")
         self.assertEqual(self.price(self.serum).final_price, Decimal("500.00"))
         self.assertIsNone(self.price(self.cream).discount)  # ৳1500 off a ৳1000 item would go negative
 
@@ -138,7 +145,7 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             "type": "percent",
             "value": "20",
             "target_type": "category",
-            "category": self.parent.id,
+            "categories": [self.parent.id],
             "starts_at": "2026-10-01T00:00",
             "ends_at": "2026-10-10T23:59",
             "is_active": True,
@@ -151,7 +158,7 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
         response = self.client.post(self.URL, self.payload(), format="json")
         self.assertEqual(response.status_code, 201, response.data)
         discount_id = response.data["id"]
-        self.assertEqual(response.data["category_name"], "Skincare")
+        self.assertEqual(response.data["category_names"], "Skincare")
         self.assertTrue(response.data["starts_at"].startswith("2026-10-01T00:00:00+06:00"))
         self.assertEqual(Discount.objects.get().created_by, self.admin)
 
@@ -161,7 +168,7 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertIsNone(response.data["category"])
+        self.assertEqual(response.data["categories"], [])
         self.assertEqual(response.data["product_count"], 2)
 
         detail = self.client.get(f"{self.URL}{discount_id}/").data
@@ -170,6 +177,16 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
         self.assertEqual(self.client.patch(f"{self.URL}{discount_id}/", {"is_active": False}, format="json").data["status"], "inactive")
         self.assertEqual(self.client.delete(f"{self.URL}{discount_id}/").status_code, 204)
         self.assertFalse(Discount.objects.exists())
+
+    def test_admin_can_target_multiple_categories(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            self.URL, self.payload(categories=[self.parent.id, self.other.id]), format="json"
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(sorted(response.data["categories"]), sorted([self.parent.id, self.other.id]))
+        self.assertIn("Skincare", response.data["category_names"])
+        self.assertIn("Bags", response.data["category_names"])
 
     def test_only_admin_has_access(self):
         existing = self.discount(products=[self.serum])
@@ -195,8 +212,8 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             ({"ends_at": "2026-10-01T00:00"}, "ends_at"),
             ({"ends_at": "2026-09-01T00:00"}, "ends_at"),
             ({"starts_at": "not a date"}, "starts_at"),
-            ({"category": None}, "category"),
-            ({"category": 99999}, "category"),
+            ({"categories": []}, "categories"),
+            ({"categories": [99999]}, "categories"),
             ({"target_type": "products", "products": []}, "products"),
             ({"target_type": "products", "products": [99999]}, "products"),
             # Cheapest item under Skincare is the ৳1000 cream.
@@ -219,7 +236,7 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             self.URL, self.payload(target_type="products", products=[self.serum.id]), format="json"
         )
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertIsNone(response.data["category"])
+        self.assertEqual(response.data["categories"], [])
         response = self.client.post(self.URL, self.payload(products=[self.serum.id]), format="json")
         self.assertEqual(response.data["product_count"], 0)
 
@@ -227,7 +244,7 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
         self.discount(products=[self.serum], name="Live", value="10")
         self.discount(products=[self.serum], name="Soon", start=2, end=3)
         self.discount(products=[self.serum], name="Gone", start=-5, end=-2)
-        self.discount(category=self.parent, name="Off", active=False, type="fixed", value="50")
+        self.discount(categories=[self.parent], name="Off", active=False, type="fixed", value="50")
         self.client.force_authenticate(self.admin)
 
         rows = {d["name"]: d["status"] for d in self.client.get(self.URL).data["results"]}
@@ -301,7 +318,7 @@ class DiscountStorefrontTests(DiscountFixtures, APITestCase):
         self.assertEqual(item["discount_name_snapshot"], "percent 20")
 
     def test_historical_orders_keep_their_prices(self):
-        discount = self.discount(category=self.parent, value="20")
+        discount = self.discount(categories=[self.parent], value="20")
         self.client.force_authenticate(self.customer)
         self.add_to_cart(self.cream)
         order_id = self.checkout().data["id"]
@@ -374,20 +391,26 @@ class DiscountShowcaseTests(DiscountFixtures, APITestCase):
         return {p["name"] for p in section["products"]}
 
     def test_only_live_discounts_with_their_own_names(self):
-        self.discount(category=self.parent, name="Skincare Week")
+        self.discount(categories=[self.parent], name="Skincare Week")
         self.discount(products=[self.bag], name="Future Sale", start=1, end=2)
         self.discount(products=[self.bag], name="Old Sale", start=-5, end=-2)
         self.discount(products=[self.bag], name="Paused Sale", active=False)
         self.assertEqual(set(self.sections()), {"Skincare Week"})
 
     def test_category_section_includes_sub_categories_and_nothing_else(self):
-        self.discount(category=self.parent, name="Skincare Week", value="20")
+        self.discount(categories=[self.parent], name="Skincare Week", value="20")
         section = self.sections()["Skincare Week"]
         self.assertEqual(self.product_names(section), {"Vitamin C Serum", "Hydrating Cream"})
         self.assertEqual(section["product_count"], 2)
-        self.assertEqual(section["category"]["name"], "Skincare")
+        self.assertEqual([c["name"] for c in section["categories"]], ["Skincare"])
         serum = next(p for p in section["products"] if p["name"] == "Vitamin C Serum")
         self.assertEqual(serum["variations"][0]["effective_price"], "1600.00")
+
+    def test_multi_category_section_includes_products_from_each(self):
+        self.discount(categories=[self.parent, self.other], name="Multi", value="20")
+        section = self.sections()["Multi"]
+        self.assertEqual(self.product_names(section), {"Vitamin C Serum", "Hydrating Cream", "Tote Bag"})
+        self.assertEqual({c["name"] for c in section["categories"]}, {"Skincare", "Bags"})
 
     def test_product_section_shows_only_selected_products(self):
         self.discount(products=[self.serum, self.bag], name="Lipstick Special", type="fixed", value="100")
@@ -396,14 +419,14 @@ class DiscountShowcaseTests(DiscountFixtures, APITestCase):
         self.assertEqual(section["value"], "100.00")
 
     def test_multiple_discounts_get_separate_sections(self):
-        self.discount(category=self.parent, name="Skincare Week")
+        self.discount(categories=[self.parent], name="Skincare Week")
         self.discount(products=[self.bag], name="Bag Deal")
         sections = self.sections()
         self.assertEqual(set(sections), {"Skincare Week", "Bag Deal"})
         self.assertEqual(self.product_names(sections["Bag Deal"]), {"Tote Bag"})
 
     def test_product_overridden_by_its_own_discount_moves_to_that_section(self):
-        self.discount(category=self.parent, name="Skincare Week", value="10")
+        self.discount(categories=[self.parent], name="Skincare Week", value="10")
         self.discount(products=[self.serum], name="Serum Special", value="30")
         sections = self.sections()
         self.assertEqual(self.product_names(sections["Skincare Week"]), {"Hydrating Cream"})
@@ -416,7 +439,7 @@ class DiscountShowcaseTests(DiscountFixtures, APITestCase):
         addon_only.visibility_type = Product.VisibilityType.ADDON_ONLY
         addon_only.save()
         self.discount(products=[hidden, addon_only], name="Nothing To Show")
-        self.discount(category=self.other, name="Too Big", type="fixed", value="600")  # > ৳500 bag
+        self.discount(categories=[self.other], name="Too Big", type="fixed", value="600")  # > ৳500 bag
         self.assertEqual(self.sections(), {})
 
     def test_admin_edits_are_reflected(self):
@@ -433,7 +456,7 @@ class DiscountShowcaseTests(DiscountFixtures, APITestCase):
         self.assertEqual(self.sections(), {})
 
     def test_shop_filter_by_discount(self):
-        live = self.discount(category=self.parent, name="Skincare Week")
+        live = self.discount(categories=[self.parent], name="Skincare Week")
         expired = self.discount(products=[self.bag], name="Old", start=-5, end=-2)
         names = {p["name"] for p in self.client.get(f"/api/products/?discount={live.id}").data["results"]}
         self.assertEqual(names, {"Vitamin C Serum", "Hydrating Cream"})

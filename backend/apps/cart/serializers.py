@@ -17,6 +17,10 @@ class CartItemSerializer(serializers.ModelSerializer):
     # Set only when an automatic discount lowers this line's price.
     original_unit_price = serializers.SerializerMethodField()
     discount = serializers.SerializerMethodField()
+    # Basket-level promotional offer applied to this line (if any).
+    promotion_discount = serializers.SerializerMethodField()
+    promotion_label = serializers.SerializerMethodField()
+    free_quantity = serializers.SerializerMethodField()
     children = serializers.SerializerMethodField()
 
     class Meta:
@@ -33,6 +37,9 @@ class CartItemSerializer(serializers.ModelSerializer):
             "unit_price_snapshot",
             "original_unit_price",
             "discount",
+            "promotion_discount",
+            "promotion_label",
+            "free_quantity",
             "line_total",
             "parent_cart_item",
             "children",
@@ -46,6 +53,15 @@ class CartItemSerializer(serializers.ModelSerializer):
         quote = pricing_engine_for(self.context).quote(obj.variation)
         return quote if quote.discount and quote.final_price == obj.unit_price_snapshot else None
 
+    def _promotion(self, obj):
+        # Add-on lines never carry a basket promotion.
+        if obj.parent_cart_item_id:
+            return None
+        promotions = self.context.get("promotions") if self.context else None
+        if not promotions:
+            return None
+        return promotions["by_item"].get(obj.id)
+
     def get_original_unit_price(self, obj):
         quote = self._quote(obj)
         return str(quote.base_price) if quote else None
@@ -57,8 +73,24 @@ class CartItemSerializer(serializers.ModelSerializer):
         info = quote.discount_info()
         return {**info, "value": str(info["value"]), "amount": str(info["amount"])}
 
+    def get_promotion_discount(self, obj):
+        promotion = self._promotion(obj)
+        return promotion["discount"] if promotion and promotion["discount"] > 0 else None
+
+    def get_promotion_label(self, obj):
+        promotion = self._promotion(obj)
+        return promotion["label"] if promotion and promotion["discount"] > 0 else None
+
+    def get_free_quantity(self, obj):
+        promotion = self._promotion(obj)
+        return promotion["free"] if promotion else 0
+
     def get_line_total(self, obj):
-        return obj.unit_price_snapshot * obj.quantity
+        total = obj.unit_price_snapshot * obj.quantity
+        promotion = self._promotion(obj)
+        if promotion:
+            total -= promotion["discount"]
+        return total
 
     def get_variation_label(self, obj):
         values = [av.attribute_value.value for av in obj.variation.variation_attribute_values.all()]
@@ -99,18 +131,42 @@ class CartItemCreateSerializer(serializers.Serializer):
 class CartSerializer(serializers.ModelSerializer):
     items = serializers.SerializerMethodField()
     subtotal = serializers.SerializerMethodField()
+    promotion_discount_total = serializers.SerializerMethodField()
+    promotions = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
 
     class Meta:
         model = Cart
-        fields = ["id", "items", "subtotal", "item_count", "created_at"]
+        fields = [
+            "id",
+            "items",
+            "subtotal",
+            "promotion_discount_total",
+            "promotions",
+            "item_count",
+            "created_at",
+        ]
+
+    def _promotions(self):
+        return self.context.get("promotions") if self.context else None
 
     def get_items(self, obj):
         top_level = obj.items.filter(parent_cart_item__isnull=True).order_by("id")
         return CartItemSerializer(top_level, many=True, context=self.context).data
 
     def get_subtotal(self, obj):
-        return sum((item.unit_price_snapshot * item.quantity for item in obj.items.all()), Decimal("0.00"))
+        # Net of basket promotions — the price checkout will actually charge.
+        gross = sum((item.unit_price_snapshot * item.quantity for item in obj.items.all()), Decimal("0.00"))
+        promotions = self._promotions()
+        return gross - (promotions["total"] if promotions else Decimal("0.00"))
+
+    def get_promotion_discount_total(self, obj):
+        promotions = self._promotions()
+        return promotions["total"] if promotions else Decimal("0.00")
+
+    def get_promotions(self, obj):
+        promotions = self._promotions()
+        return promotions["applied"] if promotions else []
 
     def get_item_count(self, obj):
         return sum(item.quantity for item in obj.items.all())

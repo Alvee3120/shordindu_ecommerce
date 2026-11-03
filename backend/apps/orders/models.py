@@ -31,6 +31,10 @@ class Order(models.Model):
     guest_email = models.EmailField(null=True, blank=True)
     status = models.CharField(max_length=20, choices=Status.choices, default=Status.PENDING)
     subtotal = models.DecimalField(max_digits=10, decimal_places=2)
+    # Basket-level promotional offers (buy X get Y / bundle) — applied before
+    # coupons and kept separate from discount_total (which is the coupon).
+    promotion_discount_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    # Coupon discount.
     discount_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     shipping_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
     tax_total = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
@@ -81,6 +85,14 @@ class OrderItem(models.Model):
     # Later edits to the discount or product never change these.
     original_unit_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     discount_name_snapshot = models.CharField(max_length=120, blank=True)
+    # Snapshot of a basket-level promotional offer applied to this line: the
+    # amount taken off the line, how many units were free, and the offer's
+    # identity. All frozen at order time — later edits/deletes never change them.
+    promotion_discount = models.DecimalField(max_digits=10, decimal_places=2, default=Decimal("0.00"))
+    promotion_id_snapshot = models.PositiveIntegerField(null=True, blank=True)
+    promotion_name_snapshot = models.CharField(max_length=120, blank=True)
+    promotion_type_snapshot = models.CharField(max_length=30, blank=True)
+    free_quantity = models.PositiveIntegerField(default=0)
     parent_order_item = models.ForeignKey(
         "self", on_delete=models.CASCADE, null=True, blank=True, related_name="children"
     )

@@ -302,7 +302,12 @@ export default function CheckoutPage() {
   }
 
   const items = cart?.items || [];
+  // `subtotal` is already net of basket promotions; keep the gross figure for
+  // the "Subtotal − offer = …" breakdown, then add delivery.
+  const promotions = cart?.promotions || [];
+  const promotionTotal = Number(cart?.promotion_discount_total || 0);
   const subtotal = Number(cart?.subtotal || 0);
+  const grossSubtotal = subtotal + promotionTotal;
   const total = subtotal + (deliveryFee ?? 0);
 
   return (
@@ -672,6 +677,12 @@ export default function CheckoutPage() {
                       + {addon.product_name} x{addon.quantity}
                     </p>
                   ))}
+                  {Number(item.promotion_discount) > 0 && (
+                    <p className="text-xs font-medium text-emerald-600">
+                      {item.promotion_label || "Offer applied"}
+                      {item.free_quantity > 0 && ` · ${item.free_quantity} free`}
+                    </p>
+                  )}
                 </div>
                 <span className="font-medium text-(--primary)">
                   ৳
@@ -686,8 +697,16 @@ export default function CheckoutPage() {
 
           <div className="flex justify-between border-b border-neutral-100 py-3 text-sm">
             <span className="text-neutral-500">Subtotal</span>
-            <span className="font-medium text-(--primary)">৳{subtotal.toFixed(2)}</span>
+            <span className="font-medium text-(--primary)">৳{grossSubtotal.toFixed(2)}</span>
           </div>
+          {promotions.map((promotion) => (
+            <div key={promotion.id} className="flex justify-between border-b border-neutral-100 py-3 text-sm">
+              <span className="pr-3 text-emerald-700">{promotion.label || promotion.name}</span>
+              <span className="font-medium whitespace-nowrap text-emerald-700">
+                −৳{Number(promotion.discount_amount).toFixed(2)}
+              </span>
+            </div>
+          ))}
           <div className="flex justify-between border-b border-neutral-100 py-3 text-sm">
             <span className="text-neutral-500">Delivery charge</span>
             <span className="font-medium text-(--primary)">

@@ -10,7 +10,7 @@ from apps.catalog.pricing import PricingEngine
 
 from .cart_resolver import CartMixin
 from .models import CartItem
-from .services import addon_unit_price, reprice_cart
+from .services import addon_unit_price, cart_promotions, reprice_cart
 from .serializers import CartItemCreateSerializer, CartItemSerializer, CartSerializer
 
 
@@ -20,7 +20,12 @@ class CartView(CartMixin, APIView):
     def get(self, request):
         cart = self.get_cart(request)
         engine = reprice_cart(cart)
-        return Response(CartSerializer(cart, context={"request": request, "pricing_engine": engine}).data)
+        promotions = cart_promotions(cart, engine)
+        return Response(
+            CartSerializer(
+                cart, context={"request": request, "pricing_engine": engine, "promotions": promotions}
+            ).data
+        )
 
 
 class CartItemViewSet(CartMixin, viewsets.ModelViewSet):

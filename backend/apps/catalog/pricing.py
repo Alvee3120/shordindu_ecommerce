@@ -87,6 +87,14 @@ def category_with_descendants(category_id, parent_of=None):
     return result
 
 
+def categories_with_descendants(category_ids, parent_of=None):
+    """Ids of every given category plus all of their descendants."""
+    result = set()
+    for category_id in category_ids:
+        result |= category_with_descendants(category_id, parent_of)
+    return result
+
+
 class PricingEngine:
     """Prices variations against the discounts live at ``now``.
 
@@ -101,7 +109,9 @@ class PricingEngine:
     def _load(self):
         from .models import Category, Discount
 
-        live = list(Discount.objects.live(self.now).prefetch_related("products"))
+        # Only per-item rules price a single variation; basket-level offers are
+        # applied once per cart/order by apps.catalog.promotions.
+        live = list(Discount.objects.live(self.now).per_item().prefetch_related("products", "categories"))
         self._by_product = defaultdict(list)
         self._by_category = defaultdict(list)
         parent_of = None
@@ -109,10 +119,11 @@ class PricingEngine:
             if discount.target_type == Discount.Target.PRODUCTS:
                 for product in discount.products.all():
                     self._by_product[product.pk].append(discount)
-            elif discount.category_id:
+            elif discount.target_type == Discount.Target.CATEGORY:
                 if parent_of is None:
                     parent_of = dict(Category.objects.values_list("id", "parent_id"))
-                for category_id in category_with_descendants(discount.category_id, parent_of):
+                ids = categories_with_descendants([c.pk for c in discount.categories.all()], parent_of)
+                for category_id in ids:
                     self._by_category[category_id].append(discount)
         self._loaded = True
 
@@ -169,8 +180,9 @@ def discounted_product_ids(discount, engine):
     )
     if discount.target_type == Discount.Target.PRODUCTS:
         products = products.filter(pk__in=discount.products.values("pk"))
-    elif discount.category_id:
-        products = products.filter(categories__in=category_with_descendants(discount.category_id))
+    elif discount.categories.exists():
+        ids = categories_with_descendants(discount.categories.values_list("pk", flat=True))
+        products = products.filter(categories__in=ids)
     else:
         return []
     products = products.distinct().order_by("-created_at").prefetch_related("variations", "categories")

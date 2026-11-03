@@ -107,7 +107,12 @@ export default function CartPage() {
 
   const items = cart?.items || [];
   const isEmpty = items.length === 0;
+  // `subtotal` is already net of basket promotions; keep the gross figure for
+  // the "Subtotal − offer = …" breakdown, then add shipping.
+  const promotions = cart?.promotions || [];
+  const promotionTotal = Number(cart?.promotion_discount_total || 0);
   const subtotal = Number(cart?.subtotal || 0);
+  const grossSubtotal = subtotal + promotionTotal;
   // Estimate only — checkout prices the actual address. Without a priceable
   // saved address, fall back to the configured outside-Dhaka charge.
   const estimatedShipping =
@@ -188,6 +193,12 @@ export default function CartPage() {
                           {row.variation_label && (
                             <p className="text-xs text-neutral-400">{row.variation_label}</p>
                           )}
+                          {!row.isAddon && Number(row.promotion_discount) > 0 && (
+                            <p className="text-xs font-medium text-emerald-600">
+                              {row.promotion_label || "Offer applied"}
+                              {row.free_quantity > 0 && ` · ${row.free_quantity} free`}
+                            </p>
+                          )}
                         </div>
                       </div>
                     </td>
@@ -240,8 +251,17 @@ export default function CartPage() {
 
             <div className="flex justify-between border-b border-neutral-100 py-3 text-sm">
               <span className="text-neutral-500">Subtotal</span>
-              <span className="font-medium text-neutral-900">৳{subtotal.toFixed(2)}</span>
+              <span className="font-medium text-neutral-900">৳{grossSubtotal.toFixed(2)}</span>
             </div>
+
+            {promotions.map((promotion) => (
+              <div key={promotion.id} className="flex justify-between border-b border-neutral-100 py-3 text-sm">
+                <span className="pr-3 text-emerald-700">{promotion.label || promotion.name}</span>
+                <span className="font-medium whitespace-nowrap text-emerald-700">
+                  −৳{Number(promotion.discount_amount).toFixed(2)}
+                </span>
+              </div>
+            ))}
 
             <div className="flex flex-col gap-1 border-b border-neutral-100 py-3">
               <div className="flex justify-between text-sm">

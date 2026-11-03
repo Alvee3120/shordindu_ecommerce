@@ -51,8 +51,38 @@ export async function getDiscountShowcases() {
   }
 }
 
-/** "20%" or "৳200 OFF" — how a discount's value is shown in lists. */
+/**
+ * Every discount type the admin can create, grouped the way the editor offers
+ * them. "Product price" types lower a single variation's price
+ * (apps.catalog.pricing); "Cart offer" types are basket-level promotions
+ * applied to a group of units in the cart/order (apps.catalog.promotions).
+ */
+export const DISCOUNT_TYPES = [
+  { value: "percent", label: "Percentage off", group: "Product price" },
+  { value: "fixed", label: "Fixed amount off", group: "Product price" },
+  { value: "bxgy_percent", label: "Buy X, get Y% off", group: "Cart offer" },
+  { value: "bxgy_free", label: "Buy X, get Y free", group: "Cart offer" },
+  { value: "lowest_free", label: "Buy X, get cheapest free", group: "Cart offer" },
+  { value: "three_for_two", label: "3 for 2", group: "Cart offer" },
+  { value: "bundle_price", label: "Bundle for a fixed price", group: "Cart offer" },
+];
+
+export const DISCOUNT_TYPE_LABEL = Object.fromEntries(DISCOUNT_TYPES.map((t) => [t.value, t.label]));
+
+/** DISCOUNT_TYPES bucketed by group, for <optgroup>-style pickers. */
+export const DISCOUNT_TYPE_GROUPS = [...new Set(DISCOUNT_TYPES.map((t) => t.group))].map((group) => ({
+  group,
+  options: DISCOUNT_TYPES.filter((t) => t.group === group),
+}));
+
+/** Product-price types change a variation's price; the rest are cart offers. */
+export function isBasketDiscount(type) {
+  return type !== "percent" && type !== "fixed";
+}
+
+/** How a discount's offer reads in lists: "20%", "৳200 OFF" or "Buy 3, get 20% off". */
 export function formatDiscountValue(discount) {
+  if (isBasketDiscount(discount.type)) return discount.label;
   const value = Number(discount.value);
   const shown = Number.isInteger(value) ? value.toLocaleString("en-US") : value.toFixed(2);
   return discount.type === "percent" ? `${shown}%` : `৳${shown} OFF`;

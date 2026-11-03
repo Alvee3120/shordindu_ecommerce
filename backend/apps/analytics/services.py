@@ -93,7 +93,9 @@ def _eligible_items(start, end):
 
 
 def _with_net_line(items):
-    """Annotate each order item with its proportional share of the order discount."""
+    """Annotate each order item with its proportional share of the order
+    discounts (coupon + basket promotions — the schema only stores them at the
+    order level, so they're allocated by the line's share of the subtotal)."""
     subtotal_sq = Subquery(
         Order.objects.filter(pk=OuterRef("order_id")).values("subtotal")[:1],
         output_field=_dec(),
@@ -102,11 +104,18 @@ def _with_net_line(items):
         Order.objects.filter(pk=OuterRef("order_id")).values("discount_total")[:1],
         output_field=_dec(),
     )
-    return items.annotate(_order_subtotal=subtotal_sq, _order_discount=discount_sq).annotate(
+    promotion_sq = Subquery(
+        Order.objects.filter(pk=OuterRef("order_id")).values("promotion_discount_total")[:1],
+        output_field=_dec(),
+    )
+    return items.annotate(
+        _order_subtotal=subtotal_sq, _order_discount=discount_sq, _order_promotion=promotion_sq
+    ).annotate(
         _net_line=Case(
             When(
                 _order_subtotal__gt=0,
-                then=F("line_total") - F("_order_discount") * F("line_total") / F("_order_subtotal"),
+                then=F("line_total")
+                - (F("_order_discount") + F("_order_promotion")) * F("line_total") / F("_order_subtotal"),
             ),
             default=F("line_total"),
             output_field=_dec(),
@@ -168,7 +177,8 @@ def _sales_totals(start, end):
 
     agg = eligible.aggregate(
         gross=Coalesce(Sum("subtotal"), ZERO, output_field=_dec()),
-        discounts=Coalesce(Sum("discount_total"), ZERO, output_field=_dec()),
+        discounts=Coalesce(Sum("discount_total"), ZERO, output_field=_dec())
+        + Coalesce(Sum("promotion_discount_total"), ZERO, output_field=_dec()),
         delivery=Coalesce(Sum("shipping_total"), ZERO, output_field=_dec()),
         qualifying_orders=Count("id"),
     )
@@ -281,7 +291,7 @@ def _series_points(start, end, granularity):
         .annotate(
             revenue=Coalesce(
                 Sum(
-                    F("subtotal") - F("discount_total"),
+                    F("subtotal") - F("discount_total") - F("promotion_discount_total"),
                     filter=Q(status__in=ELIGIBLE_SALES_STATUSES),
                     output_field=_dec(),
                 ),

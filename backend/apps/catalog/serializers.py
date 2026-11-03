@@ -16,7 +16,7 @@ from .models import (
     StockNotification,
     VariationAttributeValue,
 )
-from .pricing import category_with_descendants, pricing_engine_for
+from .pricing import categories_with_descendants, pricing_engine_for
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -292,13 +292,26 @@ class DiscountSerializer(serializers.ModelSerializer):
     """Admin CRUD for automatic discounts. The backend is the final authority
     on every rule here — the dashboard form only mirrors these checks."""
 
-    value = serializers.DecimalField(max_digits=10, decimal_places=2, min_value=Decimal("0.01"))
-    category = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), required=False, allow_null=True)
+    value = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"), required=False, allow_null=True
+    )
+    min_quantity = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    percent_off = serializers.DecimalField(
+        max_digits=5, decimal_places=2, min_value=Decimal("0.01"), max_value=Decimal("100"),
+        required=False, allow_null=True,
+    )
+    free_quantity = serializers.IntegerField(min_value=1, required=False, allow_null=True)
+    bundle_price = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"), required=False, allow_null=True
+    )
+    free_same_product = serializers.BooleanField(required=False)
+    categories = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, required=False)
     products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), many=True, required=False)
-    category_name = serializers.CharField(source="category.name", read_only=True, default=None)
+    category_names = serializers.SerializerMethodField()
     product_count = serializers.SerializerMethodField()
     product_details = serializers.SerializerMethodField()
     status = serializers.SerializerMethodField()
+    label = serializers.SerializerMethodField()
 
     class Meta:
         model = Discount
@@ -307,9 +320,14 @@ class DiscountSerializer(serializers.ModelSerializer):
             "name",
             "type",
             "value",
+            "min_quantity",
+            "percent_off",
+            "free_quantity",
+            "bundle_price",
+            "free_same_product",
             "target_type",
-            "category",
-            "category_name",
+            "categories",
+            "category_names",
             "products",
             "product_count",
             "product_details",
@@ -317,10 +335,17 @@ class DiscountSerializer(serializers.ModelSerializer):
             "ends_at",
             "is_active",
             "status",
+            "label",
             "created_at",
             "updated_at",
         ]
         read_only_fields = ["created_at", "updated_at"]
+
+    def get_label(self, obj):
+        return obj.label()
+
+    def get_category_names(self, obj):
+        return " › ".join(category.name for category in obj.categories.all())
 
     def get_status(self, obj):
         return obj.status_at()
@@ -366,43 +391,104 @@ class DiscountSerializer(serializers.ModelSerializer):
                 return default
             if name == "products":
                 return list(instance.products.all())
+            if name == "categories":
+                return list(instance.categories.all())
             return getattr(instance, name)
 
         errors = {}
         discount_type = final("type")
-        value = final("value")
-        if discount_type == Discount.Type.PERCENT and value is not None and value > 100:
-            errors["value"] = ["A percentage discount can't be more than 100%."]
 
         starts_at, ends_at = final("starts_at"), final("ends_at")
         if starts_at and ends_at and ends_at <= starts_at:
             errors["ends_at"] = ["The end must be after the start."]
 
         target_type = final("target_type")
-        category = final("category")
+        categories = final("categories")
         products = final("products", [])
         if target_type == Discount.Target.CATEGORY:
-            if not category:
-                errors["category"] = ["Choose a category."]
+            if not categories:
+                errors["categories"] = ["Choose at least one category."]
             attrs["products"] = []
         elif target_type == Discount.Target.PRODUCTS:
             if not products:
                 errors["products"] = ["Choose at least one product."]
-            attrs["category"] = None
+            attrs["categories"] = []
+
+        self._validate_offer(discount_type, attrs, instance, errors)
 
         if errors:
             raise serializers.ValidationError(errors)
 
         if discount_type == Discount.Type.FIXED:
-            self._check_fixed_amount(value, target_type, category, products)
+            self._check_fixed_amount(final("value"), target_type, categories, products)
         return attrs
 
     @staticmethod
-    def _check_fixed_amount(value, target_type, category, products):
+    def _validate_offer(discount_type, attrs, instance, errors):
+        """Validate the fields the chosen offer type uses and clear the rest.
+
+        A field is only cleared when it (or the type) is part of this request, so
+        an unrelated PATCH never wipes a stored configuration.
+        """
+
+        def current(name):
+            if name in attrs:
+                return attrs[name]
+            return getattr(instance, name) if instance is not None else None
+
+        def clear(name):
+            if name in attrs or "type" in attrs:
+                attrs[name] = None
+
+        if discount_type in Discount.PER_ITEM_TYPES:
+            value = current("value")
+            if value is None:
+                errors["value"] = ["Enter a discount value."]
+            elif value <= 0:
+                errors["value"] = ["The value must be greater than 0."]
+            elif discount_type == Discount.Type.PERCENT and value > 100:
+                errors["value"] = ["A percentage discount can't be more than 100%."]
+            for field in ("min_quantity", "percent_off", "free_quantity", "bundle_price"):
+                clear(field)
+            return
+
+        # Basket-level offer: `value` is never used.
+        clear("value")
+        if discount_type in (
+            Discount.Type.BXGY_PERCENT,
+            Discount.Type.BXGY_FREE,
+            Discount.Type.LOWEST_FREE,
+            Discount.Type.BUNDLE_PRICE,
+        ) and current("min_quantity") is None:
+            errors["min_quantity"] = ["Enter the required quantity."]
+
+        if discount_type == Discount.Type.BXGY_PERCENT:
+            if current("percent_off") is None:
+                errors["percent_off"] = ["Enter the discount percentage."]
+            clear("free_quantity")
+            clear("bundle_price")
+        elif discount_type == Discount.Type.BXGY_FREE:
+            if current("free_quantity") is None:
+                errors["free_quantity"] = ["Enter how many items are free."]
+            clear("percent_off")
+            clear("bundle_price")
+        elif discount_type == Discount.Type.BUNDLE_PRICE:
+            if current("bundle_price") is None:
+                errors["bundle_price"] = ["Enter the bundle price."]
+            clear("percent_off")
+            clear("free_quantity")
+        else:  # lowest_free / three_for_two
+            clear("percent_off")
+            clear("free_quantity")
+            clear("bundle_price")
+
+    @staticmethod
+    def _check_fixed_amount(value, target_type, categories, products):
         """A fixed discount must not exceed the price of anything it targets."""
         variations = ProductVariation.objects.filter(is_active=True)
         if target_type == Discount.Target.CATEGORY:
-            variations = variations.filter(product__categories__in=category_with_descendants(category.pk))
+            ids = categories_with_descendants([category.pk for category in categories])
+            variations = variations.filter(product__categories__in=ids)
         else:
             variations = variations.filter(product__in=products)
         cheapest = variations.aggregate(price=Min("price"))["price"]
@@ -418,15 +504,20 @@ class DiscountSerializer(serializers.ModelSerializer):
 
     def create(self, validated_data):
         products = validated_data.pop("products", [])
+        categories = validated_data.pop("categories", [])
         discount = Discount.objects.create(**validated_data)
         discount.products.set(products)
+        discount.categories.set(categories)
         return discount
 
     def update(self, instance, validated_data):
         products = validated_data.pop("products", None)
+        categories = validated_data.pop("categories", None)
         for field, value in validated_data.items():
             setattr(instance, field, value)
         instance.save()
         if products is not None:
             instance.products.set(products)
+        if categories is not None:
+            instance.categories.set(categories)
         return instance

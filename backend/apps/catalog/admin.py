@@ -147,7 +147,11 @@ class StockNotificationAdmin(admin.ModelAdmin):
 
 @admin.register(Discount)
 class DiscountAdmin(admin.ModelAdmin):
-    list_display = ["name", "type", "value", "target_type", "category", "starts_at", "ends_at", "is_active"]
+    list_display = ["name", "type", "value", "target_type", "category_list", "starts_at", "ends_at", "is_active"]
     list_filter = ["type", "target_type", "is_active"]
     search_fields = ["name"]
-    filter_horizontal = ["products"]
+    filter_horizontal = ["products", "categories"]
+
+    @admin.display(description="Categories")
+    def category_list(self, obj):
+        return ", ".join(category.name for category in obj.categories.all())

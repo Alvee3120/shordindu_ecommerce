@@ -5,7 +5,13 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { FiEdit2, FiPercent, FiPlus, FiSearch, FiTrash2 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
-import { deleteDiscount, formatDiscountValue, listDiscounts } from "@/lib/discounts";
+import {
+  DISCOUNT_TYPE_GROUPS,
+  DISCOUNT_TYPE_LABEL,
+  deleteDiscount,
+  formatDiscountValue,
+  listDiscounts,
+} from "@/lib/discounts";
 import { formatDate } from "@/lib/format";
 import StatusBadge from "@/components/admin/StatusBadge";
 
@@ -22,7 +28,7 @@ const selectClass =
   "rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)";
 
 function targetSummary(discount) {
-  if (discount.target_type === "category") return discount.category_name || "Deleted category";
+  if (discount.target_type === "category") return discount.category_names || "No categories";
   return `${discount.product_count} product${discount.product_count === 1 ? "" : "s"}`;
 }
 
@@ -105,7 +111,8 @@ export default function AdminDiscountsPage() {
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Discounts</h1>
           <p className="mt-1 text-sm text-neutral-500">
-            Automatic price reductions for a category or chosen products. Coupons are managed separately.
+            Automatic offers for a category or chosen products — either a price cut, or a cart offer like
+            &ldquo;buy 3, get 20% off&rdquo;. Coupons are managed separately.
           </p>
         </div>
         <Link
@@ -137,8 +144,15 @@ export default function AdminDiscountsPage() {
         </select>
         <select value={type} onChange={changeFilter(setType)} aria-label="Filter by type" className={selectClass}>
           <option value="">All types</option>
-          <option value="percent">Percentage</option>
-          <option value="fixed">Fixed amount</option>
+          {DISCOUNT_TYPE_GROUPS.map(({ group, options }) => (
+            <optgroup key={group} label={group}>
+              {options.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </optgroup>
+          ))}
         </select>
         <select value={target} onChange={changeFilter(setTarget)} aria-label="Filter by target" className={selectClass}>
           <option value="">All targets</option>
@@ -192,7 +206,7 @@ export default function AdminDiscountsPage() {
                     >
                       {discount.name}
                     </Link>
-                    <p className="text-xs text-neutral-500">{discount.type === "percent" ? "Percentage" : "Fixed amount"}</p>
+                    <p className="text-xs text-neutral-500">{DISCOUNT_TYPE_LABEL[discount.type] || discount.type}</p>
                   </td>
                   <td className="px-5 py-3 font-semibold text-neutral-900">{formatDiscountValue(discount)}</td>
                   <td className="px-5 py-3">

@@ -2,7 +2,6 @@ import { Suspense } from "react";
 import localFont from "next/font/local";
 import "./globals.css";
 import NavbarSwitcher from "@/components/shared/NavbarSwitcher";
-import Footer from "@/components/shared/Footer";
 import FooterSwitcher from "@/components/shared/FooterSwitcher";
 import SmoothScroll from "@/components/shared/SmoothScroll";
 import AppLoadingShell from "./AppLoadingShell";
@@ -31,13 +30,15 @@ export const myFontsT = localFont({
 });
 
 export const metadata = {
+  // Small raster icons generated from public/favicon.svg — that SVG is ~620 KB
+  // (a traced image), which browsers often refuse to use as a tab icon, and
+  // Safari doesn't support SVG favicons at all.
   icons: {
     icon: [
-      {
-        url: "/favicon.svg",
-        href: "/favicon.svg",
-      },
+      { url: "/favicon.ico", sizes: "16x16 32x32 48x48" },
+      { url: "/icon-192.png", type: "image/png", sizes: "192x192" },
     ],
+    apple: [{ url: "/apple-icon.png", sizes: "180x180" }],
   },
   title: "Shordindu",
   description: "Hello Beautiful Soul",

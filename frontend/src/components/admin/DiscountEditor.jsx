@@ -6,7 +6,13 @@ import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { FiArrowLeft, FiBox, FiInfo, FiX } from "react-icons/fi";
 import { getCategories } from "@/lib/categories";
-import { createDiscount, getDiscount, updateDiscount } from "@/lib/discounts";
+import {
+  DISCOUNT_TYPE_GROUPS,
+  createDiscount,
+  getDiscount,
+  isBasketDiscount,
+  updateDiscount,
+} from "@/lib/discounts";
 import { formatBDT } from "@/lib/format";
 import StatusBadge from "@/components/admin/StatusBadge";
 import CategorySelect from "@/components/admin/CategorySelect";
@@ -23,8 +29,14 @@ const EMPTY_FORM = {
   name: "",
   type: "percent",
   value: "",
+  // Cart-offer parameters (only the ones the chosen type uses are submitted).
+  min_quantity: "3",
+  percent_off: "",
+  free_quantity: "1",
+  bundle_price: "",
+  free_same_product: true,
   target_type: "category",
-  category: null,
+  categories: [],
   start_date: "",
   start_time: "00:00",
   end_date: "",
@@ -32,11 +44,32 @@ const EMPTY_FORM = {
   is_active: true,
 };
 
+/** The customer-facing one-liner the backend will store as the offer's label. */
+function offerPreview(form) {
+  const x = form.min_quantity || "?";
+  switch (form.type) {
+    case "bxgy_percent":
+      return `Buy ${x}, get ${form.percent_off || "?"}% off`;
+    case "bxgy_free":
+      return `Buy ${x}, get ${form.free_quantity || "?"} free`;
+    case "lowest_free":
+      return `Buy ${x}, get cheapest free`;
+    case "three_for_two":
+      return "3 for 2";
+    case "bundle_price":
+      return `${x} for ৳${form.bundle_price || "?"}`;
+    default:
+      return null;
+  }
+}
+
 // API datetimes come back in Bangladesh time (+06:00), the same zone the
 // backend reads these naive inputs in — so the date/time parts map 1:1.
 function splitDateTime(value) {
   return value ? { date: value.slice(0, 10), time: value.slice(11, 16) } : { date: "", time: "" };
 }
+
+const num = (value, fallback = "") => (value == null || value === "" ? fallback : String(Number(value)));
 
 function toForm(discount) {
   const start = splitDateTime(discount.starts_at);
@@ -44,9 +77,14 @@ function toForm(discount) {
   return {
     name: discount.name,
     type: discount.type,
-    value: String(Number(discount.value)),
+    value: num(discount.value),
+    min_quantity: num(discount.min_quantity, "3"),
+    percent_off: num(discount.percent_off),
+    free_quantity: num(discount.free_quantity, "1"),
+    bundle_price: num(discount.bundle_price),
+    free_same_product: discount.free_same_product ?? true,
     target_type: discount.target_type,
-    category: discount.category,
+    categories: discount.categories ?? [],
     start_date: start.date,
     start_time: start.time,
     end_date: end.date,
@@ -111,15 +149,50 @@ function Segmented({ value, onChange, options, label }) {
   );
 }
 
+const MONEY_RE = /^\d+(\.\d{1,2})?$/;
+
+/** Client-side mirror of the backend's per-type rules (the serializer is authority). */
+function validateOffer(form, errors) {
+  if (!isBasketDiscount(form.type)) {
+    const value = Number(form.value);
+    if (form.value === "" || !Number.isFinite(value)) errors.value = "Enter a discount value.";
+    else if (value <= 0) errors.value = "The value must be greater than 0.";
+    else if (form.type === "percent" && value > 100) errors.value = "A percentage can't be more than 100.";
+    else if (!MONEY_RE.test(form.value.trim())) errors.value = "Use at most 2 decimal places.";
+    return;
+  }
+
+  const positiveInt = (field, message) => {
+    const value = Number(form[field]);
+    if (form[field] === "" || !Number.isInteger(value) || value < 1) errors[field] = message;
+  };
+
+  if (form.type !== "three_for_two") positiveInt("min_quantity", "Enter the required quantity.");
+
+  if (form.type === "bxgy_percent") {
+    const percent = Number(form.percent_off);
+    if (form.percent_off === "" || !Number.isFinite(percent)) errors.percent_off = "Enter the discount percentage.";
+    else if (percent <= 0 || percent > 100) errors.percent_off = "Enter a percentage between 1 and 100.";
+    else if (!MONEY_RE.test(form.percent_off.trim())) errors.percent_off = "Use at most 2 decimal places.";
+  }
+
+  if (form.type === "bxgy_free") positiveInt("free_quantity", "Enter how many items are free.");
+
+  if (form.type === "bundle_price") {
+    const price = Number(form.bundle_price);
+    if (form.bundle_price === "" || !Number.isFinite(price)) errors.bundle_price = "Enter the bundle price.";
+    else if (price <= 0) errors.bundle_price = "The bundle price must be greater than 0.";
+    else if (!MONEY_RE.test(form.bundle_price.trim())) errors.bundle_price = "Use at most 2 decimal places.";
+  }
+}
+
 function validate(form, products) {
   const errors = {};
   if (!form.name.trim()) errors.name = "Give the discount a name.";
-  const value = Number(form.value);
-  if (form.value === "" || !Number.isFinite(value)) errors.value = "Enter a discount value.";
-  else if (value <= 0) errors.value = "The value must be greater than 0.";
-  else if (form.type === "percent" && value > 100) errors.value = "A percentage can't be more than 100.";
-  else if (!/^\d+(\.\d{1,2})?$/.test(form.value.trim())) errors.value = "Use at most 2 decimal places.";
-  if (form.target_type === "category" && !form.category) errors.category = "Choose a category.";
+  validateOffer(form, errors);
+  if (form.target_type === "category" && form.categories.length === 0) {
+    errors.categories = "Choose at least one category.";
+  }
   if (form.target_type === "products" && products.length === 0) errors.products = "Choose at least one product.";
   if (!form.start_date || !form.start_time) errors.starts_at = "Choose a start date and time.";
   if (!form.end_date || !form.end_time) errors.ends_at = "Choose an end date and time.";
@@ -174,7 +247,20 @@ export default function DiscountEditor({ discountId }) {
   const update = (field, value) => {
     setForm((prev) => ({ ...prev, [field]: value }));
     const errorKey = field.startsWith("start_") ? "starts_at" : field.startsWith("end_") ? "ends_at" : field;
-    setErrors((prev) => ({ ...prev, [errorKey]: undefined }));
+    setErrors((prev) => {
+      const next = { ...prev, [errorKey]: undefined };
+      // Switching offer type invalidates every type-specific field's error.
+      if (field === "type") {
+        for (const key of ["value", "min_quantity", "percent_off", "free_quantity", "bundle_price"]) {
+          next[key] = undefined;
+        }
+      }
+      if (field === "target_type") {
+        next.categories = undefined;
+        next.products = undefined;
+      }
+      return next;
+    });
   };
 
   const addProduct = (product) => {
@@ -196,14 +282,24 @@ export default function DiscountEditor({ discountId }) {
     const payload = {
       name: form.name.trim(),
       type: form.type,
-      value: form.value.trim(),
       target_type: form.target_type,
-      category: form.target_type === "category" ? form.category : null,
+      categories: form.target_type === "category" ? form.categories : [],
       products: form.target_type === "products" ? products.map((p) => p.id) : [],
       starts_at: `${form.start_date}T${form.start_time}`,
       ends_at: `${form.end_date}T${form.end_time}`,
       is_active: form.is_active,
     };
+    if (isBasketDiscount(form.type)) {
+      // Only the fields this offer type uses; the rest are sent null so an edit
+      // that switches type never leaves a stale configuration behind.
+      payload.min_quantity = form.type === "three_for_two" ? null : Number(form.min_quantity);
+      payload.percent_off = form.type === "bxgy_percent" ? form.percent_off.trim() : null;
+      payload.free_quantity = form.type === "bxgy_free" ? Number(form.free_quantity) : null;
+      payload.bundle_price = form.type === "bundle_price" ? form.bundle_price.trim() : null;
+      if (form.type === "bxgy_free") payload.free_same_product = form.free_same_product;
+    } else {
+      payload.value = form.value.trim();
+    }
     setSaving(true);
     try {
       if (isNew) await createDiscount(payload);
@@ -270,34 +366,155 @@ export default function DiscountEditor({ discountId }) {
               className={inputClass(errors.name)}
             />
           </Field>
-          <Field label="Discount type" error={errors.type}>
-            <Segmented
-              label="Discount type"
+          <Field label="Offer type" error={errors.type} htmlFor="type" className="sm:col-span-2">
+            <select
+              id="type"
               value={form.type}
-              onChange={(v) => update("type", v)}
-              options={[
-                { value: "percent", label: "Percentage" },
-                { value: "fixed", label: "Fixed amount" },
-              ]}
-            />
+              onChange={(e) => update("type", e.target.value)}
+              className={inputClass(errors.type)}
+            >
+              {DISCOUNT_TYPE_GROUPS.map(({ group, options }) => (
+                <optgroup key={group} label={group}>
+                  {options.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                </optgroup>
+              ))}
+            </select>
           </Field>
-          <Field label="Discount value" error={errors.value} hint={example} htmlFor="value">
-            <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.value ? "border-red-400" : "border-neutral-300"}`}>
-              {form.type === "fixed" && <span className="pl-3 text-sm text-neutral-500">৳</span>}
-              <input
-                id="value"
-                type="number"
-                inputMode="decimal"
-                min="0.01"
-                max={form.type === "percent" ? 100 : undefined}
-                step="0.01"
-                value={form.value}
-                onChange={(e) => update("value", e.target.value)}
-                className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
-              />
-              {form.type === "percent" && <span className="pr-3 text-sm text-neutral-500">%</span>}
-            </div>
-          </Field>
+
+          {isBasketDiscount(form.type) ? (
+            <>
+              {form.type !== "three_for_two" && (
+                <Field
+                  label="Buy quantity (X)"
+                  error={errors.min_quantity}
+                  htmlFor="min_quantity"
+                  hint={form.type === "bundle_price" ? "Units per bundle group." : "Units needed to trigger the offer."}
+                >
+                  <input
+                    id="min_quantity"
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    step="1"
+                    value={form.min_quantity}
+                    onChange={(e) => update("min_quantity", e.target.value)}
+                    className={inputClass(errors.min_quantity)}
+                  />
+                </Field>
+              )}
+
+              {form.type === "bxgy_percent" && (
+                <Field label="Percent off (Y)" error={errors.percent_off} htmlFor="percent_off">
+                  <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.percent_off ? "border-red-400" : "border-neutral-300"}`}>
+                    <input
+                      id="percent_off"
+                      type="number"
+                      inputMode="decimal"
+                      min="0.01"
+                      max="100"
+                      step="0.01"
+                      value={form.percent_off}
+                      onChange={(e) => update("percent_off", e.target.value)}
+                      className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
+                    />
+                    <span className="pr-3 text-sm text-neutral-500">%</span>
+                  </div>
+                </Field>
+              )}
+
+              {form.type === "bxgy_free" && (
+                <Field label="Free quantity (Y)" error={errors.free_quantity} htmlFor="free_quantity">
+                  <input
+                    id="free_quantity"
+                    type="number"
+                    inputMode="numeric"
+                    min="1"
+                    step="1"
+                    value={form.free_quantity}
+                    onChange={(e) => update("free_quantity", e.target.value)}
+                    className={inputClass(errors.free_quantity)}
+                  />
+                </Field>
+              )}
+
+              {form.type === "bundle_price" && (
+                <Field label="Bundle price (৳)" error={errors.bundle_price} htmlFor="bundle_price">
+                  <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.bundle_price ? "border-red-400" : "border-neutral-300"}`}>
+                    <span className="pl-3 text-sm text-neutral-500">৳</span>
+                    <input
+                      id="bundle_price"
+                      type="number"
+                      inputMode="decimal"
+                      min="0.01"
+                      step="0.01"
+                      value={form.bundle_price}
+                      onChange={(e) => update("bundle_price", e.target.value)}
+                      className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
+                    />
+                  </div>
+                </Field>
+              )}
+
+              {form.type === "bxgy_free" && (
+                <label className="flex items-start justify-between gap-3 sm:col-span-2">
+                  <span>
+                    <span className="block text-sm font-medium text-neutral-800">Free units, same product</span>
+                    <span className="block text-xs text-neutral-500">
+                      Off to let the free units come from any targeted product instead.
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    role="switch"
+                    aria-checked={form.free_same_product}
+                    aria-label="Free units must be the same product"
+                    onClick={() => update("free_same_product", !form.free_same_product)}
+                    className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition-colors ${
+                      form.free_same_product ? "bg-(--primary)" : "bg-neutral-300"
+                    }`}
+                  >
+                    <span
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        form.free_same_product ? "translate-x-6" : "translate-x-1"
+                      }`}
+                    />
+                  </button>
+                </label>
+              )}
+
+              <Field label="Customers will see" className="sm:col-span-2">
+                <p className="rounded-lg bg-neutral-50 px-3 py-2 text-sm font-medium text-neutral-800">{offerPreview(form)}</p>
+              </Field>
+            </>
+          ) : (
+            <Field
+              label={form.type === "percent" ? "Percentage off" : "Amount off"}
+              error={errors.value}
+              hint={example}
+              htmlFor="value"
+              className="sm:col-span-2"
+            >
+              <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.value ? "border-red-400" : "border-neutral-300"}`}>
+                {form.type === "fixed" && <span className="pl-3 text-sm text-neutral-500">৳</span>}
+                <input
+                  id="value"
+                  type="number"
+                  inputMode="decimal"
+                  min="0.01"
+                  max={form.type === "percent" ? 100 : undefined}
+                  step="0.01"
+                  value={form.value}
+                  onChange={(e) => update("value", e.target.value)}
+                  className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
+                />
+                {form.type === "percent" && <span className="pr-3 text-sm text-neutral-500">%</span>}
+              </div>
+            </Field>
+          )}
         </div>
       </section>
 
@@ -315,19 +532,20 @@ export default function DiscountEditor({ discountId }) {
 
         {form.target_type === "category" ? (
           <div className="mt-4">
-            <Field label="Target category" error={null} htmlFor="category">
+            <Field label="Target categories" error={null} htmlFor="categories">
               <CategorySelect
+                multiple
                 categories={categories}
                 loading={categoriesLoading}
-                value={form.category}
-                onChange={(id) => update("category", id)}
-                error={errors.category}
+                value={form.categories}
+                onChange={(ids) => update("categories", ids)}
+                error={errors.categories}
               />
             </Field>
             <p className="mt-2 flex items-start gap-1.5 text-xs text-neutral-500">
               <FiInfo size={13} className="mt-0.5 shrink-0" />
-              Includes products in this category and all of its sub-categories — the same products the shop shows
-              for it.
+              Includes products in any of these categories and all of their sub-categories — the same products the
+              shop shows for them.
             </p>
           </div>
         ) : (

@@ -2,6 +2,7 @@ import django_filters
 
 from .models import Discount, Product
 from .pricing import PricingEngine, discounted_product_ids
+from .promotions import promotion_product_ids
 
 
 class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
@@ -26,4 +27,11 @@ class ProductFilter(django_filters.FilterSet):
         discount = Discount.objects.live(engine.now).filter(pk=value).first()
         if discount is None:
             return queryset.none()
-        return queryset.filter(pk__in=discounted_product_ids(discount, engine))
+        # Per-item rules price the product directly; basket offers list every
+        # product they target (the saving happens in the cart).
+        ids = (
+            promotion_product_ids(discount)
+            if discount.is_basket
+            else discounted_product_ids(discount, engine)
+        )
+        return queryset.filter(pk__in=ids)

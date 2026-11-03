@@ -8,6 +8,7 @@ from apps.cart.cart_resolver import resolve_cart
 from apps.cart.services import reprice_cart
 from apps.catalog.models import InventoryLog, Product, ProductVariation
 from apps.catalog.pricing import PricingEngine
+from apps.catalog.promotions import PromotionEngine, units_from_lines
 from apps.users.models import Address, User
 from apps.users.utils import generate_secure_password
 
@@ -148,23 +149,52 @@ def _delivery_fee(district, zone):
         raise CheckoutError({"shipping_zone": [str(exc)]})
 
 
+def _promotion_plan(lines):
+    """Apply basket-level offers to ``lines`` (top-level only).
+
+    Returns ``(per_line, total, applied)`` where ``per_line`` maps a line index
+    to its promotion snapshot. Purely a calculation — nothing is written.
+    """
+    applied = PromotionEngine().apply(units_from_lines(lines))
+    per_line = defaultdict(lambda: {"discount": ZERO, "free": 0, "best": ZERO, "id": None, "name": "", "type": ""})
+    for promotion in applied:
+        for index, amount in promotion.line_discounts.items():
+            entry = per_line[index]
+            entry["discount"] += amount
+            if amount > entry["best"]:
+                entry.update(
+                    best=amount,
+                    id=promotion.discount_id,
+                    name=promotion.name,
+                    type=promotion.type,
+                )
+        for index, free in promotion.line_free_qty.items():
+            per_line[index]["free"] += free
+    total = sum((promotion.discount_amount for promotion in applied), ZERO)
+    return per_line, total, applied
+
+
 def _create_order(*, lines, address, user, guest_email, coupon_code, **order_fields):
     """Prices ``lines`` server-side and writes the order, items, stock and payment.
 
     ``lines``: [{product, variation, quantity, unit_price, children: [...]}].
-    Total = subtotal − discount + delivery + tax (tax is always 0 today).
+    Subtotal is the gross product total; basket promotions come off it, then the
+    coupon, then delivery and tax (tax is always 0 today).
     """
     subtotal = _subtotal(lines)
-    coupon, discount_total = _apply_coupon(coupon_code, subtotal)
+    promotion_lines, promotion_total, _ = _promotion_plan(lines)
+    net_subtotal = subtotal - promotion_total
+    coupon, discount_total = _apply_coupon(coupon_code, net_subtotal)
     shipping_total = _delivery_fee(address.district, address.zone)
     tax_total = ZERO
-    grand_total = subtotal - discount_total + shipping_total + tax_total
+    grand_total = net_subtotal - discount_total + shipping_total + tax_total
 
     order = Order.objects.create(
         order_number=generate_order_number(),
         user=user,
         guest_email=guest_email,
         subtotal=subtotal,
+        promotion_discount_total=promotion_total,
         discount_total=discount_total,
         shipping_total=shipping_total,
         tax_total=tax_total,
@@ -174,7 +204,7 @@ def _create_order(*, lines, address, user, guest_email, coupon_code, **order_fie
         **order_fields,
     )
 
-    def write_item(line, parent=None):
+    def write_item(line, parent=None, promotion=None):
         item = OrderItem.objects.create(
             order=order,
             product=line["product"],
@@ -185,14 +215,19 @@ def _create_order(*, lines, address, user, guest_email, coupon_code, **order_fie
             unit_price=line["unit_price"],
             original_unit_price=line.get("original_unit_price"),
             discount_name_snapshot=line.get("discount_name", ""),
+            promotion_discount=promotion["discount"] if promotion else ZERO,
+            promotion_id_snapshot=promotion["id"] if promotion else None,
+            promotion_name_snapshot=promotion["name"] if promotion else "",
+            promotion_type_snapshot=promotion["type"] if promotion else "",
+            free_quantity=promotion["free"] if promotion else 0,
             line_total=_line_total(line),
             parent_order_item=parent,
         )
         _decrement_stock(line["variation"], line["quantity"], order.order_number)
         return item
 
-    for line in lines:
-        parent = write_item(line)
+    for index, line in enumerate(lines):
+        parent = write_item(line, promotion=promotion_lines.get(index))
         for child in line["children"]:
             write_item(child, parent)
 
@@ -348,7 +383,8 @@ def quote_manual_order(data):
     """
     lines = _manual_lines(data["items"])
     subtotal = _subtotal(lines)
-    coupon, discount_total = _apply_coupon(data.get("coupon_code"), subtotal)
+    promotion_lines, promotion_total, applied = _promotion_plan(lines)
+    coupon, discount_total = _apply_coupon(data.get("coupon_code"), subtotal - promotion_total)
 
     district = data.get("district", "")
     zone = normalize_zone(district, data.get("zone"))
@@ -368,18 +404,24 @@ def quote_manual_order(data):
                 "unit_price": line["unit_price"],
                 "original_unit_price": line.get("original_unit_price"),
                 "discount_name": line.get("discount_name"),
+                "promotion_discount": promotion_lines[index]["discount"],
+                "promotion_name": promotion_lines[index]["name"],
+                "promotion_type": promotion_lines[index]["type"],
+                "free_quantity": promotion_lines[index]["free"],
                 "quantity": line["quantity"],
                 "line_total": _line_total(line),
                 "available_stock": line["variation"].stock_quantity,
             }
-            for line in lines
+            for index, line in enumerate(lines)
         ],
         "subtotal": subtotal,
+        "promotion_discount_total": promotion_total,
+        "promotions": [promotion.to_dict() for promotion in applied],
         "coupon_code": coupon.code if coupon else None,
         "discount_total": discount_total,
         "delivery_tier": tier,
         "shipping_total": shipping_total,
-        "grand_total": subtotal - discount_total + (shipping_total or ZERO),
+        "grand_total": subtotal - promotion_total - discount_total + (shipping_total or ZERO),
     }
 
 

@@ -45,6 +45,7 @@ export default function LoginPage() {
       } else {
         setFormError(err.message);
       }
+      toast.error(err.message);
     } finally {
       setLoading(false);
     }
