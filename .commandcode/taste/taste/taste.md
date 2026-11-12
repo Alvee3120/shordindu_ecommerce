@@ -26,3 +26,4 @@
 - Expects verification that dashboard metrics reconcile with the underlying source records/pages. Confidence: 0.8
 - Prioritizes accurate calculations, secure access, maintainability, performance, and UX above speed of delivery. Confidence: 0.8
 - When requesting demo/sample data, expects it seeded into the real backend as actual records via a reusable, parameterized command (count, date range, reproducible seed, reset-safe, environment-guarded) rather than hardcoded or mocked data in the frontend. Confidence: 0.65
+- Distinguishes surface roles in theming: content cards (product, review, location cards) stay white, while page/section backgrounds take the theme background token — don't blanket-replace `bg-white` with a theme color across all containers. Confidence: 0.75

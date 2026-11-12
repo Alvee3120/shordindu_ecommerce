@@ -100,7 +100,7 @@ export default function SearchBar({ className = "", inputClassName = "", autoFoc
       </form>
 
       {open && query.trim() && (
-        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-neutral-100 bg-white shadow-xl transition-all duration-200">
+        <div className="absolute left-0 right-0 top-[calc(100%+8px)] z-50 max-h-[70vh] overflow-y-auto rounded-2xl border border-neutral-100 bg-background shadow-xl transition-all duration-200">
           {results.length > 0 ? (
             <>
               <ul className="divide-y divide-neutral-100">

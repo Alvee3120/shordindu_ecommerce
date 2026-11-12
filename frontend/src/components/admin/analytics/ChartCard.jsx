@@ -24,7 +24,7 @@ export function ErrorState({ message = "Could not load this data.", onRetry }) {
         <button
           type="button"
           onClick={onRetry}
-          className="rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
+          className="rounded-lg border border-red-300 bg-background px-3 py-1.5 text-xs font-semibold text-red-700 hover:bg-red-50"
         >
           Retry
         </button>
@@ -46,7 +46,7 @@ export default function ChartCard({
   children,
 }) {
   return (
-    <section className={`rounded-xl border border-neutral-200 bg-white p-5 ${className}`}>
+    <section className={`rounded-xl border border-neutral-200 bg-background p-5 ${className}`}>
       <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
         <div>
           <h3 className="font-semibold text-neutral-900">{title}</h3>

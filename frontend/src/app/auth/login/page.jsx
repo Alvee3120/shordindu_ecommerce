@@ -71,7 +71,7 @@ export default function LoginPage() {
             onChange={handleChange}
             placeholder="Enter your email"
             required
-            className="w-full rounded-lg border border-white/20 bg-white px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-(--primary)"
+            className="w-full rounded-lg border border-white/20 bg-background px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-(--primary)"
           />
           {fieldErrors.email && (
             <p className="mt-1 text-xs text-red-200">{fieldErrors.email[0]}</p>
@@ -90,7 +90,7 @@ export default function LoginPage() {
               onChange={handleChange}
               placeholder="••••••••••"
               required
-              className="w-full rounded-lg border border-white/20 bg-white px-4 py-3 pr-11 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-(--primary)"
+              className="w-full rounded-lg border border-white/20 bg-background px-4 py-3 pr-11 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-(--primary)"
             />
             <button
               type="button"

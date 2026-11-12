@@ -130,7 +130,7 @@ export default function PrivacyPolicyPage() {
             ))}
 
             {/* Contact callout */}
-            <div className="rounded-2xl border border-white/10 bg-white/[0.03] p-6 sm:p-8">
+            <div className="rounded-2xl border border-white/10 bg-background/[0.03] p-6 sm:p-8">
               <h3 className="font-sora mb-2 text-lg font-bold">
                 Questions about your privacy?
               </h3>

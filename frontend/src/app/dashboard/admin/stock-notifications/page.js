@@ -68,7 +68,7 @@ export default function AdminStockNotificationsPage() {
           {items.map((n) => (
             <div
               key={n.id}
-              className="flex flex-col items-start justify-between gap-4 rounded-xl border border-neutral-200 bg-white p-5 sm:flex-row"
+              className="flex flex-col items-start justify-between gap-4 rounded-xl border border-neutral-200 bg-background p-5 sm:flex-row"
             >
               <div className="min-w-0 flex-1">
                 <div className="mb-1 flex items-center gap-2 text-neutral-500">

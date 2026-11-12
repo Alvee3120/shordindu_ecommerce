@@ -78,7 +78,7 @@ export default function CustomerReviews() {
   const row2 = reviews.slice(half);
 
   return (
-    <section className="w-full bg-white px-6 py-16 sm:px-8">
+    <section className="w-full bg-background px-6 py-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 text-center">
           <span className="font-sora text-2xl font-medium text-(--primary)">

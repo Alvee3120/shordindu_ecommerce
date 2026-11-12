@@ -171,7 +171,7 @@ export default function AdminCategoriesPage() {
           <CategoryBarChart data={performance.data?.results} />
         </ChartCard>
 
-        <div className="rounded-xl border border-neutral-200 bg-white p-5">
+        <div className="rounded-xl border border-neutral-200 bg-background p-5">
           <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
             <h3 className="font-semibold text-neutral-900">Category Performance</h3>
             <select
@@ -193,7 +193,7 @@ export default function AdminCategoriesPage() {
           ) : (
             <div className="max-h-[220px] overflow-y-auto">
               <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 bg-white">
+                <thead className="sticky top-0 bg-background">
                   <tr className="border-b border-neutral-200 text-neutral-500">
                     <th className="px-3 py-2 font-medium">Category</th>
                     <th className="px-3 py-2 font-medium">Units</th>
@@ -223,7 +223,7 @@ export default function AdminCategoriesPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-5"
+          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-background p-5"
         >
           <h2 className="text-sm font-semibold text-neutral-900">
             {editingId === "new" ? "New Category" : "Edit Category"}
@@ -333,7 +333,7 @@ export default function AdminCategoriesPage() {
       ) : categories.length === 0 ? (
         <p className="text-sm text-neutral-500">No categories yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-500">

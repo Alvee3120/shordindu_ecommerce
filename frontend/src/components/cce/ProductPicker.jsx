@@ -224,7 +224,7 @@ export default function ProductPicker({
                               type="button"
                               onClick={() => onAdd(toLine(product, variation))}
                               disabled={atLimit}
-                              className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-white px-3 py-2 text-left text-sm hover:border-(--primary)/50 disabled:cursor-not-allowed disabled:opacity-50"
+                              className="flex items-center justify-between gap-2 rounded-lg border border-neutral-200 bg-background px-3 py-2 text-left text-sm hover:border-(--primary)/50 disabled:cursor-not-allowed disabled:opacity-50"
                             >
                               <span className="min-w-0">
                                 <span className="block truncate font-medium text-neutral-800">{variationLabel(variation)}</span>

@@ -31,7 +31,7 @@ export default function AdminProfilePage() {
       <h1 className="text-xl font-semibold text-neutral-900">My Profile</h1>
       <p className="mt-1 text-sm text-neutral-500">Manage your account details.</p>
 
-      <div className="mt-6 flex items-center gap-4 rounded-xl border border-neutral-200 bg-white p-6">
+      <div className="mt-6 flex items-center gap-4 rounded-xl border border-neutral-200 bg-background p-6">
         <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-full bg-(--primary)/10 text-xl font-semibold text-(--primary)">
           {initialsFor(user)}
         </div>
@@ -48,7 +48,7 @@ export default function AdminProfilePage() {
       <ProfileFields user={user} />
 
       <h2 className="mt-8 mb-3 text-sm font-semibold text-neutral-700">Account information</h2>
-      <div className="divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-white">
+      <div className="divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-background">
         <div className="flex items-center justify-between px-5 py-4">
           <span className="text-sm text-neutral-500">Member since</span>
           <span className="text-sm font-medium text-neutral-900">{formatDate(user.created_at)}</span>

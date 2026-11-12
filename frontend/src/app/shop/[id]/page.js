@@ -377,7 +377,7 @@ export default function ProductDetailsPage() {
                   type="button"
                   onClick={() => scrollThumbs(-1)}
                   aria-label="Previous image"
-                  className="absolute top-1/2 left-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-neutral-700 opacity-0 shadow-md backdrop-blur transition-opacity group-hover:opacity-100 hover:bg-white"
+                  className="absolute top-1/2 left-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 text-neutral-700 opacity-0 shadow-md backdrop-blur transition-opacity group-hover:opacity-100 hover:bg-background"
                 >
                   <FiChevronLeft size={18} />
                 </button>
@@ -385,7 +385,7 @@ export default function ProductDetailsPage() {
                   type="button"
                   onClick={() => scrollThumbs(1)}
                   aria-label="Next image"
-                  className="absolute top-1/2 right-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-white/80 text-neutral-700 opacity-0 shadow-md backdrop-blur transition-opacity group-hover:opacity-100 hover:bg-white"
+                  className="absolute top-1/2 right-3 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-full bg-background/80 text-neutral-700 opacity-0 shadow-md backdrop-blur transition-opacity group-hover:opacity-100 hover:bg-background"
                 >
                   <FiChevronRight size={18} />
                 </button>
@@ -538,7 +538,7 @@ export default function ProductDetailsPage() {
                                     className={`rounded-full border px-3 py-1 text-xs font-medium transition-colors ${
                                       valueChecked
                                         ? "border-(--primary) bg-(--primary)/15 text-(--primary)"
-                                        : "border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300"
+                                        : "border-neutral-200 bg-background text-neutral-600 hover:border-neutral-300"
                                     }`}
                                   >
                                     {v.value}
@@ -674,7 +674,7 @@ export default function ProductDetailsPage() {
             onClick={() => setCartDrawerOpen(false)}
             className="absolute inset-0 bg-black/40"
           />
-          <div className="relative flex h-full w-full max-w-md flex-col bg-white shadow-xl">
+          <div className="relative flex h-full w-full max-w-md flex-col bg-background shadow-xl">
             <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
               <h2 className="font-sora text-lg font-bold tracking-wide text-neutral-900 uppercase">
                 Shopping Cart

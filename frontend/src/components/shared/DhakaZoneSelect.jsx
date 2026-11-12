@@ -15,7 +15,7 @@ export default function DhakaZoneSelect({ config, value, onChange, error, id = "
         value={value || ""}
         onChange={(e) => onChange(e.target.value)}
         disabled={!config}
-        className={`w-full rounded-lg border bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary) disabled:opacity-60 ${
+        className={`w-full rounded-lg border bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary) disabled:opacity-60 ${
           error ? "border-red-400" : "border-neutral-300"
         } ${value ? "text-neutral-800" : "text-neutral-400"}`}
       >

@@ -324,7 +324,7 @@ export default function CheckoutPage() {
 
       <div className="grid gap-8 lg:grid-cols-3">
         <div className="flex flex-col gap-4 lg:col-span-2">
-          <div className="rounded-xl border border-neutral-200 bg-white p-5">
+          <div className="rounded-xl border border-neutral-200 bg-background p-5">
             <h2 className="mb-3 text-sm font-semibold text-(--primary)">Shipping details</h2>
 
             {user && addresses.length > 0 && !useNewAddress && (
@@ -629,7 +629,7 @@ export default function CheckoutPage() {
                       }`}
                     >
                       <span
-                        className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
                           createAccount ? "translate-x-6" : "translate-x-1"
                         }`}
                       />
@@ -649,7 +649,7 @@ export default function CheckoutPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-neutral-200 bg-white p-5">
+          <div className="rounded-xl border border-neutral-200 bg-background p-5">
             <h2 className="mb-3 text-sm font-semibold text-(--primary)">Payment method</h2>
             <div className="flex items-center gap-2 rounded-lg border border-(--primary) bg-(--primary)/10 px-3 py-2.5 text-sm font-medium text-(--primary)">
               Cash on Delivery
@@ -657,7 +657,7 @@ export default function CheckoutPage() {
           </div>
         </div>
 
-        <div className="h-fit rounded-xl border border-neutral-200 bg-white p-5">
+        <div className="h-fit rounded-xl border border-neutral-200 bg-background p-5">
           <h2 className="mb-4 font-sora text-lg font-semibold text-(--primary)">Order Summary</h2>
 
           <div className="flex flex-col gap-3 border-b border-neutral-100 pb-4">

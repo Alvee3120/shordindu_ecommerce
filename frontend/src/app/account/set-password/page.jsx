@@ -73,7 +73,7 @@ export default function SetPasswordPage() {
             value={form.old_password}
             onChange={handleChange}
             required
-            className="w-full rounded-lg border border-white/20 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-(--primary)"
+            className="w-full rounded-lg border border-white/20 bg-background px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-(--primary)"
           />
           {fieldErrors.old_password && (
             <p className="mt-1 text-xs text-red-200">{fieldErrors.old_password[0]}</p>
@@ -88,7 +88,7 @@ export default function SetPasswordPage() {
             value={form.new_password}
             onChange={handleChange}
             required
-            className="w-full rounded-lg border border-white/20 bg-white px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-(--primary)"
+            className="w-full rounded-lg border border-white/20 bg-background px-4 py-3 text-sm text-neutral-900 outline-none focus:ring-2 focus:ring-(--primary)"
           />
           {fieldErrors.new_password && (
             <p className="mt-1 text-xs text-red-200">{fieldErrors.new_password[0]}</p>

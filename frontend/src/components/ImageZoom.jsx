@@ -46,7 +46,7 @@ export default function ImageZoom({ src, alt, sizes, priority }) {
       />
 
       {!zooming && (
-        <div className="pointer-events-none absolute top-3 right-3 hidden h-8 w-8 items-center justify-center rounded-full bg-white/80 text-neutral-600 shadow-md backdrop-blur [@media(hover:hover)_and_(pointer:fine)]:flex">
+        <div className="pointer-events-none absolute top-3 right-3 hidden h-8 w-8 items-center justify-center rounded-full bg-background/80 text-neutral-600 shadow-md backdrop-blur [@media(hover:hover)_and_(pointer:fine)]:flex">
           <FiZoomIn size={16} />
         </div>
       )}

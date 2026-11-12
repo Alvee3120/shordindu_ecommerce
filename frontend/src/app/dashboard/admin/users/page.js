@@ -109,7 +109,7 @@ export default function AdminUsersPage() {
       ) : users.length === 0 ? (
         <p className="text-sm text-neutral-500">No users found.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-500">

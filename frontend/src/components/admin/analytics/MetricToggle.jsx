@@ -10,7 +10,7 @@ export default function MetricToggle({ value, onChange, options }) {
           onClick={() => onChange(option.key)}
           className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
             value === option.key
-              ? "bg-white text-(--primary) shadow-sm"
+              ? "bg-background text-(--primary) shadow-sm"
               : "text-neutral-500 hover:text-neutral-700"
           }`}
         >

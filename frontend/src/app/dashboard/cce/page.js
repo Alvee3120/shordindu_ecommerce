@@ -75,7 +75,7 @@ export default function CceDashboardPage() {
           </Link>
           <Link
             href="/dashboard/cce/orders"
-            className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
+            className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-background px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50"
           >
             <FiList size={15} />
             All Orders
@@ -154,7 +154,7 @@ export default function CceDashboardPage() {
             View all
           </Link>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 whitespace-nowrap text-neutral-500">

@@ -139,7 +139,7 @@ export default function CartPage() {
       <h1 className="mb-6 font-sora text-2xl font-semibold text-neutral-900">Your Cart</h1>
 
       {isEmpty ? (
-        <div className="rounded-xl border border-neutral-200 bg-white p-10 text-center">
+        <div className="rounded-xl border border-neutral-200 bg-background p-10 text-center">
           <p className="text-sm text-neutral-500">Your cart is empty.</p>
           <Link
             href="/shop"
@@ -150,7 +150,7 @@ export default function CartPage() {
         </div>
       ) : (
         <div className="grid gap-8 lg:grid-cols-3">
-          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white lg:col-span-2">
+          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background lg:col-span-2">
             <table className="w-full min-w-140 text-left text-sm">
               <thead>
                 <tr className="border-b border-neutral-200 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
@@ -246,7 +246,7 @@ export default function CartPage() {
             </table>
           </div>
 
-          <div className="h-fit rounded-xl border border-neutral-200 bg-white p-5">
+          <div className="h-fit rounded-xl border border-neutral-200 bg-background p-5">
             <h2 className="mb-4 font-sora text-lg font-semibold text-neutral-900">Cart Totals</h2>
 
             <div className="flex justify-between border-b border-neutral-100 py-3 text-sm">

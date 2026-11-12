@@ -87,7 +87,7 @@ export default function CategoryShowcase() {
   if (!loading && categories.length === 0) return null;
 
   return (
-    <section className="w-full bg-white px-6 py-16 sm:px-8">
+    <section className="w-full bg-background px-6 py-16 sm:px-8">
       <div className="mx-auto w-full" style={containerStyle}>
         {/* Section label */}
         <div className="mb-10 flex items-center gap-3">

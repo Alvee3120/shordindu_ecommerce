@@ -26,7 +26,7 @@ function Trend({ changePct }) {
 
 export default function KpiCard({ label, value, icon: Icon, changePct, tooltip, loading = false }) {
   return (
-    <div className="rounded-xl border border-neutral-200 bg-white p-4">
+    <div className="rounded-xl border border-neutral-200 bg-background p-4">
       <div className="flex items-start justify-between gap-2">
         {Icon ? (
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-(--primary)/10 text-(--primary)">
