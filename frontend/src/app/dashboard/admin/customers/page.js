@@ -151,7 +151,7 @@ export default function AdminCustomersPage() {
           </select>
         </div>
 
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-500">

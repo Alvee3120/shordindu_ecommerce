@@ -94,6 +94,12 @@ Base path: `/api/auth/`
 ```
 → `200`, sets auth cookies, same user object body.
 
+The `email` field accepts **either an email address or a phone number**. Accounts created by an
+administrator may have no email at all, in which case the phone number is their sign-in identity:
+```json
+{ "email": "01700000000", "password": "StrongPass123!" }
+```
+
 ### Sign out
 `POST /api/auth/logout/` → `205`, clears cookies, blacklists the refresh token.
 
@@ -119,7 +125,9 @@ User object shape (same on signup/signin/me):
   "created_at": "2026-08-19T10:30:00Z"
 }
 ```
-- `role`: `customer` | `staff` | `admin`
+- `role`: `customer` | `cce` | `admin`
+- `email` is `null` for accounts created by an administrator without an email address — those
+  users sign in with their phone number instead.
 - `force_password_change`: `true` for accounts auto-created during guest checkout. **If true,
   redirect the user to a "set a new password" screen right after login**, using the endpoint
   below.
@@ -130,6 +138,41 @@ User object shape (same on signup/signin/me):
 { "old_password": "...", "new_password": "..." }
 ```
 → `200`. Clears `force_password_change` automatically.
+
+### Admin user management
+Base path: `/api/users/` — **administrators only** (CCE and customer accounts get `403`).
+
+| Method | Path | Purpose |
+|---|---|---|
+| GET | `/api/users/` | Paginated list. Supports `?role=`, `?is_active=`, `?search=` and `?ordering=`. |
+| POST | `/api/users/` | Create an account (any role) with an admin-set password. |
+| PATCH | `/api/users/:id/` | Edit name, phone, email, role and `is_active`. |
+| POST | `/api/users/:id/reset-password/` | Set a new password; forces a change at next sign-in. |
+| DELETE | `/api/users/:id/` | Delete an account. |
+
+Create body:
+```json
+{
+  "name": "Ayesha",
+  "phone": "01700000000",
+  "email": "",
+  "password": "StrongPass123!",
+  "confirm_password": "StrongPass123!",
+  "role": "cce",
+  "is_active": true
+}
+```
+- `name`, `phone` (unique), `password`, `confirm_password` and `role` are required. `email` is
+  optional — send an empty string or omit it.
+- Passwords are hashed with Django's hasher; plain text is never stored.
+- Responses include `created_via` (`admin` | `checkout` | `self`) and `created_by_name`.
+- Safety rules: an admin cannot deactivate, demote or delete their own account, and the last
+  active administrator can never be removed.
+
+Reset password body:
+```json
+{ "new_password": "BrandNewPass123!", "confirm_password": "BrandNewPass123!" }
+```
 
 ---
 

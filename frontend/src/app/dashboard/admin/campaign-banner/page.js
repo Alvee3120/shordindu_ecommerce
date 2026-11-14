@@ -72,7 +72,7 @@ function Toggle({ checked, onChange, label, description, id }) {
         }`}
       >
         <span
-          className={`inline-block h-4 w-4 transform rounded-full bg-background transition-transform ${
+          className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
             checked ? "translate-x-6" : "translate-x-1"
           }`}
         />
@@ -295,7 +295,7 @@ export default function CampaignBannerAdminPage() {
         <button
           type="button"
           onClick={load}
-          className="mt-3 rounded-lg border border-red-300 bg-background px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
+          className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
         >
           Retry
         </button>
@@ -331,7 +331,7 @@ export default function CampaignBannerAdminPage() {
       </div>
 
       {/* Preview */}
-      <section className="mb-6 rounded-xl border border-neutral-200 bg-background p-5">
+      <section className="mb-6 rounded-xl border border-neutral-200 bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="font-semibold text-neutral-900">Preview</h2>
@@ -350,7 +350,7 @@ export default function CampaignBannerAdminPage() {
                 onClick={() => setPreviewMode(key)}
                 aria-pressed={previewMode === key}
                 className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-                  previewMode === key ? "bg-background text-(--primary) shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+                  previewMode === key ? "bg-white text-(--primary) shadow-sm" : "text-neutral-500 hover:text-neutral-700"
                 }`}
               >
                 <Icon size={13} />
@@ -371,7 +371,7 @@ export default function CampaignBannerAdminPage() {
 
       <div className="grid gap-6 xl:grid-cols-2">
         {/* Visibility */}
-        <section className="rounded-xl border border-neutral-200 bg-background p-5">
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
           <h2 className="mb-4 font-semibold text-neutral-900">Visibility</h2>
           <div className="space-y-4">
             <Toggle
@@ -418,7 +418,7 @@ export default function CampaignBannerAdminPage() {
         </section>
 
         {/* Images */}
-        <section className="rounded-xl border border-neutral-200 bg-background p-5">
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
           <h2 className="mb-4 font-semibold text-neutral-900">Images</h2>
           <div className="grid gap-4 sm:grid-cols-2">
             <ImagePicker
@@ -458,7 +458,7 @@ export default function CampaignBannerAdminPage() {
         </section>
 
         {/* Text */}
-        <section className="rounded-xl border border-neutral-200 bg-background p-5">
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
           <h2 className="mb-4 font-semibold text-neutral-900">Text</h2>
           <div className="space-y-4">
             <Field label="Eyebrow text" hint="Small line above the heading, e.g. SEASONAL OFFER." error={errors.eyebrow} htmlFor="eyebrow">
@@ -494,7 +494,7 @@ export default function CampaignBannerAdminPage() {
         </section>
 
         {/* Button */}
-        <section className="rounded-xl border border-neutral-200 bg-background p-5">
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
           <h2 className="mb-4 font-semibold text-neutral-900">Button</h2>
           <div className="space-y-4">
             <Toggle
@@ -534,7 +534,7 @@ export default function CampaignBannerAdminPage() {
       </div>
 
       {/* Save bar */}
-      <div className="sticky bottom-0 z-20 mt-6 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-neutral-200 bg-background/95 px-5 py-3 shadow-sm backdrop-blur">
+      <div className="sticky bottom-0 z-20 mt-6 flex flex-wrap items-center justify-end gap-3 rounded-xl border border-neutral-200 bg-white/95 px-5 py-3 shadow-sm backdrop-blur">
         <p className="mr-auto text-xs text-neutral-500">
           {isDirty ? "You have unsaved changes." : "No unsaved changes."}
         </p>

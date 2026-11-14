@@ -133,7 +133,7 @@ export default function AdminProductAddonsPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-background p-5"
+          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-5"
         >
           <h2 className="text-sm font-semibold text-neutral-900">New Addon Link</h2>
 
@@ -256,7 +256,7 @@ export default function AdminProductAddonsPage() {
       ) : addons.length === 0 ? (
         <p className="text-sm text-neutral-500">No addon links yet.</p>
       ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-500">

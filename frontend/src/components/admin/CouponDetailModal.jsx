@@ -29,7 +29,7 @@ export default function CouponDetailModal({ coupon, onClose }) {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4" role="dialog" aria-modal="true">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <div className="relative max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-background shadow-xl">
+      <div className="relative max-h-[85vh] w-full max-w-md overflow-y-auto rounded-2xl bg-white shadow-xl">
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
           <div className="flex min-w-0 items-center gap-2">
             <h2 className="truncate text-lg font-semibold text-neutral-900">{coupon.code}</h2>

@@ -104,7 +104,7 @@ export default function SalesAnalyticsPage() {
               type="button"
               onClick={() => handleExport(dataset)}
               disabled={exporting === dataset}
-              className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-background px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
+              className="flex items-center gap-1.5 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 hover:bg-neutral-50 disabled:opacity-60"
             >
               <FiDownload size={14} />
               {exporting === dataset ? "Exporting…" : `Export ${dataset}`}
@@ -184,7 +184,7 @@ export default function SalesAnalyticsPage() {
       </div>
 
       {/* 3. Product performance */}
-      <div className="mt-6 rounded-xl border border-neutral-200 bg-background p-5">
+      <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h2 className="text-lg font-semibold text-neutral-900">Product Performance</h2>
@@ -221,7 +221,7 @@ export default function SalesAnalyticsPage() {
         </ChartCard>
       </div>
 
-      <div className="mt-6 rounded-xl border border-neutral-200 bg-background p-5">
+      <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold text-neutral-900">Category Breakdown</h2>
           <select
@@ -316,7 +316,7 @@ export default function SalesAnalyticsPage() {
       </div>
 
       {/* 6. Period comparison */}
-      <div className="mt-6 rounded-xl border border-neutral-200 bg-background p-5">
+      <div className="mt-6 rounded-xl border border-neutral-200 bg-white p-5">
         <div className="mb-4">
           <h2 className="text-lg font-semibold text-neutral-900">Period Comparison</h2>
           <p className="text-xs text-neutral-500">Absolute and percentage change vs the previous equivalent period.</p>

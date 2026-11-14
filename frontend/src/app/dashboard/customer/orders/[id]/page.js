@@ -140,7 +140,7 @@ export default function OrderDetailPage() {
       </div>
 
       <div className="grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-neutral-200 bg-background p-5 lg:col-span-2">
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 lg:col-span-2">
           <h2 className="mb-3 text-sm font-semibold text-neutral-900">Items</h2>
           <div className="divide-y divide-neutral-100">
             {order.items.map((item) => (
@@ -150,7 +150,7 @@ export default function OrderDetailPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-xl border border-neutral-200 bg-background p-5">
+          <div className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="mb-3 text-sm font-semibold text-neutral-900">Summary</h2>
             <div className="flex flex-col gap-1.5 text-sm">
               <div className="flex justify-between text-neutral-600">
@@ -184,7 +184,7 @@ export default function OrderDetailPage() {
           </div>
 
           {order.shipping_address_detail && (
-            <div className="rounded-xl border border-neutral-200 bg-background p-5">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-neutral-900">Shipping Address</h2>
               <p className="text-sm text-neutral-900">{order.shipping_address_detail.name}</p>
               {order.shipping_address_detail.phone && (
@@ -198,7 +198,7 @@ export default function OrderDetailPage() {
           )}
 
           {order.payments?.length > 0 && (
-            <div className="rounded-xl border border-neutral-200 bg-background p-5">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-neutral-900">Payment</h2>
               {order.payments.map((payment) => (
                 <div key={payment.id} className="text-sm text-neutral-600">

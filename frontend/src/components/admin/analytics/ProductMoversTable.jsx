@@ -54,7 +54,7 @@ export default function ProductMoversTable({ query, queryKey, pageSize = 8 }) {
             type="button"
             onClick={() => setTab(item.key)}
             className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors ${
-              tab === item.key ? "bg-background text-(--primary) shadow-sm" : "text-neutral-500 hover:text-neutral-700"
+              tab === item.key ? "bg-white text-(--primary) shadow-sm" : "text-neutral-500 hover:text-neutral-700"
             }`}
           >
             {item.label}

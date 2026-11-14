@@ -59,7 +59,7 @@ export default function DistrictSelect({ value, onChange, onBlur, error, id = "d
       </button>
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-neutral-200 bg-background shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
           <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
             <FiSearch size={14} className="shrink-0 text-neutral-400" />
             <input

@@ -112,7 +112,7 @@ export default function AdminOrderDetailPage() {
       </div>
 
       <div className="mb-6 grid gap-6 lg:grid-cols-3">
-        <div className="rounded-xl border border-neutral-200 bg-background p-5 lg:col-span-2">
+        <div className="rounded-xl border border-neutral-200 bg-white p-5 lg:col-span-2">
           <h2 className="mb-4 text-sm font-semibold text-neutral-900">Items</h2>
           <div className="divide-y divide-neutral-100">
             {order.items.map((item) => (
@@ -153,7 +153,7 @@ export default function AdminOrderDetailPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-xl border border-neutral-200 bg-background p-5">
+          <div className="rounded-xl border border-neutral-200 bg-white p-5">
             <h2 className="mb-3 text-sm font-semibold text-neutral-900">Shipping Address</h2>
             {order.shipping_address_detail ? (
               <div className="text-sm text-neutral-600">
@@ -170,7 +170,7 @@ export default function AdminOrderDetailPage() {
             )}
           </div>
 
-          <div className="rounded-xl border border-neutral-200 bg-background p-5 text-sm text-neutral-600">
+          <div className="rounded-xl border border-neutral-200 bg-white p-5 text-sm text-neutral-600">
             <h2 className="mb-3 text-sm font-semibold text-neutral-900">Customer</h2>
             <p className="font-medium text-neutral-900">{orderCustomerName(order)}</p>
             <p>{order.user ? "Registered customer" : "Guest order"}</p>
@@ -183,7 +183,7 @@ export default function AdminOrderDetailPage() {
           </div>
 
           {order.coupons?.length > 0 && (
-            <div className="rounded-xl border border-neutral-200 bg-background p-5">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-neutral-900">Coupons</h2>
               {order.coupons.map((c) => (
                 <div key={c.coupon} className="flex justify-between text-sm text-neutral-600">
@@ -195,7 +195,7 @@ export default function AdminOrderDetailPage() {
           )}
 
           {order.payments?.length > 0 && (
-            <div className="rounded-xl border border-neutral-200 bg-background p-5">
+            <div className="rounded-xl border border-neutral-200 bg-white p-5">
               <h2 className="mb-3 text-sm font-semibold text-neutral-900">Payments</h2>
               {order.payments.map((p) => (
                 <div key={p.id} className="flex justify-between text-sm text-neutral-600">

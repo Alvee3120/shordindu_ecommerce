@@ -300,12 +300,19 @@ def checkout(request, data):
             )
     elif data["create_account"]:
         password = generate_secure_password()
+        # Phone numbers are unique across accounts. If this shipping number is
+        # already on another account, keep it on the order's address but not on
+        # the newly auto-created account (the user can add it later).
+        phone = data.get("shipping_phone", "")
+        if phone and User.objects.filter(phone=phone).exists():
+            phone = ""
         user = User.objects.create_user(
             email=data["email"],
             password=password,
             name=data.get("shipping_name") or data["email"],
-            phone=data.get("shipping_phone", ""),
+            phone=phone,
             force_password_change=True,
+            created_via=User.CreatedVia.CHECKOUT,
         )
         created_account_password = password
         address = Address.objects.create(user=user, **inline_address)
