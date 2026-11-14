@@ -367,6 +367,40 @@ Deleting a parent line cascades and removes its addon children too.
 `/api/products/{parent_product_id}/addons/` — check that first to know what's offerable), or
 this returns `400`. Also enforces the addon link's `max_select`.
 
+### Old cart monitoring (Admin / CCE only)
+A cart is **old** when it contains at least one active item whose `CartItem.created_at` is older
+than **6 hours**. The rule is strict — exactly 6 hours is not old. Nothing is stored: the status
+is derived from the timestamp on every request. Checkout deletes the cart, and removing an item
+removes its age contribution immediately. Old cart items are never deleted or reserved.
+
+`GET /api/cart/old/` — paginated, one row per **customer** (each customer appears once).
+Query params: `page`, `page_size`, `search` (customer name / phone / email / product name),
+`age` (`6-24h`, `1-3d`, `3d+`), `ordering` (`oldest_item_at`, `last_item_at`, `cart_value`,
+`item_count`).
+
+```json
+{
+  "count": 1,
+  "results": [
+    {
+      "id": 12,
+      "customer": { "id": 5, "name": "Ayesha", "phone": "017...", "email": "a@b.com" },
+      "item_count": 3, "old_item_count": 2, "cart_value": "1500.00",
+      "oldest_item_at": "...", "oldest_age_seconds": 259200,
+      "last_item_at": "...", "last_age_seconds": 3600, "threshold_hours": 6
+    }
+  ]
+}
+```
+
+`GET /api/cart/old/summary/` → `{ "threshold_hours": 6, "customers": 12, "old_items": 27 }`
+(`customers` counts each customer once; `old_items` sums quantities of items older than 6 hours).
+
+`GET /api/cart/old/{cart_id}/` → the full read-only cart with live prices and per-item
+`created_at`, `age_seconds`, `stock_quantity`, `variation_is_active`, plus nested addon
+`children`. Returns `404` once no old item remains. Only Admin and CCE are allowed; customers
+get `403` and anonymous requests `401`.
+
 ---
 
 ## 6. Checkout & Orders
@@ -493,6 +527,40 @@ start/end dates (Asia/Dhaka). `heading` uses `
 `multipart/form-data`: the text fields, optional `desktop_image` / `mobile_image` files (JPEG, PNG
 or WebP, max 5 MB) and `remove_desktop_image` / `remove_mobile_image` flags. `button_url` must be a
 site path (`/shop`) or an `http(s)://` URL.
+
+### Hero banners (homepage carousel)
+`GET /api/hero-banners/` (public) returns active slides in display order, plus the carousel delay:
+```json
+{
+  "autoplay_delay_ms": 5000,
+  "banners": [
+    {
+      "id": 1, "desktop_image_url": "http://.../media/hero-banners/slide-1.jpeg",
+      "mobile_image_url": "http://.../media/hero-banners/slide-1-mobile.jpeg",
+      "image_alt": "SHORDINDU", "bold_heading": "SHORDINDU",
+      "normal_heading": "Step Into Effortless Elegance",
+      "text_color": "#FFFFFF", "text_alignment": "left", "show_text": true,
+      "button_text": "Shop Now", "button_link": "/shop",
+      "button_background_color": "#003333", "button_text_color": "#FFFFFF",
+      "button_radius": 9999, "button_style": "solid", "show_button": true,
+      "sort_order": 0, "updated_at": "..."
+    }
+  ]
+}
+```
+Inactive banners are excluded. There are at most 3 hero banners.
+
+Admin-only management:
+- `GET/POST /api/hero-banners/manage/` — list every banner (including inactive) / create.
+- `PATCH/DELETE /api/hero-banners/manage/{id}/`.
+- `POST /api/hero-banners/manage/reorder/` with `{"order": [id, ...]}` — must contain every banner id exactly once.
+- `GET/PATCH /api/hero-banners/manage/settings/` — `{"autoplay_delay_ms": 2000–15000}`.
+
+Create/update are `multipart/form-data`: `desktop_image` (required), optional `mobile_image`,
+`remove_desktop_image` / `remove_mobile_image` flags (JPEG, PNG or WebP, max 5 MB). Colours are
+6-digit hex (`#003333`); `text_alignment` is `left|center|right`; `button_style` is
+`solid|outline`; `button_link` must be a site path or an `http(s)://` URL. Creating a fourth
+banner returns `400`.
 
 ---
 

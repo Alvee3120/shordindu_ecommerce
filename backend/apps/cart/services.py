@@ -44,8 +44,11 @@ def merge_guest_cart(request, user):
                 quantity=guest_item.quantity,
                 unit_price_snapshot=guest_item.unit_price_snapshot,
             )
+            # Keep the age the item had in the guest cart: merging must not
+            # reset how long it has been sitting in a cart.
+            CartItem.objects.filter(pk=new_parent.pk).update(created_at=guest_item.created_at)
         for addon_item in guest_item.children.all():
-            CartItem.objects.create(
+            merged_addon = CartItem.objects.create(
                 cart=user_cart,
                 product=addon_item.product,
                 variation=addon_item.variation,
@@ -53,6 +56,7 @@ def merge_guest_cart(request, user):
                 unit_price_snapshot=addon_item.unit_price_snapshot,
                 parent_cart_item=new_parent,
             )
+            CartItem.objects.filter(pk=merged_addon.pk).update(created_at=addon_item.created_at)
 
     guest_cart.delete()
 

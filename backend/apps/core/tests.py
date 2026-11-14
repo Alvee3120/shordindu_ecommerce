@@ -9,10 +9,11 @@ from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APITestCase
 
-from apps.core.models import CampaignBanner
+from apps.core.models import CampaignBanner, HeroBanner, HeroBannerSettings
 from apps.users.models import User
 
 TEMP_MEDIA = tempfile.mkdtemp(prefix="banner-test-media-")
+TEMP_HERO_MEDIA = tempfile.mkdtemp(prefix="hero-banner-test-media-")
 
 
 def image_upload(name="banner.png", fmt="PNG", size=(40, 20)):
@@ -208,3 +209,232 @@ class CampaignBannerApiTests(APITestCase):
         self.assertEqual(self.put(image_mode="mobile").status_code, 400)
         # Disabled banners may be saved half-finished.
         self.assertEqual(self.put(is_enabled="false", remove_desktop_image="true").status_code, 200)
+
+
+@override_settings(MEDIA_ROOT=TEMP_HERO_MEDIA)
+class HeroBannerApiTests(APITestCase):
+    PUBLIC = "/api/hero-banners/"
+    MANAGE = "/api/hero-banners/manage/"
+    REORDER = "/api/hero-banners/manage/reorder/"
+    SETTINGS = "/api/hero-banners/manage/settings/"
+
+    @classmethod
+    def tearDownClass(cls):
+        super().tearDownClass()
+        shutil.rmtree(TEMP_HERO_MEDIA, ignore_errors=True)
+
+    def setUp(self):
+        HeroBanner.objects.all().delete()
+        HeroBannerSettings.objects.all().delete()
+        self.admin = User.objects.create_user(
+            email="hero-admin@x.com", password="pw", name="Hero Admin", role=User.Role.ADMIN
+        )
+        self.cce = User.objects.create_user(
+            email="hero-cce@x.com", password="pw", name="Hero CCE", role=User.Role.CCE
+        )
+        self.customer = User.objects.create_user(
+            email="hero-c@x.com", password="pw", name="Hero Customer"
+        )
+
+    def payload(self, **overrides):
+        data = {
+            "desktop_image": image_upload("hero.png"),
+            "bold_heading": "DISCOVER YOUR STYLE",
+            "normal_heading": "Explore the latest collection",
+            "text_color": "#FFFFFF",
+            "text_alignment": "left",
+            "show_text": "true",
+            "button_text": "Shop Now",
+            "button_link": "/shop",
+            "button_background_color": "#003333",
+            "button_text_color": "#FFFFFF",
+            "button_radius": 8,
+            "button_style": "solid",
+            "show_button": "true",
+            "is_active": "true",
+        }
+        data.update(overrides)
+        return data
+
+    def create(self, user=None, **overrides):
+        self.client.force_authenticate(user or self.admin)
+        return self.client.post(self.MANAGE, self.payload(**overrides), format="multipart")
+
+    def make_banner(self, sort_order, is_active=True, bold="Slide"):
+        banner = HeroBanner.objects.create(
+            desktop_image=image_upload(f"hero-{sort_order}.png"),
+            bold_heading=bold,
+            normal_heading="Normal",
+            button_text="Shop Now",
+            button_link="/shop",
+            is_active=is_active,
+            sort_order=sort_order,
+        )
+        return banner
+
+    # -- public ---------------------------------------------------------------
+
+    def test_public_returns_only_active_banners_in_order_with_settings(self):
+        self.make_banner(1, is_active=False, bold="Hidden")
+        self.make_banner(0, is_active=True, bold="First")
+        self.make_banner(2, is_active=True, bold="Third")
+
+        response = self.client.get(self.PUBLIC)
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.data["autoplay_delay_ms"], 5000)
+        self.assertEqual([b["bold_heading"] for b in response.data["banners"]], ["First", "Third"])
+        first = response.data["banners"][0]
+        self.assertTrue(first["desktop_image_url"].startswith("http://testserver/media/hero-banners/"))
+        for admin_only in ("is_active", "created_at", "updated_by_name"):
+            self.assertNotIn(admin_only, first)
+
+    # -- create ---------------------------------------------------------------
+
+    def test_admin_creates_banners_with_incremental_order(self):
+        for index, style in enumerate(("solid", "outline", "solid")):
+            response = self.create(button_style=style)
+            self.assertEqual(response.status_code, 201, response.data)
+            self.assertEqual(response.data["sort_order"], index)
+            self.assertEqual(response.data["updated_by_name"], "Hero Admin")
+
+        self.assertEqual(HeroBanner.objects.count(), 3)
+
+    def test_fourth_banner_is_rejected(self):
+        for _ in range(3):
+            self.assertEqual(self.create().status_code, 201)
+        response = self.create()
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("at most 3", str(response.data))
+        self.assertEqual(HeroBanner.objects.count(), 3)
+
+    def test_desktop_image_is_required(self):
+        response = self.client.post(self.MANAGE, {}, format="multipart")
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(
+            self.MANAGE, {k: v for k, v in self.payload().items() if k != "desktop_image"}, format="multipart"
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("desktop_image", response.data)
+
+    def test_button_fields_required_only_when_shown(self):
+        self.assertEqual(self.create(button_text="").status_code, 400)
+        response = self.create(show_button="false", button_text="", button_link="")
+        self.assertEqual(response.status_code, 201, response.data)
+
+    def test_colour_validation(self):
+        for field in ("text_color", "button_background_color", "button_text_color"):
+            response = self.create(**{field: "#123"})
+            self.assertEqual(response.status_code, 400, field)
+            self.assertIn(field, response.data)
+        self.assertEqual(self.create(button_radius=10000).status_code, 400)
+
+    # -- permissions ----------------------------------------------------------
+
+    def test_only_admins_can_manage_banners(self):
+        self.assertEqual(self.client.get(self.MANAGE).status_code, 401)
+        self.assertEqual(self.client.post(self.MANAGE, self.payload(), format="multipart").status_code, 401)
+        for user in (self.cce, self.customer):
+            self.client.force_authenticate(user)
+            self.assertEqual(self.client.get(self.MANAGE).status_code, 403)
+            self.assertEqual(
+                self.client.post(self.MANAGE, self.payload(), format="multipart").status_code, 403
+            )
+            self.assertEqual(self.client.get(self.SETTINGS).status_code, 403)
+        self.client.force_authenticate(user=None)
+        self.assertEqual(self.client.get(self.PUBLIC).status_code, 200)
+
+    # -- update / delete ------------------------------------------------------
+
+    def test_admin_updates_text_colours_and_button(self):
+        created = self.create().data
+        url = f"{self.MANAGE}{created['id']}/"
+        self.client.force_authenticate(self.admin)
+        response = self.client.patch(
+            url,
+            {
+                "bold_heading": "NEW SEASON",
+                "normal_heading": "Fresh arrivals",
+                "text_color": "#ffcc00",
+                "text_alignment": "center",
+                "button_style": "outline",
+                "button_radius": 24,
+            },
+            format="multipart",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["bold_heading"], "NEW SEASON")
+        self.assertEqual(response.data["text_color"], "#FFCC00")
+        self.assertEqual(response.data["text_alignment"], "center")
+        self.assertEqual(response.data["button_style"], "outline")
+        self.assertEqual(response.data["button_radius"], 24)
+        self.assertEqual(response.data["updated_by_name"], "Hero Admin")
+
+    def test_remove_mobile_image_and_protect_desktop(self):
+        created = self.create(mobile_image=image_upload("hero-mobile.png")).data
+        self.assertIsNotNone(created["mobile_image_url"])
+        url = f"{self.MANAGE}{created['id']}/"
+        self.client.force_authenticate(self.admin)
+
+        response = self.client.patch(url, {"remove_mobile_image": "true"}, format="multipart")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNone(response.data["mobile_image_url"])
+
+        response = self.client.patch(url, {"remove_desktop_image": "true"}, format="multipart")
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("desktop_image", response.data)
+
+    def test_delete_banner(self):
+        created = self.create().data
+        self.client.force_authenticate(self.admin)
+        response = self.client.delete(f"{self.MANAGE}{created['id']}/")
+        self.assertEqual(response.status_code, 204)
+        self.assertEqual(HeroBanner.objects.count(), 0)
+
+    # -- reorder / settings ---------------------------------------------------
+
+    def test_reorder_assigns_new_sort_order(self):
+        ids = [self.create().data["id"] for _ in range(3)]
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(self.REORDER, {"order": list(reversed(ids))}, format="json")
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual([b["id"] for b in response.data], list(reversed(ids)))
+        for index, banner_id in enumerate(reversed(ids)):
+            self.assertEqual(HeroBanner.objects.get(pk=banner_id).sort_order, index)
+
+    def test_reorder_rejects_partial_and_duplicate_lists(self):
+        ids = [self.create().data["id"] for _ in range(3)]
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.post(self.REORDER, {"order": ids[:2]}, format="json").status_code, 400)
+        self.assertEqual(
+            self.client.post(self.REORDER, {"order": [ids[0], ids[0], ids[1]]}, format="json").status_code,
+            400,
+        )
+        self.assertEqual(self.client.post(self.REORDER, {"order": []}, format="json").status_code, 400)
+
+    def test_carousel_settings(self):
+        self.client.force_authenticate(self.admin)
+        self.assertEqual(self.client.get(self.SETTINGS).data["autoplay_delay_ms"], 5000)
+
+        response = self.client.patch(self.SETTINGS, {"autoplay_delay_ms": 7000}, format="json")
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(HeroBannerSettings.load().autoplay_delay_ms, 7000)
+
+        for invalid in (1000, 20000):
+            response = self.client.patch(self.SETTINGS, {"autoplay_delay_ms": invalid}, format="json")
+            self.assertEqual(response.status_code, 400, invalid)
+
+    # -- images ---------------------------------------------------------------
+
+    def test_image_type_and_size_validation(self):
+        self.assertEqual(self.create(desktop_image=image_upload("x.gif", "GIF")).status_code, 400)
+        not_an_image = SimpleUploadedFile("x.png", b"not really a png", content_type="image/png")
+        self.assertEqual(self.create(desktop_image=not_an_image).status_code, 400)
+
+        from apps.core import serializers as core_serializers
+
+        original = core_serializers.MAX_IMAGE_BYTES
+        core_serializers.MAX_IMAGE_BYTES = 10
+        try:
+            self.assertEqual(self.create().status_code, 400)
+        finally:
+            core_serializers.MAX_IMAGE_BYTES = original

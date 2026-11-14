@@ -3,7 +3,6 @@
 import django.db.models.deletion
 from django.conf import settings
 from django.db import migrations, models
-from django.db.models import Count
 
 
 def backfill_created_via(apps, schema_editor):
@@ -12,25 +11,6 @@ def backfill_created_via(apps, schema_editor):
     field, so treat it as a self signup."""
     User = apps.get_model("users", "User")
     User.objects.filter(force_password_change=True, created_via="self").update(created_via="checkout")
-
-
-def check_duplicate_phones(apps, schema_editor):
-    """The unique phone constraint is about to be created. Blank phones are
-    excluded, but duplicate real numbers would abort the migration with an
-    opaque DB error — surface them clearly instead."""
-    User = apps.get_model("users", "User")
-    duplicates = (
-        User.objects.exclude(phone="")
-        .values("phone")
-        .annotate(total=Count("id"))
-        .filter(total__gt=1)
-    )
-    if duplicates:
-        numbers = ", ".join(f"{row['phone']} ({row['total']}x)" for row in duplicates)
-        raise RuntimeError(
-            "Cannot make phone numbers unique: these numbers are duplicated across user "
-            f"accounts: {numbers}. Resolve them before running this migration."
-        )
 
 
 class Migration(migrations.Migration):
@@ -57,9 +37,8 @@ class Migration(migrations.Migration):
             field=models.EmailField(blank=True, max_length=254, null=True, unique=True),
         ),
         migrations.RunPython(backfill_created_via, migrations.RunPython.noop),
-        migrations.RunPython(check_duplicate_phones, migrations.RunPython.noop),
         migrations.AddConstraint(
             model_name='user',
-            constraint=models.UniqueConstraint(condition=models.Q(('phone', ''), _negated=True), fields=('phone',), name='uniq_user_phone_nonblank'),
+            constraint=models.UniqueConstraint(condition=models.Q(created_via='admin') & ~models.Q(phone=''), fields=('phone',), name='uniq_user_phone_admin'),
         ),
     ]

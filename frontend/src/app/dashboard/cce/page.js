@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { FiDollarSign, FiInfo, FiList, FiPackage, FiPlus, FiShoppingBag, FiTrendingUp } from "react-icons/fi";
+import { FiDollarSign, FiInfo, FiList, FiPackage, FiPlus, FiShoppingBag, FiShoppingCart, FiTrendingUp } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import StatusBadge from "@/components/admin/StatusBadge";
 import RangeFilter from "@/components/admin/analytics/RangeFilter";
@@ -15,6 +15,7 @@ import { useAnalyticsRange } from "@/components/admin/analytics/AnalyticsRangeCo
 import { useAnalyticsResource } from "@/components/admin/analytics/useAnalyticsResource";
 import { METRIC_CONFIG, OrderStatusChart, RevenueTrendChart } from "@/components/admin/analytics/charts";
 import { getOrderStatus, getRecentOrders, getSalesTrend, getSummary } from "@/lib/analytics";
+import { getOldCartsSummary } from "@/lib/oldCarts";
 import { formatBDT, formatDate, formatNumber } from "@/lib/format";
 
 // Same metric definitions as the admin Overview (backend apps/analytics/rules.py):
@@ -39,6 +40,7 @@ export default function CceDashboardPage() {
   const trend = useAnalyticsResource(() => getSalesTrend(query), [key], { enabled: isReady });
   const status = useAnalyticsResource(() => getOrderStatus(query), [key], { enabled: isReady });
   const recent = useAnalyticsResource(() => getRecentOrders(query, { scope: "latest", limit: 6 }), [], {});
+  const oldCarts = useAnalyticsResource(() => getOldCartsSummary(), [], {});
 
   const sales = summary.data?.sales;
   const points = trend.data?.points ?? [];
@@ -111,6 +113,26 @@ export default function CceDashboardPage() {
           })}
         </div>
         <InlineStats className="mt-3" items={statusStats} />
+      </section>
+
+      <section className="mb-6">
+        <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+          <KpiCard
+            href="/dashboard/cce/old-carts"
+            label="Customers with Old Carts"
+            icon={FiShoppingCart}
+            loading={oldCarts.loading}
+            value={formatNumber(oldCarts.data?.customers)}
+            tooltip={`Customers whose active cart has at least one item older than ${oldCarts.data?.threshold_hours ?? 6} hours. Each customer is counted once.`}
+          />
+          <KpiCard
+            href="/dashboard/cce/old-carts"
+            label="Old Cart Items"
+            loading={oldCarts.loading}
+            value={formatNumber(oldCarts.data?.old_items)}
+            tooltip="Total quantity of items that have been sitting in customer carts longer than the threshold."
+          />
+        </div>
       </section>
 
       <div className="grid gap-5 lg:grid-cols-3">

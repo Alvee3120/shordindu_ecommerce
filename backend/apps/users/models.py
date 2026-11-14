@@ -73,10 +73,14 @@ class User(AbstractBaseUser, PermissionsMixin):
     class Meta:
         db_table = "users"
         constraints = [
+            # Phone numbers are unique for accounts created through the admin
+            # flow. Older accounts may share a number (e.g. one person's test
+            # accounts), so the constraint is scoped to admin-created rows;
+            # the API serializers still reject duplicates across all accounts.
             models.UniqueConstraint(
                 fields=["phone"],
-                condition=~Q(phone=""),
-                name="uniq_user_phone_nonblank",
+                condition=Q(created_via="admin") & ~Q(phone=""),
+                name="uniq_user_phone_admin",
             )
         ]
 

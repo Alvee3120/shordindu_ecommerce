@@ -1,11 +1,21 @@
 from decimal import Decimal
 
+from django.utils import timezone
 from rest_framework import serializers
 
 from apps.catalog.models import Product, ProductVariation
 from apps.catalog.pricing import pricing_engine_for
+from apps.users.models import User
 
 from .models import Cart, CartItem
+from .old_carts import OLD_CART_THRESHOLD_HOURS
+
+
+def _age_seconds(value, context):
+    if not value:
+        return None
+    now = (context or {}).get("now") or timezone.now()
+    return max(0, int((now - value).total_seconds()))
 
 
 class CartItemSerializer(serializers.ModelSerializer):
@@ -170,3 +180,113 @@ class CartSerializer(serializers.ModelSerializer):
 
     def get_item_count(self, obj):
         return sum(item.quantity for item in obj.items.all())
+
+
+class OldCartCustomerSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = User
+        fields = ["id", "name", "phone", "email"]
+
+
+class OldCartSummarySerializer(serializers.ModelSerializer):
+    """One row per customer (Cart.user is unique), only for carts that contain
+    at least one item older than the threshold. Counts come from annotations."""
+
+    customer = OldCartCustomerSerializer(source="user", read_only=True)
+    item_count = serializers.IntegerField(read_only=True)
+    old_item_count = serializers.IntegerField(read_only=True)
+    cart_value = serializers.DecimalField(max_digits=12, decimal_places=2, read_only=True)
+    oldest_item_at = serializers.DateTimeField(read_only=True)
+    last_item_at = serializers.DateTimeField(read_only=True)
+    oldest_age_seconds = serializers.SerializerMethodField()
+    last_age_seconds = serializers.SerializerMethodField()
+    threshold_hours = serializers.SerializerMethodField()
+
+    class Meta:
+        model = Cart
+        fields = [
+            "id",
+            "customer",
+            "item_count",
+            "old_item_count",
+            "cart_value",
+            "oldest_item_at",
+            "oldest_age_seconds",
+            "last_item_at",
+            "last_age_seconds",
+            "threshold_hours",
+        ]
+
+    def get_oldest_age_seconds(self, obj):
+        return _age_seconds(obj.oldest_item_at, self.context)
+
+    def get_last_age_seconds(self, obj):
+        return _age_seconds(obj.last_item_at, self.context)
+
+    def get_threshold_hours(self, obj):
+        return OLD_CART_THRESHOLD_HOURS
+
+
+class OldCartItemSerializer(CartItemSerializer):
+    """Cart item as seen by Admin/CCE monitoring: adds the item's own age and
+    the variation's *current* stock (which may have changed since it was
+    added). The item is never hidden or removed because stock hit zero."""
+
+    created_at = serializers.DateTimeField(read_only=True)
+    age_seconds = serializers.SerializerMethodField()
+    stock_quantity = serializers.IntegerField(source="variation.stock_quantity", read_only=True)
+    variation_is_active = serializers.BooleanField(source="variation.is_active", read_only=True)
+    children = serializers.SerializerMethodField()
+
+    class Meta(CartItemSerializer.Meta):
+        fields = CartItemSerializer.Meta.fields + [
+            "created_at",
+            "age_seconds",
+            "stock_quantity",
+            "variation_is_active",
+        ]
+
+    def get_age_seconds(self, obj):
+        return _age_seconds(obj.created_at, self.context)
+
+    def get_children(self, obj):
+        return OldCartItemSerializer(obj.children.all(), many=True, context=self.context).data
+
+
+class OldCartDetailSerializer(CartSerializer):
+    customer = OldCartCustomerSerializer(source="user", read_only=True)
+    oldest_item_at = serializers.SerializerMethodField()
+    oldest_age_seconds = serializers.SerializerMethodField()
+    last_item_at = serializers.SerializerMethodField()
+    threshold_hours = serializers.SerializerMethodField()
+
+    class Meta(CartSerializer.Meta):
+        fields = CartSerializer.Meta.fields + [
+            "customer",
+            "oldest_item_at",
+            "oldest_age_seconds",
+            "last_item_at",
+            "threshold_hours",
+        ]
+
+    def _item_times(self, obj):
+        return [item.created_at for item in obj.items.all()]
+
+    def get_oldest_item_at(self, obj):
+        times = self._item_times(obj)
+        return min(times) if times else None
+
+    def get_oldest_age_seconds(self, obj):
+        return _age_seconds(self.get_oldest_item_at(obj), self.context)
+
+    def get_last_item_at(self, obj):
+        times = self._item_times(obj)
+        return max(times) if times else None
+
+    def get_threshold_hours(self, obj):
+        return OLD_CART_THRESHOLD_HOURS
+
+    def get_items(self, obj):
+        top_level = obj.items.filter(parent_cart_item__isnull=True).order_by("id")
+        return OldCartItemSerializer(top_level, many=True, context=self.context).data
+
