@@ -1,17 +1,26 @@
 from django.db.models import Sum
 from django.shortcuts import get_object_or_404
-from rest_framework import permissions, status, viewsets
+from django.utils import timezone
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
 from apps.catalog.models import ProductAddon
 from apps.catalog.pricing import PricingEngine
+from apps.core.permissions import CanManageOrders
 
 from .cart_resolver import CartMixin
 from .models import CartItem
+from .old_carts import old_carts_queryset, old_carts_summary
+from .serializers import (
+    CartItemCreateSerializer,
+    CartItemSerializer,
+    CartSerializer,
+    OldCartDetailSerializer,
+    OldCartSummarySerializer,
+)
 from .services import addon_unit_price, cart_promotions, reprice_cart
-from .serializers import CartItemCreateSerializer, CartItemSerializer, CartSerializer
 
 
 class CartView(CartMixin, APIView):
@@ -95,3 +104,54 @@ class CartItemViewSet(CartMixin, viewsets.ModelViewSet):
             unit_price_snapshot=unit_price, parent_cart_item=parent_item,
         )
         return Response(CartItemSerializer(item).data, status=status.HTTP_201_CREATED)
+
+
+class OldCartListView(generics.ListAPIView):
+    """Admin/CCE: active customer carts with at least one item older than
+    the threshold. The status is derived from CartItem.created_at."""
+
+    serializer_class = OldCartSummarySerializer
+    permission_classes = [CanManageOrders]
+
+    def get_queryset(self):
+        return old_carts_queryset(self.request.query_params)
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        context["now"] = timezone.now()
+        return context
+
+
+class OldCartSummaryView(APIView):
+    permission_classes = [CanManageOrders]
+
+    def get(self, request):
+        return Response(old_carts_summary())
+
+
+class OldCartDetailView(generics.RetrieveAPIView):
+    """Admin/CCE: full read-only contents of one old cart, with current
+    prices (through the same reprice path the cart itself uses), current
+    stock, and per-item ages."""
+
+    serializer_class = OldCartDetailSerializer
+    permission_classes = [CanManageOrders]
+
+    def get_queryset(self):
+        return old_carts_queryset()
+
+    def retrieve(self, request, *args, **kwargs):
+        cart = self.get_object()
+        engine = reprice_cart(cart)
+        promotions = cart_promotions(cart, engine)
+        context = self.get_serializer_context()
+        context.update(
+            {
+                "pricing_engine": engine,
+                "promotions": promotions,
+                "now": timezone.now(),
+            }
+        )
+        serializer = self.get_serializer(cart, context=context)
+        return Response(serializer.data)
+
