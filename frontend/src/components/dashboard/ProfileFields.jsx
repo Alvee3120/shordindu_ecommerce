@@ -50,7 +50,7 @@ export default function ProfileFields({ user }) {
   };
 
   return (
-    <div className="divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-background">
+    <div className="divide-y divide-neutral-200 rounded-xl border border-neutral-200 bg-white">
       {fields.map(({ label, key }) => {
         const isEditable = editableKeys.includes(key);
         const isEditing = editingKey === key;

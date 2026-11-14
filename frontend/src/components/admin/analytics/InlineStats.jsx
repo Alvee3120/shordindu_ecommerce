@@ -27,7 +27,7 @@ function ChangeHint({ value }) {
 export default function InlineStats({ items, className = "" }) {
   return (
     <div
-      className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-neutral-200 bg-background px-4 py-3 ${className}`}
+      className={`flex flex-wrap items-center gap-x-6 gap-y-2 rounded-xl border border-neutral-200 bg-white px-4 py-3 ${className}`}
     >
       {items.map((item) => (
         <div key={item.label} className="flex items-baseline gap-1.5" title={item.tooltip || undefined}>

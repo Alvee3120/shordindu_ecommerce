@@ -104,7 +104,7 @@ export default function AdminAttributesPage() {
 
       <form
         onSubmit={handleCreateAttribute}
-        className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-background p-5"
+        className="mb-6 flex flex-wrap items-end gap-3 rounded-xl border border-neutral-200 bg-white p-5"
       >
         <div className="flex-1 min-w-[200px]">
           <label className="mb-1.5 block text-sm font-medium text-neutral-700">
@@ -139,7 +139,7 @@ export default function AdminAttributesPage() {
           {attributes.map((attr) => {
             const isOpen = expandedId === attr.id;
             return (
-              <div key={attr.id} className="rounded-xl border border-neutral-200 bg-background">
+              <div key={attr.id} className="rounded-xl border border-neutral-200 bg-white">
                 <div className="flex items-center justify-between px-5 py-3.5">
                   <button
                     type="button"

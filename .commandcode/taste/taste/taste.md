@@ -14,7 +14,7 @@
 - Define business rules/formulas once as a single source of truth so metrics stay consistent across cards, charts, tables, and reports. Confidence: 0.9
 - Prioritize accurate business calculations (clear documented formulas, no double-counting, correct exclusion of cancelled/pending orders, historical prices over current prices). Confidence: 0.9
 - Do aggregation/filtering/pagination on the server; avoid fetching every record into frontend memory, and avoid N+1 queries. Confidence: 0.85
-- Protect admin/sensitive endpoints with the existing authentication and authorization; only authorized administrators access sensitive customer data. Confidence: 0.85
+- Protect admin/sensitive endpoints with the existing authentication and authorization; only authorized administrators access sensitive customer data, and role permissions are enforced server-side — a frontend guard alone is not acceptable. Confidence: 0.85
 - Do not show misleading metrics (e.g. suppress percentage change when the previous period is zero/unavailable rather than showing a fake value). Confidence: 0.85
 - Expects loading/skeleton states, clear empty states, and error messages with retry actions in data-driven UIs. Confidence: 0.85
 - Expects fully responsive layouts (desktop/tablet/mobile) and accessible controls. Confidence: 0.85
@@ -27,3 +27,4 @@
 - Prioritizes accurate calculations, secure access, maintainability, performance, and UX above speed of delivery. Confidence: 0.8
 - When requesting demo/sample data, expects it seeded into the real backend as actual records via a reusable, parameterized command (count, date range, reproducible seed, reset-safe, environment-guarded) rather than hardcoded or mocked data in the frontend. Confidence: 0.65
 - Distinguishes surface roles in theming: content cards (product, review, location cards) stay white, while page/section backgrounds take the theme background token — don't blanket-replace `bg-white` with a theme color across all containers. Confidence: 0.75
+- Keeps the dashboard/admin UI on a white background: the storefront's cream/theme background token (`bg-background` / `--background`) must not appear anywhere in dashboard pages or their components — everything there should be white. Confidence: 0.8

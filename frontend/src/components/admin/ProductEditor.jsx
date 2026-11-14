@@ -547,7 +547,7 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
     <form
       onSubmit={handleSubmit}
       noValidate
-      className="flex flex-col gap-6 rounded-xl border border-neutral-200 bg-background p-5"
+      className="flex flex-col gap-6 rounded-xl border border-neutral-200 bg-white p-5"
     >
       {formError && (
         <p className="rounded-lg bg-red-50 px-4 py-2.5 text-sm text-red-700">{formError}</p>
@@ -925,7 +925,7 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.preview} alt="" className="h-full w-full object-cover" />
                   {idx === 0 && (
-                    <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
+                    <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
                       <FiStar size={10} />
                       Primary
                     </span>
@@ -948,7 +948,7 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={img.image} alt={img.alt_text || ""} className="h-full w-full object-cover" />
                   {img.is_primary && (
-                    <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-background/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
+                    <span className="absolute top-1 left-1 flex items-center gap-0.5 rounded-full bg-white/90 px-1.5 py-0.5 text-[10px] font-semibold text-(--primary)">
                       <FiStar size={10} />
                       Primary
                     </span>

@@ -90,7 +90,7 @@ export default function OrdersPage() {
         <p className="text-sm text-neutral-500">No orders found.</p>
       ) : (
         <>
-          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
+          <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
             <table className="w-full text-left text-sm">
               <thead className="border-b border-neutral-200 text-xs text-neutral-500 uppercase">
                 <tr>

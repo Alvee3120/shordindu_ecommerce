@@ -186,7 +186,7 @@ function AnalyticsOverview() {
           <CategoryBarChart data={topCategories.data?.results} limit={5} />
         </ChartCard>
 
-        <section className="rounded-xl border border-neutral-200 bg-background p-5">
+        <section className="rounded-xl border border-neutral-200 bg-white p-5">
           <div className="mb-3 flex items-center justify-between">
             <h3 className="font-semibold text-neutral-900">Best-Selling Products</h3>
             <Link href="/dashboard/admin/products" className="text-sm font-medium text-(--primary) hover:underline">
@@ -239,7 +239,7 @@ function AnalyticsOverview() {
             View all
           </Link>
         </div>
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-background">
+        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 text-neutral-500">

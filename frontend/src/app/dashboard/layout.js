@@ -12,7 +12,7 @@ function LoadingSkeleton({ isStaff }) {
         <aside
             className={`w-full shrink-0 animate-pulse ${
                 isStaff
-                    ? "border-b border-neutral-200 bg-background p-4 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:border-r lg:border-b-0"
+                    ? "border-b border-neutral-200 bg-white p-4 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:border-r lg:border-b-0"
                     : "lg:w-64"
             }`}
         >
@@ -45,14 +45,14 @@ function LoadingSkeleton({ isStaff }) {
 
     if (isStaff) {
         return (
-            <div className="min-h-screen bg-background">
+            <div className="min-h-screen bg-white">
                 {sidebar}
                 <div className="px-4 py-6 sm:px-6 lg:pl-72 lg:pr-8">{content}</div>
             </div>
         );
     }
     return (
-        <div className="pt-15">
+        <div className="min-h-screen bg-white pt-15">
             <div className="mx-auto flex min-h-screen w-full max-w-7xl flex-col gap-8 px-4 py-10 sm:px-6 lg:flex-row">
                 {sidebar}
                 {content}
@@ -78,7 +78,7 @@ export default function MainDashboardLayout({ children }) {
 
     return (
         // Staff dashboards have no site navbar, so no top offset for it.
-        <div className={isStaffDashboard ? "" : "pt-15"}>
+        <div className={`min-h-screen bg-white ${isStaffDashboard ? "" : "pt-15"}`}>
             <DashboardLayout userRole={user?.role}>
                 {children}
             </DashboardLayout>

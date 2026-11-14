@@ -2,6 +2,7 @@ from django.conf import settings
 from django.db.models import Prefetch, ProtectedError, Q
 from kombu.exceptions import OperationalError as BrokerOperationalError
 from rest_framework import generics, permissions, serializers, status, viewsets
+from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework_simplejwt.exceptions import TokenError
@@ -16,6 +17,8 @@ from .cookies import clear_auth_cookies, set_auth_cookies
 from .models import Address, User
 from .serializers import (
     AddressSerializer,
+    AdminPasswordResetSerializer,
+    AdminUserCreateSerializer,
     AdminUserSerializer,
     ChangePasswordSerializer,
     CustomerLookupSerializer,
@@ -138,27 +141,76 @@ class MeView(generics.RetrieveUpdateAPIView):
 
 
 class UserManagementViewSet(viewsets.ModelViewSet):
-    """Admin-only user management: list/search accounts, change role or
-    active status. No create endpoint here — accounts are made via signup."""
+    """Admin-only user management: create accounts, list/search them, edit
+    profile fields, change role or active status, reset passwords and delete.
 
-    queryset = User.objects.all().order_by("-created_at")
+    Every method is admin-only; CCE and customer accounts get a 403. Two
+    safety rules always apply: an administrator can never deactivate, demote
+    or delete their own account, and the last remaining active administrator
+    can never be removed."""
+
+    queryset = User.objects.select_related("created_by").order_by("-created_at")
     serializer_class = AdminUserSerializer
     permission_classes = [IsAdminOnly]
-    http_method_names = ["get", "patch", "delete", "head", "options"]
+    http_method_names = ["get", "post", "patch", "delete", "head", "options"]
     filterset_fields = ["role", "is_active"]
+    search_fields = ["name", "phone", "email"]
+    ordering_fields = ["created_at", "name"]
+
+    def get_serializer_class(self):
+        if self.request.method == "POST":
+            return AdminUserCreateSerializer
+        return AdminUserSerializer
+
+    def _active_admin_count(self):
+        return User.objects.filter(role=User.Role.ADMIN, is_active=True).count()
+
+    def _ensure_not_last_admin(self, target, message):
+        is_active_admin = target.role == User.Role.ADMIN and target.is_active
+        if is_active_admin and self._active_admin_count() <= 1:
+            raise serializers.ValidationError(message)
 
     def perform_update(self, serializer):
-        if serializer.instance == self.request.user:
-            if "is_active" in serializer.validated_data:
+        target = serializer.instance
+        data = serializer.validated_data
+
+        if target == self.request.user:
+            if "is_active" in data:
                 raise serializers.ValidationError("You can't deactivate your own account.")
-            if "role" in serializer.validated_data:
+            if "role" in data and data["role"] != User.Role.ADMIN:
                 raise serializers.ValidationError("You can't change your own role.")
+
+        removing_admin = data.get("role", target.role) != User.Role.ADMIN or data.get(
+            "is_active", target.is_active
+        ) is False
+        if removing_admin:
+            self._ensure_not_last_admin(target, "You can't remove the last administrator.")
+
         serializer.save()
 
     def perform_destroy(self, instance):
         if instance == self.request.user:
             raise serializers.ValidationError("You can't delete your own account.")
+        self._ensure_not_last_admin(instance, "You can't delete the last administrator.")
         instance.delete()
+
+    @action(detail=True, methods=["post"], url_path="reset-password")
+    def reset_password(self, request, pk=None):
+        target = self.get_object()
+        if target == request.user:
+            raise serializers.ValidationError(
+                "Use Change Password to update your own password."
+            )
+
+        serializer = AdminPasswordResetSerializer(
+            data=request.data, context={"user": target, "request": request}
+        )
+        serializer.is_valid(raise_exception=True)
+
+        target.set_password(serializer.validated_data["new_password"])
+        target.force_password_change = True
+        target.save(update_fields=["password", "force_password_change"])
+        return Response({"detail": "Password reset."}, status=status.HTTP_200_OK)
 
 
 class CustomerLookupView(generics.ListAPIView):

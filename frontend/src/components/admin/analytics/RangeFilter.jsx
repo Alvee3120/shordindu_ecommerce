@@ -52,7 +52,7 @@ export default function RangeFilter({ className = "" }) {
       <button
         type="button"
         onClick={() => (open ? setOpen(false) : openPanel())}
-        className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-background px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
+        className="flex items-center gap-2 rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm font-medium text-neutral-700 transition-colors hover:bg-neutral-50"
       >
         <FiCalendar size={15} className="text-(--primary)" />
         <span className="max-w-[14rem] truncate">{label}</span>
@@ -60,7 +60,7 @@ export default function RangeFilter({ className = "" }) {
       </button>
 
       {open && (
-        <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-neutral-200 bg-background p-3 shadow-lg">
+        <div className="absolute right-0 z-30 mt-2 w-72 rounded-xl border border-neutral-200 bg-white p-3 shadow-lg">
           <div className="grid grid-cols-2 gap-1">
             {RANGE_PRESETS.filter((preset) => preset.key !== "custom").map((preset) => (
               <button

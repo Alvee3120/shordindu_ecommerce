@@ -25,7 +25,7 @@ const STATUS_OPTIONS = [
 ];
 
 const selectClass =
-  "rounded-lg border border-neutral-300 bg-background px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)";
+  "rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)";
 
 function targetSummary(discount) {
   if (discount.target_type === "category") return discount.category_names || "No categories";
@@ -162,7 +162,7 @@ export default function AdminDiscountsPage() {
       </div>
 
       {loading && discounts.length === 0 ? (
-        <div className="animate-pulse space-y-2 rounded-xl border border-neutral-200 bg-background p-5">
+        <div className="animate-pulse space-y-2 rounded-xl border border-neutral-200 bg-white p-5">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-9 rounded bg-neutral-100" />
           ))}
@@ -173,18 +173,18 @@ export default function AdminDiscountsPage() {
           <button
             type="button"
             onClick={reload}
-            className="mt-3 rounded-lg border border-red-300 bg-background px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
+            className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
           >
             Retry
           </button>
         </div>
       ) : discounts.length === 0 ? (
-        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-200 bg-background py-12 text-neutral-400">
+        <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed border-neutral-200 bg-white py-12 text-neutral-400">
           <FiPercent size={22} />
           <p className="text-sm">{hasFilters ? "No discounts match these filters." : "No discounts yet."}</p>
         </div>
       ) : (
-        <div className={`overflow-x-auto rounded-xl border border-neutral-200 bg-background ${loading ? "opacity-60" : ""}`}>
+        <div className={`overflow-x-auto rounded-xl border border-neutral-200 bg-white ${loading ? "opacity-60" : ""}`}>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 whitespace-nowrap text-neutral-500">

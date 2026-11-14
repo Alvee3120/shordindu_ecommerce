@@ -205,7 +205,7 @@ export default function AdminCouponsPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-background p-5"
+          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-5"
         >
           <h2 className="text-sm font-semibold text-neutral-900">
             {editingId === "new" ? "New Coupon" : "Edit Coupon"}
@@ -379,7 +379,7 @@ export default function AdminCouponsPage() {
       </div>
 
       {loading && coupons.length === 0 ? (
-        <div className="animate-pulse space-y-2 rounded-xl border border-neutral-200 bg-background p-5">
+        <div className="animate-pulse space-y-2 rounded-xl border border-neutral-200 bg-white p-5">
           {Array.from({ length: 4 }).map((_, i) => (
             <div key={i} className="h-8 rounded bg-neutral-100" />
           ))}
@@ -390,7 +390,7 @@ export default function AdminCouponsPage() {
           <button
             type="button"
             onClick={load}
-            className="mt-3 rounded-lg border border-red-300 bg-background px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
+            className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
           >
             Retry
           </button>
@@ -398,7 +398,7 @@ export default function AdminCouponsPage() {
       ) : coupons.length === 0 ? (
         <p className="text-sm text-neutral-500">{hasFilters ? "No coupons match these filters." : "No coupons yet."}</p>
       ) : (
-        <div className={`overflow-x-auto rounded-xl border border-neutral-200 bg-background ${loading ? "opacity-60" : ""}`}>
+        <div className={`overflow-x-auto rounded-xl border border-neutral-200 bg-white ${loading ? "opacity-60" : ""}`}>
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-neutral-200 whitespace-nowrap text-neutral-500">

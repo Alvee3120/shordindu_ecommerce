@@ -62,14 +62,14 @@ export default function LoginPage() {
 
         <div>
           <label className="mb-1.5 block text-sm font-medium text-white">
-            Email
+            Email or phone
           </label>
           <input
-            type="email"
+            type="text"
             name="email"
             value={form.email}
             onChange={handleChange}
-            placeholder="Enter your email"
+            placeholder="Enter your email or phone number"
             required
             className="w-full rounded-lg border border-white/20 bg-background px-4 py-3 text-sm text-neutral-900 placeholder:text-neutral-400 outline-none focus:ring-2 focus:ring-(--primary)"
           />

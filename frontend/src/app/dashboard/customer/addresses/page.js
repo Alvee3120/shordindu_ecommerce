@@ -152,7 +152,7 @@ export default function AddressesPage() {
         <form
           onSubmit={handleSubmit}
           noValidate
-          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-background p-5"
+          className="mb-6 flex flex-col gap-4 rounded-xl border border-neutral-200 bg-white p-5"
         >
           <h2 className="text-sm font-semibold text-neutral-900">
             {editingId === "new" ? "New Address" : "Edit Address"}
@@ -283,7 +283,7 @@ export default function AddressesPage() {
           {addresses.map((addr) => (
             <div
               key={addr.id}
-              className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-background p-5"
+              className="flex flex-col gap-2 rounded-xl border border-neutral-200 bg-white p-5"
             >
               <div className="flex items-start justify-between gap-2">
                 <div>
