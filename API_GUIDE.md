@@ -570,16 +570,35 @@ Base path: `/api/reviews/`. Public read, auth required to write, and **one revie
 product** (a second `POST` for the same product returns `400 non_field_errors`).
 
 ```json
-{ "id": 1, "product": 1, "user_name": "Ayesha", "rating": 5, "comment": "Great!", "image": "http://.../reviews/x.jpg", "created_at": "..." }
+{ "id": 1, "product": 1, "display_name": "Ayesha", "user_name": "Ayesha", "avatar_url": null, "rating": 5, "title": "My favourite", "comment": "Great!", "image": "http://.../reviews/x.jpg", "images": ["http://.../reviews/x.jpg"], "is_verified_purchase": true, "review_date": "2026-11-14", "created_at": "..." }
 ```
 
 - `rating`: integer 1–5.
-- `image`: optional — send as multipart if attaching one, otherwise omit.
+- `image`: optional single image; `images` is the complete gallery (legacy image + extra images).
 - `user_name` is filled in automatically from the account; there's no `user` field to set.
 - Only the review's author (or staff) can `PATCH`/`DELETE` it — others get `403`.
 - Filter: `?product=1`, `?rating=5`.
 - Product detail (`/api/products/{id}/`) carries `average_rating` and `review_count` computed
-  live — no need to fetch all reviews just to show a star rating on a product card.
+  live from **approved** reviews only.
+
+### Review management (Admin / CCE)
+- `GET/POST /api/reviews/manage/` — all reviews, all statuses; search + filter + paginate.
+  Query params: `search` (customer name/email, product name, title, comment), `status`,
+  `rating`, `verified_purchase`, `product`, `ordering` (`review_date`, `rating`, `created_at`).
+- `GET/PATCH/DELETE /api/reviews/manage/{id}/`.
+- Status values map to the dashboard labels: `approved` = Published, `pending` = Pending,
+  `rejected` = Hidden.
+- Create/update are `multipart/form-data`:
+  `customer_name` (required on create), `customer_email`, `product` (required), `rating` (1–5),
+  `title`, `comment` (required on create), `review_date` (defaults to today), `status`,
+  `verified_purchase`, optional `avatar`, and repeated `images` files (JPEG/PNG/WebP, max 5 MB,
+  at most 5 images). Removal flags: `remove_avatar`, `remove_legacy_image`, and
+  `remove_image_ids` (comma-separated ids).
+- Manual reviews have no linked user; `created_by_name` records the Admin/CCE who created them.
+- A duplicate review for the same product and customer email returns `400`.
+- `is_verified_purchase` is only true when the explicit flag is on **and** a delivered order
+  matches the customer (user, or email for guest orders) and product.
+- Admin and CCE only; customers get `403`.
 
 ---
 

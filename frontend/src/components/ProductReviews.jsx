@@ -3,8 +3,10 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { toast } from "sonner";
-import { FiStar, FiImage, FiX } from "react-icons/fi";
+import { FiCheck, FiImage, FiStar, FiX } from "react-icons/fi";
+import InitialsAvatar from "@/components/admin/InitialsAvatar";
 import { useAuth } from "@/context/AuthContext";
+import { formatDate } from "@/lib/format";
 import { listReviews, createReview } from "@/lib/reviews";
 
 function StarRow({ value, onChange, size = 18 }) {
@@ -29,7 +31,7 @@ function StarRow({ value, onChange, size = 18 }) {
   );
 }
 
-export default function ProductReviews({ productId }) {
+export default function ProductReviews({ productId, averageRating, reviewCount = 0 }) {
   const { user, isAuthenticated } = useAuth();
   const [reviews, setReviews] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -42,7 +44,6 @@ export default function ProductReviews({ productId }) {
   useEffect(() => {
     if (!productId) return;
     let cancelled = false;
-    setLoading(true);
     listReviews({ product: productId, status: "approved" })
       .then((data) => {
         if (cancelled) return;
@@ -91,9 +92,25 @@ export default function ProductReviews({ productId }) {
     }
   }
 
+  const numericRating = Number(averageRating);
+  const numericCount = Number(reviewCount) || 0;
+
   return (
     <div className="mt-16 border-t border-neutral-100 pt-10">
-      <h2 className="font-sora mb-6 text-2xl font-bold text-neutral-900">Reviews</h2>
+      <div className="mb-6 flex flex-wrap items-center gap-3">
+        <h2 className="font-sora text-2xl font-bold text-neutral-900">Reviews</h2>
+        {numericCount > 0 && Number.isFinite(numericRating) && (
+          <div className="flex items-center gap-2">
+            <StarRow value={Math.round(numericRating)} size={16} />
+            <span className="text-sm font-semibold text-neutral-800">
+              {numericRating.toFixed(1)}
+            </span>
+            <span className="text-sm text-neutral-500">
+              ({numericCount} review{numericCount === 1 ? "" : "s"})
+            </span>
+          </div>
+        )}
+      </div>
 
       {isAuthenticated ? (
         <form onSubmit={handleSubmit} className="mb-10 rounded-2xl border border-neutral-100 p-5">
@@ -150,25 +167,72 @@ export default function ProductReviews({ productId }) {
         <p className="text-sm text-neutral-500">No reviews yet. Be the first to review this product.</p>
       ) : (
         <div className="flex flex-col gap-6">
-          {reviews.map((review) => (
-            <div key={review.id} className="border-b border-neutral-100 pb-6">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold text-neutral-900">{review.user_name}</p>
-                <StarRow value={review.rating} />
-              </div>
-              {review.comment && (
-                <p className="mt-2 text-sm text-neutral-600">{review.comment}</p>
-              )}
-              {review.image && (
-                <div className="relative mt-3 h-24 w-24 overflow-hidden rounded-lg">
-                  <Image src={review.image} alt="" fill className="object-cover" sizes="96px" />
+          {reviews.map((review) => {
+            const images =
+              review.images?.length > 0
+                ? review.images
+                : review.image
+                  ? [review.image]
+                  : [];
+            const name = review.display_name || review.user_name || "Customer";
+            return (
+              <div key={review.id} className="border-b border-neutral-100 pb-6">
+                <div className="flex flex-wrap items-start justify-between gap-2">
+                  <div className="flex items-center gap-3">
+                    {review.avatar_url ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={review.avatar_url}
+                        alt=""
+                        className="h-9 w-9 rounded-full object-cover"
+                      />
+                    ) : (
+                      <InitialsAvatar name={name} id={review.id} />
+                    )}
+                    <div>
+                      <p className="font-semibold text-neutral-900">{name}</p>
+                      {review.is_verified_purchase && (
+                        <span className="mt-0.5 inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                          <FiCheck size={11} /> Verified purchase
+                        </span>
+                      )}
+                    </div>
+                  </div>
+                  <StarRow value={review.rating} />
                 </div>
-              )}
-              <p className="mt-2 text-xs text-neutral-400">
-                {new Date(review.created_at).toLocaleDateString()}
-              </p>
-            </div>
-          ))}
+
+                {review.title && (
+                  <p className="mt-3 text-sm font-semibold text-neutral-900">{review.title}</p>
+                )}
+                {review.comment && (
+                  <p className="mt-1 text-sm leading-relaxed text-neutral-600">{review.comment}</p>
+                )}
+
+                {images.length > 0 && (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {images.map((src, index) => (
+                      <div
+                        key={`${review.id}-${index}`}
+                        className="relative h-24 w-24 overflow-hidden rounded-lg border border-neutral-200"
+                      >
+                        <Image
+                          src={src}
+                          alt=""
+                          fill
+                          className="object-cover"
+                          sizes="96px"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                <p className="mt-2 text-xs text-neutral-400">
+                  {formatDate(review.review_date || review.created_at)}
+                </p>
+              </div>
+            );
+          })}
         </div>
       )}
     </div>

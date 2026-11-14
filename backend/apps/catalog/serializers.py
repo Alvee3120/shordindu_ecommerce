@@ -212,11 +212,11 @@ class ProductSerializer(serializers.ModelSerializer):
         extra_kwargs = {"slug": {"required": False}}
 
     def get_average_rating(self, obj):
-        avg = obj.reviews.aggregate(avg=Avg("rating"))["avg"]
+        avg = obj.reviews.filter(status="approved").aggregate(avg=Avg("rating"))["avg"]
         return round(avg, 2) if avg is not None else None
 
     def get_review_count(self, obj):
-        return obj.reviews.count()
+        return obj.reviews.filter(status="approved").count()
 
     def validate(self, attrs):
         if self.instance is None:

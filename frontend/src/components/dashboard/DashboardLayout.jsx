@@ -48,6 +48,7 @@ const roleLinks = {
     { label: "Add Order", href: "/dashboard/cce/orders/new", icon: FiPlusCircle },
     { label: "Orders", href: "/dashboard/cce/orders", icon: FiPackage },
     { label: "Old Carts", href: "/dashboard/cce/old-carts", icon: FiShoppingCart },
+    { label: "Reviews", href: "/dashboard/cce/reviews", icon: FiStar },
     { label: "Coupons", href: "/dashboard/cce/coupons", icon: FiTag },
     { label: "My Profile", href: "/dashboard/cce/profile", icon: FiUser },
   ],
@@ -219,7 +220,7 @@ const DashboardLayout = ({ children }) => {
           }`}
         >
           {/* Desktop sidebar — unchanged structure and styling. */}
-          <div data-lenis-prevent className="hidden min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:block">
+          <div className="hidden min-h-0 flex-1 overflow-y-auto px-4 py-5 lg:block">
             <div className="mb-6 flex items-center justify-between gap-3">
               <Link href={`/dashboard/${role}`} aria-label="Dashboard home">
                 <Image src="/assets/logo/logolight.png" alt="Shordindu" width={56} height={56} priority />
@@ -269,7 +270,6 @@ const DashboardLayout = ({ children }) => {
 
           {/* Mobile navigation: icon-only by default, labels when expanded. */}
           <div
-            data-lenis-prevent
             onScroll={hideTooltip}
             className="sidebar-scroll min-h-0 flex-1 overflow-y-auto overscroll-contain px-1.5 py-2 lg:hidden"
           >

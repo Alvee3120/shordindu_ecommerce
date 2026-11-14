@@ -30,3 +30,4 @@
 - Keeps the dashboard/admin UI on a white background: the storefront's cream/theme background token (`bg-background` / `--background`) must not appear anywhere in dashboard pages or their components — everything there should be white. Confidence: 0.8
 - Time-sensitive state (e.g. "abandoned/old" thresholds) must be derived server-side from real DB timestamps on each query — not stored as a flag field, not computed from localStorage/frontend clocks, and not driven by a cron job unless the architecture already requires one. Confidence: 0.7
 - Wants premium, smooth motion in interactive UI (e.g. carousel transitions): no abrupt or distracting animations. Confidence: 0.65
+- Prefers native browser scrolling over JavaScript smooth-scroll libraries (e.g. Lenis): no scroll-hijacking wrapper in the root layout, keep scrolling working normally in modals/inner panes. Confidence: 0.6

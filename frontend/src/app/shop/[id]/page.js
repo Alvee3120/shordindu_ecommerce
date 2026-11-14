@@ -653,7 +653,13 @@ export default function ProductDetailsPage() {
         </div>
       </div>
 
-      {product && <ProductReviews productId={product.id} />}
+      {product && (
+        <ProductReviews
+          productId={product.id}
+          averageRating={product.average_rating}
+          reviewCount={product.review_count}
+        />
+      )}
 
       {relatedProducts.length > 0 && (
         <div className="mt-16 border-t border-neutral-100 pt-10">

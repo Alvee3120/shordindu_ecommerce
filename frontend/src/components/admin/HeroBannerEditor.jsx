@@ -235,8 +235,8 @@ export default function HeroBannerEditor({ banner, onClose, onSaved }) {
     };
   }, []);
 
-  // Lenis listens on the window, so route every wheel event over the modal
-  // into the editor's own scroll area and stop it from reaching the page.
+  // The page is pinned while the modal is open; route every wheel event over
+  // the modal into the editor's own scroll area so the background can't move.
   useEffect(() => {
     const overlayEl = overlayRef.current;
     if (!overlayEl) return undefined;
@@ -390,7 +390,6 @@ export default function HeroBannerEditor({ banner, onClose, onSaved }) {
   return (
     <div
       ref={overlayRef}
-      data-lenis-prevent
       className="fixed inset-0 z-50 flex items-center justify-center p-4"
       role="dialog"
       aria-modal="true"
@@ -429,7 +428,6 @@ export default function HeroBannerEditor({ banner, onClose, onSaved }) {
 
         <div
           ref={contentRef}
-          data-lenis-prevent
           className="min-h-0 flex-1 overflow-y-auto overscroll-contain px-5 py-4"
         >
           {formError && (
