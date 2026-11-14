@@ -4,10 +4,11 @@
 @theme {
   --font-sora: var(--sora), "Montserrat", sans-serif;
   --font-bangla: var(--bangla), sans-serif;
+  --color-background: var(--background);
 }
 
 :root {
-  --background: #ffffff;
+  --background: #faf3eb;
   --foreground: #171717;
   --primary: #003333;
   --moon: #f4a648;

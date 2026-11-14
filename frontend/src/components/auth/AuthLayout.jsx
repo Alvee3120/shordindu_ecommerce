@@ -46,7 +46,7 @@ export default function AuthLayout({ children }) {
         </div>
 
         {/* Right: form card */}
-        <div className="w-full max-w-md rounded-3xl border border-white/20 bg-white/15 p-8 shadow-2xl backdrop-blur-xl sm:p-10">
+        <div className="w-full max-w-md rounded-3xl border border-white/20 bg-background/15 p-8 shadow-2xl backdrop-blur-xl sm:p-10">
           {children}
         </div>
       </div>

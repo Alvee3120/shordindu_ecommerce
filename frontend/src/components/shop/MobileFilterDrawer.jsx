@@ -37,7 +37,7 @@ export default function MobileFilterDrawer({
       />
 
       <div
-        className={`absolute top-0 left-0 h-full w-80 max-w-[85%] transform overflow-y-auto bg-white shadow-xl transition-transform duration-300 ${
+        className={`absolute top-0 left-0 h-full w-80 max-w-[85%] transform overflow-y-auto bg-background shadow-xl transition-transform duration-300 ${
           open ? "translate-x-0" : "-translate-x-full"
         }`}
       >

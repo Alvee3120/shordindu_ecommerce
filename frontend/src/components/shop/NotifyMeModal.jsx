@@ -45,7 +45,7 @@ export default function NotifyMeModal({ open, onClose, product, variation, varia
   return (
     <div className="fixed inset-0 z-[80] flex items-center justify-center p-4">
       <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-black/40" />
-      <form onSubmit={handleSubmit} className="relative w-full max-w-md rounded-2xl bg-white p-6 shadow-2xl">
+      <form onSubmit={handleSubmit} className="relative w-full max-w-md rounded-2xl bg-background p-6 shadow-2xl">
         <button type="button" onClick={onClose} aria-label="Close" className="absolute top-4 right-4 rounded-full p-1.5 text-neutral-500 hover:bg-neutral-100"><FiX size={18} /></button>
         <h2 className="text-xl font-semibold text-neutral-900">Notify me</h2>
         <p className="mt-1 text-sm text-neutral-500">We’ll contact you when this option is back in stock.</p>

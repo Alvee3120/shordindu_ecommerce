@@ -125,7 +125,7 @@ export default function Banner() {
             onClick={() => goTo(i)}
             aria-label={`Go to slide ${i + 1}`}
             className={`h-2 rounded-full transition-all duration-300 ${
-              i === activeIndex ? "w-6 bg-white" : "w-2 bg-white/50 hover:bg-white/70"
+              i === activeIndex ? "w-6 bg-background" : "w-2 bg-background/50 hover:bg-background/70"
             }`}
           />
         ))}

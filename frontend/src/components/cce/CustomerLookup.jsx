@@ -61,7 +61,7 @@ export default function CustomerLookup({ onSelect }) {
         className="w-full rounded-lg border border-neutral-300 py-2 pr-3 pl-9 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
       />
       {showPanel && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-neutral-200 bg-background shadow-lg">
           {loading && visible.length === 0 ? (
             <p className="px-3 py-3 text-sm text-neutral-500">Searching…</p>
           ) : visible.length === 0 ? (

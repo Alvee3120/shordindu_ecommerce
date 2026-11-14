@@ -12,7 +12,7 @@ function LoadingSkeleton({ isStaff }) {
         <aside
             className={`w-full shrink-0 animate-pulse ${
                 isStaff
-                    ? "border-b border-neutral-200 bg-white p-4 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:border-r lg:border-b-0"
+                    ? "border-b border-neutral-200 bg-background p-4 lg:fixed lg:inset-y-0 lg:left-0 lg:w-64 lg:border-r lg:border-b-0"
                     : "lg:w-64"
             }`}
         >
@@ -45,7 +45,7 @@ function LoadingSkeleton({ isStaff }) {
 
     if (isStaff) {
         return (
-            <div className="min-h-screen bg-neutral-50">
+            <div className="min-h-screen bg-background">
                 {sidebar}
                 <div className="px-4 py-6 sm:px-6 lg:pl-72 lg:pr-8">{content}</div>
             </div>

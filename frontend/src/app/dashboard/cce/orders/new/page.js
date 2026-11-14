@@ -292,7 +292,7 @@ export default function AddOrderPage() {
 
   if (createdOrder) {
     return (
-      <div className="mx-auto max-w-lg rounded-xl border border-neutral-200 bg-white p-6 text-center">
+      <div className="mx-auto max-w-lg rounded-xl border border-neutral-200 bg-background p-6 text-center">
         <FiCheckCircle size={36} className="mx-auto text-emerald-600" />
         <h1 className="mt-3 text-lg font-semibold text-neutral-900">Order {createdOrder.order_number} created</h1>
         <p className="mt-1 text-sm text-neutral-500">
@@ -346,7 +346,7 @@ export default function AddOrderPage() {
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_340px]">
         <div className="flex min-w-0 flex-col gap-6">
           {/* 1. Customer information */}
-          <section className="rounded-xl border border-neutral-200 bg-white p-5">
+          <section className="rounded-xl border border-neutral-200 bg-background p-5">
             <h2 className="mb-3 text-sm font-semibold text-neutral-900">1. Customer Information</h2>
 
             {linkedCustomer ? (
@@ -361,7 +361,7 @@ export default function AddOrderPage() {
                   type="button"
                   onClick={() => setLinkedCustomer(null)}
                   aria-label="Unlink customer account"
-                  className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-white hover:text-red-600"
+                  className="shrink-0 rounded-full p-1 text-neutral-500 hover:bg-background hover:text-red-600"
                 >
                   <FiX size={16} />
                 </button>
@@ -436,7 +436,7 @@ export default function AddOrderPage() {
           </section>
 
           {/* 2. Products */}
-          <section className="rounded-xl border border-neutral-200 bg-white p-5">
+          <section className="rounded-xl border border-neutral-200 bg-background p-5">
             <h2 className="mb-3 text-sm font-semibold text-neutral-900">2. Products</h2>
             <ProductPicker onAdd={addLine} quantityInOrder={quantityInOrder} />
 
@@ -532,7 +532,7 @@ export default function AddOrderPage() {
         </div>
 
         {/* 3. Summary + delivery */}
-        <aside className="h-fit rounded-xl border border-neutral-200 bg-white p-5 lg:sticky lg:top-6">
+        <aside className="h-fit rounded-xl border border-neutral-200 bg-background p-5 lg:sticky lg:top-6">
           <h2 className="mb-3 text-sm font-semibold text-neutral-900">3. Order Summary</h2>
 
           <div className="space-y-2 text-sm">

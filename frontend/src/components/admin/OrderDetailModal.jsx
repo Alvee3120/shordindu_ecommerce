@@ -120,7 +120,7 @@ export default function OrderDetailModal({ orderId, onClose, onStatusChange }) {
       {/* Fixed h-[80vh] (not max-h) — gives the box a definite height so the
           flex-1/min-h-0 content region below always establishes a real
           scroll context, regardless of how much or little the order has. */}
-      <div className="relative flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-white shadow-xl">
+      <div className="relative flex h-[80vh] w-full max-w-2xl flex-col overflow-hidden rounded-2xl bg-background shadow-xl">
         <div className="flex items-center justify-between border-b border-neutral-200 px-5 py-4">
           <h2 className="text-lg font-semibold text-neutral-900">
             {order ? order.order_number : "Order details"}

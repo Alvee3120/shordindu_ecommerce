@@ -10,11 +10,11 @@ const rangeThumbClass =
   "pointer-events-none absolute inset-x-0 top-1/2 h-1.5 w-full -translate-y-1/2 appearance-none bg-transparent " +
   "[&::-webkit-slider-thumb]:pointer-events-auto [&::-webkit-slider-thumb]:h-4 [&::-webkit-slider-thumb]:w-4 " +
   "[&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:border-2 " +
-  "[&::-webkit-slider-thumb]:border-(--primary) [&::-webkit-slider-thumb]:bg-white [&::-webkit-slider-thumb]:shadow " +
+  "[&::-webkit-slider-thumb]:border-(--primary) [&::-webkit-slider-thumb]:bg-background [&::-webkit-slider-thumb]:shadow " +
   "[&::-webkit-slider-thumb]:cursor-pointer " +
   "[&::-moz-range-thumb]:pointer-events-auto [&::-moz-range-thumb]:h-4 [&::-moz-range-thumb]:w-4 " +
   "[&::-moz-range-thumb]:appearance-none [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:border-2 " +
-  "[&::-moz-range-thumb]:border-(--primary) [&::-moz-range-thumb]:bg-white [&::-moz-range-thumb]:shadow " +
+  "[&::-moz-range-thumb]:border-(--primary) [&::-moz-range-thumb]:bg-background [&::-moz-range-thumb]:shadow " +
   "[&::-moz-range-thumb]:cursor-pointer [&::-moz-range-track]:bg-transparent";
 
 function PriceRangeSlider({ minPrice, maxPrice, onPriceChange }) {

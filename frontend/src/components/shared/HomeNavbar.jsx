@@ -118,7 +118,7 @@ export default function HomeNavbar() {
     <>
       <header
         className={`fixed top-0 left-0 z-50 w-full transition-all duration-300 ${
-          isScrolled ? "bg-white/70 backdrop-blur-md shadow-sm" : "bg-transparent"
+          isScrolled ? "bg-background/70 backdrop-blur-md shadow-sm" : "bg-transparent"
         }`}
       >
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
@@ -209,7 +209,7 @@ export default function HomeNavbar() {
             searchOpen ? "max-h-20 overflow-visible border-t border-gray-200" : "max-h-0 overflow-hidden"
           }`}
         >
-          <div className="bg-white/90 px-4 py-3 backdrop-blur-md">
+          <div className="bg-background/90 px-4 py-3 backdrop-blur-md">
             <SearchBar autoFocus={searchOpen} onNavigate={() => setSearchOpen(false)} />
           </div>
         </div>
@@ -225,7 +225,7 @@ export default function HomeNavbar() {
 
         {/* Side drawer panel — always on a white surface, so use dark logo + primary color regardless of navbar state */}
         <div
-          className={`absolute top-0 left-0 h-full w-72 max-w-[80%] bg-white shadow-xl transition-transform duration-300 ${
+          className={`absolute top-0 left-0 h-full w-72 max-w-[80%] bg-background shadow-xl transition-transform duration-300 ${
             menuOpen ? "translate-x-0" : "-translate-x-full"
           }`}
         >

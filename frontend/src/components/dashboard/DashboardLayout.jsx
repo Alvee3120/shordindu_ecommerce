@@ -167,8 +167,8 @@ const DashboardLayout = ({ children }) => {
   // row so it's never scrolled out of the horizontal link strip.
   if (isStaffDashboard) {
     return (
-      <div className="min-h-screen bg-neutral-50">
-        <aside className="w-full border-b border-neutral-200 bg-white lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-b-0">
+      <div className="min-h-screen bg-background">
+        <aside className="w-full border-b border-neutral-200 bg-background lg:fixed lg:inset-y-0 lg:left-0 lg:z-40 lg:flex lg:w-64 lg:flex-col lg:border-r lg:border-b-0">
           <div data-lenis-prevent className="px-4 py-4 sm:px-6 lg:min-h-0 lg:flex-1 lg:overflow-y-auto lg:px-4 lg:py-5">
             <div className="mb-4 flex items-center justify-between gap-3 lg:mb-6">
               <Link href={`/dashboard/${role}`} aria-label="Dashboard home">

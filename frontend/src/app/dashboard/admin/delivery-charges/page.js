@@ -83,7 +83,7 @@ export default function DeliveryChargesPage() {
       </div>
 
       {loading && !form ? (
-        <div className="animate-pulse rounded-xl border border-neutral-200 bg-white p-5">
+        <div className="animate-pulse rounded-xl border border-neutral-200 bg-background p-5">
           <div className="mb-5 h-4 w-40 rounded bg-neutral-200" />
           <div className="grid gap-4 sm:grid-cols-3">
             {FIELDS.map(({ key }) => (
@@ -100,13 +100,13 @@ export default function DeliveryChargesPage() {
           <button
             type="button"
             onClick={reload}
-            className="mt-3 rounded-lg border border-red-300 bg-white px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
+            className="mt-3 rounded-lg border border-red-300 bg-background px-3 py-1.5 text-xs font-semibold hover:bg-red-50"
           >
             Retry
           </button>
         </div>
       ) : (
-        <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-neutral-200 bg-white p-5">
+        <form onSubmit={handleSubmit} noValidate className="rounded-xl border border-neutral-200 bg-background p-5">
           <div className="mb-5 flex items-center gap-2">
             <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-(--primary)/10 text-(--primary)">
               <FiTruck size={16} />

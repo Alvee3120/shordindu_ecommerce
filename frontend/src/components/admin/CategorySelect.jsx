@@ -98,7 +98,7 @@ export default function CategorySelect({
         }}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className={`flex w-full items-center justify-between rounded-lg border bg-white px-3 py-2 text-left text-sm outline-none focus:ring-2 focus:ring-(--primary) disabled:opacity-60 ${
+        className={`flex w-full items-center justify-between rounded-lg border bg-background px-3 py-2 text-left text-sm outline-none focus:ring-2 focus:ring-(--primary) disabled:opacity-60 ${
           error ? "border-red-400" : "border-neutral-300"
         } ${selectedOptions.length > 0 ? "text-neutral-800" : "text-neutral-400"}`}
       >
@@ -127,7 +127,7 @@ export default function CategorySelect({
       )}
 
       {open && (
-        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-neutral-200 bg-white shadow-lg">
+        <div className="absolute z-20 mt-1 w-full overflow-hidden rounded-lg border border-neutral-200 bg-background shadow-lg">
           <div className="flex items-center gap-2 border-b border-neutral-100 px-3 py-2">
             <FiSearch size={14} className="shrink-0 text-neutral-400" />
             <input

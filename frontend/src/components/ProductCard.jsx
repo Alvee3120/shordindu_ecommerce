@@ -45,7 +45,7 @@ export default function ProductCard({ product, tall = false }) {
         type="button"
         onClick={() => setWishlisted((w) => !w)}
         aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-        className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-white/70 text-neutral-500 backdrop-blur-md transition-colors hover:text-red-500 sm:top-3 sm:right-3 sm:h-9 sm:w-9"
+        className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/70 text-neutral-500 backdrop-blur-md transition-colors hover:text-red-500 sm:top-3 sm:right-3 sm:h-9 sm:w-9"
       >
         <FiHeart
           className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${wishlisted ? "text-red-500" : ""}`}

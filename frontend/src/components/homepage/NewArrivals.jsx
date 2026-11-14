@@ -58,7 +58,7 @@ export default function NewArrivals() {
   if (!loading && products.length === 0) return null;
 
   return (
-    <section className="w-full bg-white px-6 pt-16 sm:px-8">
+    <section className="w-full bg-background px-6 pt-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 flex items-center justify-between gap-3">
           <span className="font-sora text-2xl font-medium text-(--primary)">Shordindu Women</span>
@@ -106,7 +106,7 @@ export default function NewArrivals() {
                 type="button"
                 onClick={() => scrollByCard(-1)}
                 aria-label="Scroll left"
-                className="absolute top-1/2 left-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-600 shadow-md sm:hidden"
+                className="absolute top-1/2 left-0 flex h-8 w-8 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-background text-neutral-600 shadow-md sm:hidden"
               >
                 <FiChevronLeft size={16} />
               </button>
@@ -114,7 +114,7 @@ export default function NewArrivals() {
                 type="button"
                 onClick={() => scrollByCard(1)}
                 aria-label="Scroll right"
-                className="absolute top-1/2 right-0 flex h-8 w-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-white text-neutral-600 shadow-md sm:hidden"
+                className="absolute top-1/2 right-0 flex h-8 w-8 translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-neutral-200 bg-background text-neutral-600 shadow-md sm:hidden"
               >
                 <FiChevronRight size={16} />
               </button>
