@@ -70,7 +70,7 @@ export default function FooterT() {
             />
             <p className="mb-6 max-w-xs text-sm leading-relaxed text-gray-400">
               Hello Beautiful, This is SHORDINDU — a youth-centric clothing
-              brand that aims to promote ETHNICITY.
+              brand that aims to promote ethnicity.
             </p>
           </div>
 

@@ -33,4 +33,5 @@
 - Wants premium, smooth motion in interactive UI (e.g. carousel transitions): no abrupt or distracting animations. Confidence: 0.65
 - For horizontal carousels/rows, wants explicit arrow controls for swiping plus a partially visible next card so it's obvious there is more content to scroll, applied consistently across all similar sections rather than some scrolling and some wrapping in a grid. Confidence: 0.7
 - Prefers native browser scrolling over JavaScript smooth-scroll libraries (e.g. Lenis): no scroll-hijacking wrapper in the root layout, keep scrolling working normally in modals/inner panes. Confidence: 0.6
+- When stubbing out a new UI section, use lorem ipsum placeholder copy instead of writing real marketing text. Confidence: 0.6
 - Content changed in the admin must appear on the storefront without a manual hard refresh; fix the staleness at its root (targeted cache invalidation / refetch) instead of disabling caching wholesale. Confidence: 0.7
