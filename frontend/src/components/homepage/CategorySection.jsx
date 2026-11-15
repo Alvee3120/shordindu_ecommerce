@@ -30,7 +30,7 @@ export default function CategorySection({ categoryName, title }) {
         setCategoryId(category.id);
         const [categoryWithChildren] = buildCategoryTree(results).filter((cat) => cat.id === category.id);
         const categoryIds = [category.id, ...(categoryWithChildren?.children.map((c) => c.id) ?? [])];
-        return listProducts({ category: categoryIds.join(","), page_size: 5 });
+        return listProducts({ category: categoryIds.join(","), page_size: 8 });
       })
       .then((data) => {
         if (cancelled || !data) return;

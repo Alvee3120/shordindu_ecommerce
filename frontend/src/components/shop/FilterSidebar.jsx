@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import { buildCategoryTree } from "@/lib/categories";
+import { isLightColor } from "@/lib/products";
 
 const PRICE_BOUNDS = { min: 0, max: 5000, step: 50 };
 
@@ -85,10 +86,18 @@ export default function FilterSidebar({
   onPriceChange,
   onApply,
   onClear,
+  colorOptions = [],
+  selectedColors = [],
+  onToggleColor,
+  onClearColors,
   showApplyButton = false,
 }) {
   const tree = useMemo(() => buildCategoryTree(categoryList), [categoryList]);
   const [expanded, setExpanded] = useState(() => new Set());
+  const visibleColors = colorOptions.filter(
+    (color) =>
+      Number(color.count) > 0 || selectedColors.includes(String(color.attribute_value))
+  );
 
   const toggleExpand = (id) => {
     setExpanded((prev) => {
@@ -168,6 +177,53 @@ export default function FilterSidebar({
           {tree.length === 0 && <li className="text-sm text-neutral-400">No categories available</li>}
         </ul>
       </div>
+
+      {visibleColors.length > 0 && (
+        <div>
+          <h3 className="font-sora mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-900">
+            Colors
+          </h3>
+          <div className="flex flex-col gap-2">
+            {visibleColors.map((color) => {
+              const checked = selectedColors.includes(String(color.attribute_value));
+              return (
+                <label
+                  key={color.attribute_value}
+                  className="flex cursor-pointer items-center gap-2.5 py-1.5 text-sm text-neutral-600 hover:text-neutral-900"
+                >
+                  <input
+                    type="checkbox"
+                    checked={checked}
+                    onChange={() => onToggleColor?.(color.attribute_value)}
+                    className="sr-only"
+                  />
+                  <span
+                    className={`h-5 w-5 shrink-0 rounded-full border transition-shadow ${
+                      checked
+                        ? "border-transparent"
+                        : isLightColor(color.hex_code)
+                          ? "border-neutral-300"
+                          : "border-black/10"
+                    }`}
+                    style={{ backgroundColor: color.hex_code }}
+                  />
+                  <span className="flex-1">{color.name}</span>
+                  <span className="text-xs text-neutral-400">{color.count}</span>
+                </label>
+              );
+            })}
+          </div>
+          {selectedColors.length > 0 && (
+            <button
+              type="button"
+              onClick={onClearColors}
+              className="mt-3 text-xs font-medium text-neutral-500 underline underline-offset-2 hover:text-(--primary)"
+            >
+              Clear colors
+            </button>
+          )}
+        </div>
+      )}
 
       <div>
         <h3 className="font-sora mb-3 text-sm font-semibold uppercase tracking-wide text-neutral-900">

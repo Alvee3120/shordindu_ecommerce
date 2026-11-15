@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
@@ -14,8 +14,22 @@ import ProductReviews from "@/components/ProductReviews";
 import ImageZoom from "@/components/ImageZoom";
 import NotifyMeModal from "@/components/shop/NotifyMeModal";
 
+function isColorName(name) {
+  return ["color", "colour"].includes((name || "").trim().toLowerCase());
+}
+
 export default function ProductDetailsPage() {
+  return (
+    <Suspense fallback={null}>
+      <ProductDetailsContent />
+    </Suspense>
+  );
+}
+
+function ProductDetailsContent() {
   const { id } = useParams();
+  const searchParams = useSearchParams();
+  const requestedColor = searchParams.get("color");
   const { refreshCart } = useCart();
   const [product, setProduct] = useState(null);
   const [addons, setAddons] = useState([]);
@@ -24,6 +38,7 @@ export default function ProductDetailsPage() {
   const [error, setError] = useState("");
   const [activeImage, setActiveImage] = useState(0);
   const [selectedValues, setSelectedValues] = useState({}); 
+  const [fallbackColorId, setFallbackColorId] = useState(null); // colors that are not variation attributes
   const [wishlisted, setWishlisted] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [selectedAddonIds, setSelectedAddonIds] = useState(new Set());
@@ -37,8 +52,6 @@ export default function ProductDetailsPage() {
 
   useEffect(() => {
     let cancelled = false;
-    setLoading(true);
-    setError("");
     Promise.all([getProduct(id), getProductAddons(id).catch(() => [])])
       .then(([productData, addonData]) => {
         if (cancelled) return;
@@ -47,6 +60,39 @@ export default function ProductDetailsPage() {
         setActiveImage(0);
         setQuantity(1);
         setSelectedAddonIds(new Set());
+        setAddonSelectedValues({});
+        setAddonQuantities({});
+
+        const colorAttribute = (productData.variations || [])
+          .flatMap((variation) => variation.attribute_values || [])
+          .find((value) => isColorName(value.attribute))?.attribute;
+        if (colorAttribute) {
+          const configuredColors = (productData.colors || []).map((color) =>
+            Number(color.attribute_value)
+          );
+          const variationColors = (productData.variations || []).flatMap((variation) =>
+            (variation.attribute_values || [])
+              .filter((value) => isColorName(value.attribute))
+              .map((value) => Number(value.attribute_value))
+          );
+          const validColors = configuredColors.length ? configuredColors : variationColors;
+          const requested = Number(requestedColor);
+          const initialColor = validColors.includes(requested)
+            ? requested
+            : validColors[0] ?? null;
+          setSelectedValues(initialColor != null ? { [colorAttribute]: initialColor } : {});
+        } else {
+          setSelectedValues({});
+          const configuredColors = (productData.colors || []).map((color) =>
+            Number(color.attribute_value)
+          );
+          const requested = Number(requestedColor);
+          setFallbackColorId(
+            configuredColors.includes(requested)
+              ? requested
+              : configuredColors[0] ?? null
+          );
+        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message);
@@ -57,7 +103,7 @@ export default function ProductDetailsPage() {
     return () => {
       cancelled = true;
     };
-  }, [id]);
+  }, [id, requestedColor]);
 
   const categoryFilterKey = product?.categories?.join(",") || "";
 
@@ -68,7 +114,7 @@ export default function ProductDetailsPage() {
       return;
     }
     let cancelled = false;
-    listProducts({ category: categoryFilterKey, page_size: 8 })
+    listProducts({ category: categoryFilterKey, page_size: 8, status: "active" })
       .then((data) => {
         if (cancelled) return;
         const results = Array.isArray(data) ? data : data?.results ?? [];
@@ -100,12 +146,18 @@ export default function ProductDetailsPage() {
     (product.variations || []).forEach((v) => {
       (v.attribute_values || []).forEach((av) => {
         if (!groups.has(av.attribute)) groups.set(av.attribute, new Map());
-        groups.get(av.attribute).set(av.attribute_value, av.value);
+        groups
+          .get(av.attribute)
+          .set(av.attribute_value, { value: av.value, hex_code: av.hex_code });
       });
     });
     return Array.from(groups.entries()).map(([attribute, values]) => ({
       attribute,
-      values: Array.from(values.entries()).map(([id, value]) => ({ id, value })),
+      values: Array.from(values.entries()).map(([id, data]) => ({
+        id,
+        value: data.value,
+        hex_code: data.hex_code,
+      })),
     }));
   }, [product]);
 
@@ -144,8 +196,49 @@ export default function ProductDetailsPage() {
     );
   }
 
-  const images = product.images?.length ? product.images : [];
+  const baseImages = product.images?.length ? product.images : [];
   const variations = product.variations || [];
+  const colorAttributeName = attributeGroups.find((group) =>
+    isColorName(group.attribute)
+  )?.attribute;
+  const selectedColorId = colorAttributeName
+    ? selectedValues[colorAttributeName]
+    : fallbackColorId;
+  const selectedColor = (product.colors || []).find(
+    (color) => Number(color.attribute_value) === Number(selectedColorId)
+  );
+  const colorImage = selectedColor?.image_url || null;
+  const images = colorImage
+    ? [
+        { id: "color-image", image: colorImage, alt_text: product.name },
+        ...baseImages.filter((image) => image.image !== colorImage),
+      ]
+    : baseImages;
+  const colorValueIds = new Set(
+    (product.colors || []).map((color) => Number(color.attribute_value))
+  );
+
+  const isValueAvailable = (attribute, valueId) => {
+    const otherSelections = Object.entries(selectedValues).filter(
+      ([key]) => key !== attribute
+    );
+    return variations.some((variation) => {
+      if (variation.is_active === false) return false;
+      const ids = (variation.attribute_values || []).map((value) =>
+        Number(value.attribute_value)
+      );
+      if (!ids.includes(Number(valueId))) return false;
+      return otherSelections.every(([, selectedId]) =>
+        ids.includes(Number(selectedId))
+      );
+    });
+  };
+
+  const handleSelectValue = (attribute, valueId) => {
+    setSelectedValues((prev) => ({ ...prev, [attribute]: valueId }));
+    if (isColorName(attribute)) setActiveImage(0);
+  };
+
   const isVariable = product.product_type === "variable" && variations.length >= 1;
   // Automatic discounts (from the backend) take over the "was" price + badge;
   // otherwise the variation's own compare-at price is shown as before.
@@ -442,36 +535,103 @@ export default function ProductDetailsPage() {
             </p>
           )}
           
+          {!colorAttributeName && (product.colors?.length ?? 0) > 0 && (
+            <div className="mt-2">
+              <div className="mb-1.5 flex items-center justify-between gap-2">
+                <p className="text-sm font-medium text-neutral-700">Color:</p>
+                {selectedColor && (
+                  <span className="text-xs text-neutral-500">{selectedColor.name}</span>
+                )}
+              </div>
+              <div className="flex flex-wrap gap-2">
+                {product.colors
+                  .filter((color) => color.is_active !== false)
+                  .map((color) => {
+                    const checked =
+                      Number(selectedColorId) === Number(color.attribute_value);
+                    return (
+                      <button
+                        key={color.attribute_value}
+                        type="button"
+                        onClick={() => {
+                          setFallbackColorId(color.attribute_value);
+                          setActiveImage(0);
+                        }}
+                        aria-pressed={checked}
+                        className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors ${
+                          checked
+                            ? "border-(--primary) bg-(--primary)/15 text-(--primary)"
+                            : "border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-300"
+                        }`}
+                      >
+                        <span
+                          className="h-4 w-4 rounded-full border border-neutral-300"
+                          style={{ backgroundColor: color.hex_code }}
+                        />
+                        {color.name}
+                      </button>
+                    );
+                  })}
+              </div>
+            </div>
+          )}
+
           {isVariable && attributeGroups.length > 0 && (
             <div className="mt-2 flex flex-col gap-3">
-              {attributeGroups.map((group) => (
-                <div key={group.attribute}>
-                  <div className="mb-1.5 flex items-center justify-between">
-                    <p className="text-sm font-medium text-neutral-700">{group.attribute}:</p>
+              {attributeGroups.map((group) => {
+                const isColor = isColorName(group.attribute);
+                const values =
+                  isColor && colorValueIds.size > 0
+                    ? group.values.filter((value) => colorValueIds.has(Number(value.id)))
+                    : group.values;
+                if (values.length === 0) return null;
+                return (
+                  <div key={group.attribute}>
+                    <div className="mb-1.5 flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium text-neutral-700">{group.attribute}:</p>
+                      {isColor && selectedColor && (
+                        <span className="text-xs text-neutral-500">{selectedColor.name}</span>
+                      )}
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      {values.map((value) => {
+                        const checked =
+                          Number(selectedValues[group.attribute]) === Number(value.id);
+                        const available = isValueAvailable(group.attribute, value.id);
+                        const color = isColor
+                          ? product.colors?.find(
+                              (item) => Number(item.attribute_value) === Number(value.id)
+                            )
+                          : null;
+                        return (
+                          <button
+                            key={value.id}
+                            type="button"
+                            onClick={() => handleSelectValue(group.attribute, value.id)}
+                            disabled={!available}
+                            className={`flex items-center gap-2 rounded-full border px-4 py-2 text-sm font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40 ${
+                              checked
+                                ? "border-(--primary) bg-(--primary)/15 text-(--primary)"
+                                : "border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-300"
+                            }`}
+                          >
+                            {isColor && (
+                              <span
+                                className="h-4 w-4 rounded-full border border-neutral-300"
+                                style={{
+                                  backgroundColor:
+                                    color?.hex_code || value.hex_code || "#D1D5DB",
+                                }}
+                              />
+                            )}
+                            {value.value}
+                          </button>
+                        );
+                      })}
+                    </div>
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {group.values.map((v) => {
-                      const checked = selectedValues[group.attribute] === v.id;
-                      return (
-                        <button
-                          key={v.id}
-                          type="button"
-                          onClick={() =>
-                            setSelectedValues((prev) => ({ ...prev, [group.attribute]: v.id }))
-                          }
-                          className={`rounded-full border px-5 py-2 text-sm font-medium transition-colors ${
-                            checked
-                              ? "border-(--primary) bg-(--primary)/15 text-(--primary)"
-                              : "border-neutral-200 bg-neutral-50 text-neutral-600 hover:border-neutral-300"
-                          }`}
-                        >
-                          {v.value}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -653,7 +813,13 @@ export default function ProductDetailsPage() {
         </div>
       </div>
 
-      {product && <ProductReviews productId={product.id} />}
+      {product && (
+        <ProductReviews
+          productId={product.id}
+          averageRating={product.average_rating}
+          reviewCount={product.review_count}
+        />
+      )}
 
       {relatedProducts.length > 0 && (
         <div className="mt-16 border-t border-neutral-100 pt-10">

@@ -233,24 +233,30 @@ The big one. Full shape:
   "status": "active",
   "sku_prefix": "ABCDRS",
   "attribute_values": [
-    { "id": 1, "product": 1, "attribute_value": 1, "attribute": "Size", "value": "Unstitch" }
+    { "id": 1, "product": 1, "attribute_value": 1, "attribute": "Size", "value": "Unstitch", "hex_code": "" }
   ],
   "variations": [
     {
       "id": 1, "product": 1, "sku": "ABCDRS-UNSTITCH",
       "price": "1500.00", "compare_at_price": null,
       "stock_quantity": 10, "is_active": true,
-      "attribute_values": [ { "attribute_value": 1, "attribute": "Size", "value": "Unstitch" } ],
+      "attribute_values": [ { "attribute_value": 1, "attribute": "Size", "value": "Unstitch", "hex_code": "" } ],
       "images": []
     }
   ],
   "images": [ { "id": 1, "product": 1, "variation": null, "image": "http://.../x.jpg", "alt_text": "", "sort_order": 0, "is_primary": true } ],
+  "colors": [
+    { "attribute_value": 4, "name": "Black", "hex_code": "#000000", "image_url": null, "is_active": true, "sort_order": 0 }
+  ],
+  "has_addons": false,
   "average_rating": 4.5,
   "review_count": 2,
   "created_at": "...", "updated_at": "..."
 }
 ```
 
+- `colors` is the union of active product-level colors, variation-level colors and `ProductColor` configs; inactive colors are omitted. `hex_code` is `#RRGGBB` (legacy colors without one fall back to `#D1D5DB`).
+- `has_addons` tells the storefront whether the product has add-ons (use it to decide Add to Cart vs View Details).
 - `product_type`: `simple` | `variable`. `visibility_type`: `standalone` | `addon_only` | `both`.
   `status`: `draft` | `active` | `archived`.
 - **`categories`/`category_names` are lists** — a product can belong to more than one category. A
@@ -271,11 +277,40 @@ The big one. Full shape:
 | `visibility_type` | `?visibility_type=standalone` | |
 | `status` | `?status=active` | |
 | `attribute_value` | `?attribute_value=1` | products that offer this attribute value |
+| `color` | `?color=4` or `?color=4,7` | products with any of these colors (active color config, product-level color, or an active in-stock variation) |
 | `min_price` / `max_price` | `?min_price=500&max_price=2000` | filters on variation price |
 | `search` | `?search=dress` | matches name, description, sku_prefix |
 | `ordering` | `?ordering=-created_at` | or `name`, `created_at` (prefix `-` for desc) |
 
-Combine freely, e.g. `?category=3&min_price=1000&search=silk&ordering=-created_at`.
+Combine freely, e.g. `?category=3&color=4&min_price=1000&search=silk&ordering=-created_at`.
+
+`GET /api/products/color-facets/` returns every Color/Colour attribute value with its count under
+the current filters (the `color` param is ignored for facet counts, so options remain visible):
+```json
+{ "colors": [{ "attribute_value": 4, "name": "Black", "hex_code": "#000000", "count": 12 }] }
+```
+Only active products are counted. Colors with `count: 0` are returned so the UI can keep a
+currently-selected color visible; unselected zero-count colors are hidden client-side.
+
+### Product colors
+Colors are stored as the shared `Color` attribute value used by variations, plus a per-product
+`ProductColor` config (image, active, order). `GET/POST /api/product-colors/` and
+`GET/PATCH/DELETE /api/product-colors/{id}/` (admin writes; GET is public):
+- Create/edit as `multipart/form-data`: `product`, `name`, `hex_code` (`#RRGGBB`), optional
+  `image`, `is_active`, `sort_order`, `remove_image`.
+- Creating a color reuses/creates the global Color attribute value, sets its HEX, and creates the
+  product-level color link, so the variation editor can assign the same value.
+- A color used by any product variation cannot be deleted (`400`); remove it from the variations
+  first.
+
+`GET /api/attribute-values/color-library/?search=bl` returns the reusable global colors, with the
+number of products using each (direct link, variation or color config). Used by the admin color
+picker so the same color is never duplicated:
+```json
+[{ "id": 4, "name": "Black", "hex_code": "#000000", "usage_count": 7 }]
+```
+Only colors with `usage_count: 0` are safe to delete from the library
+(`DELETE /api/attribute-values/{id}/`).
 
 ### Product addons
 
@@ -511,19 +546,33 @@ read and at checkout (cart items gain `original_unit_price` / `discount`), and o
 
 `GET /api/discount-showcases/` (public) — the homepage sections: every live discount
 `{id, name, type, value, target_type, category, starts_at, ends_at, product_count, products: [...]}`
-with up to 8 products (normal product objects, effective prices included). A product is listed
-under the discount that actually prices it; discounts with no eligible products are omitted.
+with every product the discount currently prices (normal product objects, effective prices
+included). A product is listed under the discount that actually prices it; discounts with no
+eligible products are omitted.
 `GET /api/products/?discount=<id>` lists all of a live discount's products ("View All").
 
-### Campaign banner
-`GET /api/campaign-banner/` (public) — `{"active": true, "banner": {image_mode, desktop_image_url,
-mobile_image_url, image_alt, eyebrow, heading, description, button_enabled, button_label,
-button_url, updated_at}}`, or `{"active": false, "banner": null}` when it's disabled or outside its
-start/end dates (Asia/Dhaka). `heading` uses `
+### Announcement bar
+`GET /api/announcement-bar/` (public) — `{"active": true, "announcement": {text,
+background_color, text_color, updated_at}}`, or `{"active": false, "announcement": null}` when the
+strip is disabled or has no text. Colours are `#RRGGBB`.
+
+`/api/announcement-bar/manage/` (admin only) — `GET` adds `is_enabled` and `updated_by_name`;
+`PUT`/`PATCH` (JSON) to save and publish.
+
+### Campaign banners
+Two fixed slots, managed by admins: `slot` `1` renders after the homepage category section, `2`
+renders before the Men collection.
+
+`GET /api/campaign-banners/` (public) — `{"banners": [{slot, image_mode, desktop_image_url,
+mobile_image_url, image_alt, eyebrow, heading, description, text_color, button_enabled,
+button_label, button_url, button_background_color, button_text_color, updated_at}]}` — only
+banners that are live right now (disabled and out-of-schedule slots are omitted). Colours are
+`#RRGGBB`. `heading` uses `
 ` for line breaks.
 
-`/api/campaign-banner/manage/` (admin only) — `GET` the full config (adds `is_enabled`,
-`starts_at`, `ends_at`, `status`: `live|scheduled|ended|disabled`). `PUT`/`PATCH` as
+`GET /api/campaign-banners/manage/` (admin only) — every slot's full config (adds `is_enabled`,
+`starts_at`, `ends_at`, `status`: `live|scheduled|ended|disabled`).
+`GET/PUT/PATCH /api/campaign-banners/manage/<slot>/` reads or updates one slot as
 `multipart/form-data`: the text fields, optional `desktop_image` / `mobile_image` files (JPEG, PNG
 or WebP, max 5 MB) and `remove_desktop_image` / `remove_mobile_image` flags. `button_url` must be a
 site path (`/shop`) or an `http(s)://` URL.
@@ -570,16 +619,35 @@ Base path: `/api/reviews/`. Public read, auth required to write, and **one revie
 product** (a second `POST` for the same product returns `400 non_field_errors`).
 
 ```json
-{ "id": 1, "product": 1, "user_name": "Ayesha", "rating": 5, "comment": "Great!", "image": "http://.../reviews/x.jpg", "created_at": "..." }
+{ "id": 1, "product": 1, "display_name": "Ayesha", "user_name": "Ayesha", "avatar_url": null, "rating": 5, "title": "My favourite", "comment": "Great!", "image": "http://.../reviews/x.jpg", "images": ["http://.../reviews/x.jpg"], "is_verified_purchase": true, "review_date": "2026-11-14", "created_at": "..." }
 ```
 
 - `rating`: integer 1–5.
-- `image`: optional — send as multipart if attaching one, otherwise omit.
+- `image`: optional single image; `images` is the complete gallery (legacy image + extra images).
 - `user_name` is filled in automatically from the account; there's no `user` field to set.
 - Only the review's author (or staff) can `PATCH`/`DELETE` it — others get `403`.
 - Filter: `?product=1`, `?rating=5`.
 - Product detail (`/api/products/{id}/`) carries `average_rating` and `review_count` computed
-  live — no need to fetch all reviews just to show a star rating on a product card.
+  live from **approved** reviews only.
+
+### Review management (Admin / CCE)
+- `GET/POST /api/reviews/manage/` — all reviews, all statuses; search + filter + paginate.
+  Query params: `search` (customer name/email, product name, title, comment), `status`,
+  `rating`, `verified_purchase`, `product`, `ordering` (`review_date`, `rating`, `created_at`).
+- `GET/PATCH/DELETE /api/reviews/manage/{id}/`.
+- Status values map to the dashboard labels: `approved` = Published, `pending` = Pending,
+  `rejected` = Hidden.
+- Create/update are `multipart/form-data`:
+  `customer_name` (required on create), `customer_email`, `product` (required), `rating` (1–5),
+  `title`, `comment` (required on create), `review_date` (defaults to today), `status`,
+  `verified_purchase`, optional `avatar`, and repeated `images` files (JPEG/PNG/WebP, max 5 MB,
+  at most 5 images). Removal flags: `remove_avatar`, `remove_legacy_image`, and
+  `remove_image_ids` (comma-separated ids).
+- Manual reviews have no linked user; `created_by_name` records the Admin/CCE who created them.
+- A duplicate review for the same product and customer email returns `400`.
+- `is_verified_purchase` is only true when the explicit flag is on **and** a delivered order
+  matches the customer (user, or email for guest orders) and product.
+- Admin and CCE only; customers get `403`.
 
 ---
 
@@ -601,6 +669,8 @@ product** (a second `POST` for the same product returns `400 non_field_errors`).
 | GET | `/api/products/:id/addons/` | — |
 | GET/POST/PATCH/DELETE | `/api/product-variations/[:id/]` | read: —, write: staff |
 | GET/POST/PATCH/DELETE | `/api/product-images/[:id/]` | read: —, write: staff |
+| GET/POST/PATCH/DELETE | `/api/product-colors/[:id/]` | read: —, write: staff |
+| GET | `/api/products/color-facets/` | — |
 | GET/POST/PATCH/DELETE | `/api/product-attribute-values/[:id/]` | read: —, write: staff |
 | GET/POST/PATCH/DELETE | `/api/product-addons/[:id/]` | read: —, write: staff |
 | GET | `/api/cart/` | — |
@@ -614,8 +684,11 @@ product** (a second `POST` for the same product returns `400 non_field_errors`).
 | GET/PUT | `/api/delivery-charges/` | read: —, write: admin |
 | GET/POST/PATCH/DELETE | `/api/discounts/[:id/]` | admin only |
 | GET | `/api/discount-showcases/` | — |
-| GET | `/api/campaign-banner/` | — |
-| GET/PUT/PATCH | `/api/campaign-banner/manage/` | admin only |
+| GET | `/api/announcement-bar/` | — |
+| GET/PUT/PATCH | `/api/announcement-bar/manage/` | admin only |
+| GET | `/api/campaign-banners/` | — |
+| GET | `/api/campaign-banners/manage/` | admin only |
+| GET/PUT/PATCH | `/api/campaign-banners/manage/<slot>/` | admin only |
 | GET/POST/PATCH/DELETE | `/api/reviews/[:id/]` | read: —, write: ✓ (own only) |
 
 ("—" = no auth needed; "✓" = must be logged in)
@@ -633,7 +706,8 @@ these will point at S3 instead (same field, same usage — nothing changes on th
 ## 10. Known gaps (not bugs, just not built yet)
 
 - No SSLCommerz/bKash — checkout is Cash on Delivery only.
-- No search/filter beyond what's listed above (no full-text search engine, no faceted nav).
+- No search/filter beyond what's listed above (no full-text search engine; color/category/price
+  facets are supported).
 - No rate limiting on auth endpoints yet.
 - No automated backend test suite yet — treat responses as documented here, but flag anything
   that doesn't match what you see from `/api/docs/`.

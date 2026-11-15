@@ -31,12 +31,15 @@ export default function OldCartsPage() {
 
   useEffect(() => {
     const timeout = setTimeout(() => {
-      setLoading(true);
-      setSearch(searchInput.trim());
-      setPage(1);
+      const next = searchInput.trim();
+      if (next !== search) {
+        setLoading(true);
+        setSearch(next);
+        setPage(1);
+      }
     }, 400);
     return () => clearTimeout(timeout);
-  }, [searchInput]);
+  }, [searchInput, search]);
 
   useEffect(() => {
     if (!canView) return undefined;

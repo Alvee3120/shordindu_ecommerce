@@ -5,24 +5,28 @@ import NewArrivals from "@/components/homepage/NewArrivals";
 import Saree from "@/components/homepage/Saree";
 import Men from "@/components/homepage/Men";
 import Bag from "@/components/homepage/Bag";
+import BrandStatement from "@/components/homepage/BrandStatement";
+import TestimonialQuote from "@/components/homepage/TestimonialQuote";
 import DiscountShowcases from "@/components/homepage/DiscountShowcases";
 import CustomerReviews from "@/components/homepage/CustomerReviews";
-import StoreLocator from "@/components/homepage/StoreLocator";
 
 export default function Home() {
   return (
-  <div className="">
-    <Banner />
-    <CategoryShowcase />
-    {/* One section per live automatic discount (admin-managed). */}
-    <DiscountShowcases />
-    <NewArrivals />
-    <Saree />
-    <CampaignBanner />
-    <Men />
-    <Bag />
-    <StoreLocator />
-    <CustomerReviews />
-  </div>
+    <div className="">
+      <Banner />
+      <CategoryShowcase />
+      {/* Admin-managed campaign banners (/dashboard/admin/campaign-banner). */}
+      <CampaignBanner slot={1} />
+      {/* One section per live automatic discount (admin-managed). */}
+      <DiscountShowcases />
+      <NewArrivals />
+      <Saree />
+      <CampaignBanner slot={2} />
+      <Men />
+      <Bag />
+      {/* <CustomerReviews /> */}
+      <BrandStatement />
+      <TestimonialQuote />
+    </div>
   );
 }

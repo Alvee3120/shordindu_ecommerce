@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 
 from rest_framework import serializers
 
-from .models import CampaignBanner, HeroBanner, HeroBannerSettings
+from .models import AnnouncementBar, CampaignBanner, HeroBanner, HeroBannerSettings
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
@@ -57,6 +57,31 @@ def _absolute(request, field_file):
     return request.build_absolute_uri(url) if request else url
 
 
+class PublicAnnouncementBarSerializer(serializers.ModelSerializer):
+    """The strip the site shows above the footer."""
+
+    class Meta:
+        model = AnnouncementBar
+        fields = ["text", "background_color", "text_color", "updated_at"]
+
+
+class AnnouncementBarAdminSerializer(PublicAnnouncementBarSerializer):
+    updated_by_name = serializers.CharField(source="updated_by.name", read_only=True, default=None)
+
+    class Meta(PublicAnnouncementBarSerializer.Meta):
+        fields = PublicAnnouncementBarSerializer.Meta.fields + ["is_enabled", "updated_by_name"]
+        read_only_fields = ["updated_at"]
+
+    def validate_text(self, value):
+        return value.strip()
+
+    def validate_background_color(self, value):
+        return validate_hex_color(value)
+
+    def validate_text_color(self, value):
+        return validate_hex_color(value)
+
+
 class PublicCampaignBannerSerializer(serializers.ModelSerializer):
     """What the homepage renders — no scheduling or admin metadata."""
 
@@ -67,6 +92,7 @@ class PublicCampaignBannerSerializer(serializers.ModelSerializer):
     class Meta:
         model = CampaignBanner
         fields = [
+            "slot",
             "image_mode",
             "desktop_image_url",
             "mobile_image_url",
@@ -74,9 +100,12 @@ class PublicCampaignBannerSerializer(serializers.ModelSerializer):
             "eyebrow",
             "heading",
             "description",
+            "text_color",
             "button_enabled",
             "button_label",
             "button_url",
+            "button_background_color",
+            "button_text_color",
             "updated_at",
         ]
 
@@ -114,7 +143,7 @@ class CampaignBannerAdminSerializer(PublicCampaignBannerSerializer):
             "created_at",
             "updated_by_name",
         ]
-        read_only_fields = ["created_at", "updated_at"]
+        read_only_fields = ["slot", "created_at", "updated_at"]
 
     def get_status(self, obj):
         return obj.status_at()
@@ -153,6 +182,15 @@ class CampaignBannerAdminSerializer(PublicCampaignBannerSerializer):
 
     def validate_button_url(self, value):
         return validate_button_url(value)
+
+    def validate_text_color(self, value):
+        return validate_hex_color(value)
+
+    def validate_button_background_color(self, value):
+        return validate_hex_color(value)
+
+    def validate_button_text_color(self, value):
+        return validate_hex_color(value)
 
     def validate(self, attrs):
         instance = self.instance

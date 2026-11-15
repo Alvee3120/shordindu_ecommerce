@@ -6,12 +6,27 @@ import { FiImage, FiMonitor, FiSmartphone, FiTrash2, FiUpload } from "react-icon
 import { useAuth } from "@/context/AuthContext";
 import StatusBadge from "@/components/admin/StatusBadge";
 import CampaignBannerView from "@/components/homepage/CampaignBannerView";
-import { BANNER_REVALIDATE_SECONDS, getCampaignBannerConfig, updateCampaignBanner } from "@/lib/campaignBanner";
+import {
+  CAMPAIGN_BANNER_SLOTS,
+  getCampaignBannerConfigs,
+  updateCampaignBanner,
+} from "@/lib/campaignBanner";
 import { formatDateTime } from "@/lib/format";
 
 const ALLOWED_TYPES = ["image/jpeg", "image/png", "image/webp"];
 const MAX_BYTES = 5 * 1024 * 1024;
-const TEXT_FIELDS = ["eyebrow", "heading", "description", "image_alt", "button_label", "button_url"];
+const TEXT_FIELDS = [
+  "eyebrow",
+  "heading",
+  "description",
+  "image_alt",
+  "button_label",
+  "button_url",
+  "text_color",
+  "button_background_color",
+  "button_text_color",
+];
+const HEX_RE = /^#[0-9A-Fa-f]{6}$/;
 const STATUS_HELP = {
   live: "Showing on the homepage now.",
   scheduled: "Enabled, waiting for its start date.",
@@ -138,9 +153,41 @@ function ImagePicker({ label, hint, src, onPick, onRemove, error, id }) {
   );
 }
 
+function ColorField({ label, hint, value, onChange, error, id }) {
+  const valid = HEX_RE.test(value || "");
+  return (
+    <div>
+      <label htmlFor={id} className="mb-1 block text-xs font-medium text-neutral-700">
+        {label}
+      </label>
+      <div className="flex items-center gap-2">
+        <input
+          type="color"
+          value={valid ? value : "#FFFFFF"}
+          onChange={(event) => onChange(event.target.value.toUpperCase())}
+          aria-label={`${label} picker`}
+          className="h-10 w-12 shrink-0 cursor-pointer rounded border border-neutral-300 bg-white p-1"
+        />
+        <input
+          id={id}
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+          className={inputClass(error)}
+        />
+      </div>
+      {error ? (
+        <p className="mt-1 text-xs text-red-600">{error}</p>
+      ) : (
+        hint && <p className="mt-1 text-xs text-neutral-400">{hint}</p>
+      )}
+    </div>
+  );
+}
+
 export default function CampaignBannerAdminPage() {
   const { user } = useAuth();
-  const [saved, setSaved] = useState(null);
+  const [banners, setBanners] = useState([]);
+  const [slot, setSlot] = useState(CAMPAIGN_BANNER_SLOTS[0].value);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [draft, setDraft] = useState(null);
@@ -151,11 +198,13 @@ export default function CampaignBannerAdminPage() {
   const [previewMode, setPreviewMode] = useState("desktop");
   const objectUrls = useRef(new Set());
 
-  const fetchConfig = useCallback(
+  const saved = banners.find((banner) => banner.slot === slot) ?? null;
+
+  const fetchConfigs = useCallback(
     () =>
-      getCampaignBannerConfig()
+      getCampaignBannerConfigs()
         .then((data) => {
-          setSaved(data);
+          setBanners(Array.isArray(data) ? data : []);
           setLoadError("");
         })
         .catch((err) => setLoadError(err.message))
@@ -164,12 +213,20 @@ export default function CampaignBannerAdminPage() {
   );
 
   useEffect(() => {
-    fetchConfig();
-  }, [fetchConfig]);
+    fetchConfigs();
+  }, [fetchConfigs]);
 
   const load = () => {
     setLoading(true);
-    fetchConfig();
+    fetchConfigs();
+  };
+
+  const selectSlot = (nextSlot) => {
+    if (nextSlot === slot) return;
+    setSlot(nextSlot);
+    setDraft(null);
+    setImages({ desktop: null, mobile: null });
+    setErrors({});
   };
 
   useEffect(() => {
@@ -234,6 +291,11 @@ export default function CampaignBannerAdminPage() {
     if (form.starts_at && form.ends_at && form.ends_at <= form.starts_at) {
       next.ends_at = "The end date must be after the start date.";
     }
+    ["text_color", "button_background_color", "button_text_color"].forEach((field) => {
+      if (!HEX_RE.test(form[field] || "")) {
+        next[field] = "Use a hex colour like #FFFFFF.";
+      }
+    });
     return next;
   };
 
@@ -260,13 +322,13 @@ export default function CampaignBannerAdminPage() {
 
     setSaving(true);
     try {
-      const result = await updateCampaignBanner(body);
-      setSaved(result);
+      const result = await updateCampaignBanner(slot, body);
+      setBanners((prev) => prev.map((banner) => (banner.slot === slot ? result : banner)));
       setDraft(null);
       setImages({ desktop: null, mobile: null });
       setErrors({});
       toast.success("Campaign banner saved and published.", {
-        description: `The homepage picks it up within about ${BANNER_REVALIDATE_SECONDS} seconds.`,
+        description: "The homepage shows the change on its next load.",
       });
     } catch (err) {
       if (err.status === 400 && err.data) {
@@ -303,6 +365,21 @@ export default function CampaignBannerAdminPage() {
     );
   }
 
+  if (!saved) {
+    return (
+      <div className="rounded-xl border border-neutral-200 bg-white p-5 text-sm text-neutral-600">
+        <p>This banner slot could not be loaded.</p>
+        <button
+          type="button"
+          onClick={load}
+          className="mt-3 rounded-lg border border-neutral-300 px-3 py-1.5 text-xs font-semibold hover:bg-neutral-50"
+        >
+          Retry
+        </button>
+      </div>
+    );
+  }
+
   const previewBanner = {
     ...form,
     desktop_image_url: imageSrc("desktop"),
@@ -311,6 +388,29 @@ export default function CampaignBannerAdminPage() {
 
   return (
     <div className="pb-24">
+      <div className="mb-5 flex flex-wrap gap-2">
+        {CAMPAIGN_BANNER_SLOTS.map((option) => {
+          const config = banners.find((banner) => banner.slot === option.value);
+          const active = option.value === slot;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              onClick={() => selectSlot(option.value)}
+              aria-pressed={active}
+              className={`flex items-center gap-2 rounded-lg border px-3 py-2 text-sm font-medium transition-colors ${
+                active
+                  ? "border-(--primary) bg-(--primary)/10 text-(--primary)"
+                  : "border-neutral-200 text-neutral-600 hover:border-neutral-300"
+              }`}
+            >
+              {option.label}
+              {config && <StatusBadge value={config.status} />}
+            </button>
+          );
+        })}
+      </div>
+
       <div className="mb-6 flex flex-wrap items-end justify-between gap-3">
         <div>
           <div className="flex items-center gap-2">
@@ -490,6 +590,14 @@ export default function CampaignBannerAdminPage() {
                 className={inputClass(errors.description)}
               />
             </Field>
+            <ColorField
+              id="text_color"
+              label="Text colour"
+              hint="Applies to the eyebrow, heading and description."
+              value={form.text_color}
+              onChange={(value) => update("text_color", value)}
+              error={errors.text_color}
+            />
           </div>
         </section>
 
@@ -529,6 +637,22 @@ export default function CampaignBannerAdminPage() {
                 className={`${inputClass(errors.button_url)} disabled:bg-neutral-50 disabled:text-neutral-400`}
               />
             </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <ColorField
+                id="button_background_color"
+                label="Button background"
+                value={form.button_background_color}
+                onChange={(value) => update("button_background_color", value)}
+                error={errors.button_background_color}
+              />
+              <ColorField
+                id="button_text_color"
+                label="Button text colour"
+                value={form.button_text_color}
+                onChange={(value) => update("button_text_color", value)}
+                error={errors.button_text_color}
+              />
+            </div>
           </div>
         </section>
       </div>

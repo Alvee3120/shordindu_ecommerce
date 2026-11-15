@@ -94,7 +94,6 @@ export default function StoreLocator() {
           </div>
 
           <div
-            data-lenis-prevent
             className="relative aspect-square w-full overflow-hidden rounded-xl border border-neutral-200 lg:w-1/2"
           >
             <iframe

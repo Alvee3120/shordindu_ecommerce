@@ -16,7 +16,8 @@
 - Do aggregation/filtering/pagination on the server; avoid fetching every record into frontend memory, and avoid N+1 queries. Confidence: 0.85
 - Protect admin/sensitive endpoints with the existing authentication and authorization; only authorized administrators access sensitive customer data, and role permissions are enforced server-side — a frontend guard alone is not acceptable. Confidence: 0.85
 - Do not show misleading metrics (e.g. suppress percentage change when the previous period is zero/unavailable rather than showing a fake value). Confidence: 0.85
-- Expects loading/skeleton states, clear empty states, and error messages with retry actions in data-driven UIs. Confidence: 0.85
+- Expects loading/skeleton states, clear empty states, and error messages with retry actions in data-driven UIs. Confidence: 0.9
+- Loading placeholders should be layout-accurate skeletons that preview the real cards (same aspect ratio, responsive widths, and label bars) rather than a generic spinner, so nothing shifts when data arrives. Confidence: 0.6
 - Expects fully responsive layouts (desktop/tablet/mobile) and accessible controls. Confidence: 0.85
 - Format currency as BDT (৳) when that matches the existing application. Confidence: 0.8
 - Prefers avoiding cluttered dashboards: show the most important metrics first, keep the layout compact with minimal whitespace and consistent card heights/spacing, prioritize useful information above the fold, and move secondary detail to dedicated pages. Confidence: 0.9
@@ -29,4 +30,11 @@
 - Distinguishes surface roles in theming: content cards (product, review, location cards) stay white, while page/section backgrounds take the theme background token — don't blanket-replace `bg-white` with a theme color across all containers. Confidence: 0.75
 - Keeps the dashboard/admin UI on a white background: the storefront's cream/theme background token (`bg-background` / `--background`) must not appear anywhere in dashboard pages or their components — everything there should be white. Confidence: 0.8
 - Time-sensitive state (e.g. "abandoned/old" thresholds) must be derived server-side from real DB timestamps on each query — not stored as a flag field, not computed from localStorage/frontend clocks, and not driven by a cron job unless the architecture already requires one. Confidence: 0.7
+- When fixing a layout/responsive bug, scope the change to the affected breakpoint range only: the desktop layout (≥1024px) and mobile layout (<640px) must stay exactly as they are, with current colors, typography, card design, radii and shadows preserved. Confidence: 0.75
 - Wants premium, smooth motion in interactive UI (e.g. carousel transitions): no abrupt or distracting animations. Confidence: 0.65
+- For horizontal carousels/rows, wants explicit arrow controls for swiping plus a partially visible next card so it's obvious there is more content to scroll, applied consistently across all similar sections rather than some scrolling and some wrapping in a grid. Confidence: 0.7
+- Prefers native browser scrolling over JavaScript smooth-scroll libraries (e.g. Lenis): no scroll-hijacking wrapper in the root layout, keep scrolling working normally in modals/inner panes. Confidence: 0.6
+- When stubbing out a new UI section, use lorem ipsum placeholder copy instead of writing real marketing text. Confidence: 0.6
+- Site-wide announcement/promo strips belong at the very top of the page (first thing inside the fixed header, above the nav), not tucked above the footer where it requires scrolling to notice. Confidence: 0.7
+- Admin-entered content text must render exactly as typed: preserve explicit spacing/separators (don't let HTML whitespace collapsing strip them) while still keeping it on one line. Confidence: 0.6
+- Content changed in the admin must appear on the storefront without a manual hard refresh; fix the staleness at its root (targeted cache invalidation / refetch) instead of disabling caching wholesale. Confidence: 0.7

@@ -3,7 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import NavbarSwitcher from "@/components/shared/NavbarSwitcher";
 import FooterSwitcher from "@/components/shared/FooterSwitcher";
-import SmoothScroll from "@/components/shared/SmoothScroll";
+import AnnouncementBar from "@/components/shared/AnnouncementBar";
 import AppLoadingShell from "./AppLoadingShell";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
@@ -54,16 +54,20 @@ export default function RootLayout({ children }) {
         <Toaster position="top-center" richColors />
         <AuthProvider>
           <CartProvider>
-            <SmoothScroll>
-              <AppLoadingShell brandText="shordindu">
-                <Suspense fallback={null}>
-                  <NavbarSwitcher />
-                </Suspense>
-                <main>{children}</main>
-                {/* <Footer /> */}
-                <FooterSwitcher />
-              </AppLoadingShell>
-            </SmoothScroll>
+            <AppLoadingShell brandText="shordindu">
+              <Suspense fallback={null}>
+                <NavbarSwitcher
+                  announcement={
+                    <Suspense fallback={null}>
+                      <AnnouncementBar />
+                    </Suspense>
+                  }
+                />
+              </Suspense>
+              <main>{children}</main>
+              {/* <Footer /> */}
+              <FooterSwitcher />
+            </AppLoadingShell>
           </CartProvider>
         </AuthProvider>
       </body>

@@ -1,49 +1,47 @@
 from django.db import transaction
 from django.db.models import Max
+from django.http import Http404
 from rest_framework import generics, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CampaignBanner, HeroBanner, HeroBannerSettings
+from .models import AnnouncementBar, CampaignBanner, HeroBanner, HeroBannerSettings
 from .permissions import IsAdminOnly
 from .serializers import (
+    AnnouncementBarAdminSerializer,
     CampaignBannerAdminSerializer,
     HeroBannerAdminSerializer,
     HeroBannerReorderSerializer,
     HeroBannerSettingsSerializer,
+    PublicAnnouncementBarSerializer,
     PublicCampaignBannerSerializer,
     PublicHeroBannerSerializer,
 )
 
 
-class PublicCampaignBannerView(APIView):
-    """The banner the homepage should show right now.
-
-    ``{"active": false, "banner": null}`` when it's disabled or outside its
-    schedule, so unpublished/upcoming campaign content isn't exposed.
-    """
+class PublicAnnouncementBarView(APIView):
+    """The announcement strip to show, or inactive when disabled/empty."""
 
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        banner = CampaignBanner.load()
-        if not banner.is_live:
-            return Response({"active": False, "banner": None})
-        data = PublicCampaignBannerSerializer(banner, context={"request": request}).data
-        return Response({"active": True, "banner": data})
+        bar = AnnouncementBar.load()
+        if not bar.is_live:
+            return Response({"active": False, "announcement": None})
+        return Response(
+            {"active": True, "announcement": PublicAnnouncementBarSerializer(bar).data}
+        )
 
 
-class CampaignBannerManageView(APIView):
-    """Admin-only read/update of the single banner configuration."""
+class AnnouncementBarManageView(APIView):
+    """Admin-only read/update of the single announcement strip."""
 
     permission_classes = [IsAdminOnly]
-    parser_classes = [MultiPartParser, FormParser, JSONParser]
 
     def get(self, request):
-        banner = CampaignBanner.load()
-        return Response(CampaignBannerAdminSerializer(banner, context={"request": request}).data)
+        return Response(AnnouncementBarAdminSerializer(AnnouncementBar.load()).data)
 
     def put(self, request):
         return self._update(request, partial=False)
@@ -52,7 +50,73 @@ class CampaignBannerManageView(APIView):
         return self._update(request, partial=True)
 
     def _update(self, request, partial):
-        banner = CampaignBanner.load()
+        serializer = AnnouncementBarAdminSerializer(
+            AnnouncementBar.load(), data=request.data, partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(updated_by=request.user)
+        return Response(serializer.data)
+
+
+class PublicCampaignBannersView(APIView):
+    """The campaign banners the homepage should show right now, by slot.
+
+    Disabled, scheduled-in-the-future and expired banners are omitted so
+    unpublished campaign content is never exposed.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        banners = [banner for banner in CampaignBanner.objects.order_by("slot") if banner.is_live]
+        return Response(
+            {
+                "banners": PublicCampaignBannerSerializer(
+                    banners, many=True, context={"request": request}
+                ).data
+            }
+        )
+
+
+class CampaignBannersManageView(APIView):
+    """Admin-only list of every banner slot's configuration."""
+
+    permission_classes = [IsAdminOnly]
+
+    def get(self, request):
+        banners = CampaignBanner.objects.order_by("slot")
+        return Response(
+            CampaignBannerAdminSerializer(
+                banners, many=True, context={"request": request}
+            ).data
+        )
+
+
+class CampaignBannerManageView(APIView):
+    """Admin-only read/update of one banner slot (created if it doesn't exist)."""
+
+    permission_classes = [IsAdminOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+
+    VALID_SLOTS = {CampaignBanner.Slot.AFTER_CATEGORIES, CampaignBanner.Slot.BEFORE_MEN}
+
+    def _banner(self, slot):
+        if slot not in self.VALID_SLOTS:
+            raise Http404
+        return CampaignBanner.load(slot)
+
+    def get(self, request, slot):
+        banner = self._banner(slot)
+        return Response(CampaignBannerAdminSerializer(banner, context={"request": request}).data)
+
+    def put(self, request, slot):
+        return self._update(request, slot, partial=False)
+
+    def patch(self, request, slot):
+        return self._update(request, slot, partial=True)
+
+    def _update(self, request, slot, partial):
+        banner = self._banner(slot)
         serializer = CampaignBannerAdminSerializer(
             banner, data=request.data, partial=partial, context={"request": request}
         )

@@ -1,7 +1,9 @@
+from django.db.models import Count, Q
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -9,7 +11,7 @@ from rest_framework.views import APIView
 from apps.core.permissions import IsAdminOnly, IsAdminOrReadOnly, is_admin
 
 from . import imports as bulk_imports
-from .filters import ProductFilter
+from .filters import ProductFilter, color_condition
 from .pricing import PricingEngine, discounted_product_ids
 from .promotions import promotion_product_ids
 from .models import (
@@ -20,9 +22,12 @@ from .models import (
     Product,
     ProductAddon,
     ProductAttributeValue,
+    ProductColor,
     ProductImage,
     ProductVariation,
     StockNotification,
+    VariationAttributeValue,
+    is_color_attribute,
 )
 from .serializers import (
     AttributeSerializer,
@@ -32,6 +37,7 @@ from .serializers import (
     DiscountSerializer,
     ProductAddonSerializer,
     ProductAttributeValueSerializer,
+    ProductColorSerializer,
     ProductImageSerializer,
     ProductSerializer,
     ProductVariationSerializer,
@@ -56,13 +62,78 @@ class AttributeViewSet(viewsets.ModelViewSet):
 
 
 class AttributeValueViewSet(viewsets.ModelViewSet):
-    queryset = AttributeValue.objects.all()
+    queryset = AttributeValue.objects.select_related("attribute").order_by(
+        "attribute__name", "sort_order", "value"
+    )
     serializer_class = AttributeValueSerializer
     permission_classes = [IsAdminOrReadOnly]
+    filterset_fields = ["attribute"]
+    search_fields = ["value"]
+    ordering_fields = ["sort_order", "value"]
+
+    @action(detail=False, methods=["get"], url_path="color-library")
+    def color_library(self, request):
+        """Reusable colors, shared by every product, with usage counts."""
+        queryset = (
+            AttributeValue.objects.filter(
+                Q(attribute__name__iexact="color") | Q(attribute__name__iexact="colour")
+            )
+            .order_by("sort_order", "value")
+        )
+        search = (request.query_params.get("search") or "").strip()
+        if search:
+            queryset = queryset.filter(value__icontains=search)
+        values = list(queryset)
+        color_ids = [value.id for value in values]
+
+        # A color is "in use" if any product links it directly, as a variation
+        # color, or through a product color config. All three cascade on delete,
+        # so the count has to include all of them.
+        usage = {}
+
+        def record(product_id, color_id):
+            usage.setdefault(color_id, set()).add(product_id)
+
+        for product_id, color_id in ProductColor.objects.filter(
+            attribute_value_id__in=color_ids
+        ).values_list("product_id", "attribute_value_id"):
+            record(product_id, color_id)
+        for product_id, color_id in ProductAttributeValue.objects.filter(
+            attribute_value_id__in=color_ids
+        ).values_list("product_id", "attribute_value_id"):
+            record(product_id, color_id)
+        for product_id, color_id in VariationAttributeValue.objects.filter(
+            attribute_value_id__in=color_ids
+        ).values_list("variation__product_id", "attribute_value_id"):
+            if product_id:
+                record(product_id, color_id)
+
+        return Response(
+            [
+                {
+                    "id": value.id,
+                    "name": value.value,
+                    "hex_code": value.hex_code or "#D1D5DB",
+                    "usage_count": len(usage.get(value.id, ())),
+                }
+                for value in values
+            ]
+        )
 
 
 class ProductViewSet(viewsets.ModelViewSet):
-    queryset = Product.objects.all().prefetch_related("categories").order_by("-created_at")
+    queryset = (
+        Product.objects.annotate(addon_count=Count("addon_links", distinct=True))
+        .prefetch_related(
+            "categories",
+            "images",
+            "variations__images",
+            "variations__variation_attribute_values__attribute_value__attribute",
+            "product_attribute_values__attribute_value__attribute",
+            "product_colors__attribute_value__attribute",
+        )
+        .order_by("-created_at")
+    )
     serializer_class = ProductSerializer
     permission_classes = [IsAdminOrReadOnly]
     filterset_class = ProductFilter
@@ -77,6 +148,37 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.action == "list" and not is_admin(self.request.user):
             queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
         return queryset.distinct()
+
+    @action(detail=False, methods=["get"], url_path="color-facets")
+    def color_facets(self, request):
+        """Available colors with product counts for the shop color filter."""
+        params = request.query_params.copy()
+        params.pop("color", None)
+        base = Product.objects.filter(status=Product.Status.ACTIVE).exclude(
+            visibility_type=Product.VisibilityType.ADDON_ONLY
+        )
+        filtered = ProductFilter(params, queryset=base).qs.distinct()
+
+        color_values = [
+            attribute_value
+            for attribute_value in AttributeValue.objects.select_related("attribute").order_by(
+                "sort_order", "value"
+            )
+            if is_color_attribute(attribute_value.attribute.name)
+        ]
+
+        colors = []
+        for attribute_value in color_values:
+            count = filtered.filter(color_condition(attribute_value.id)).distinct().count()
+            colors.append(
+                {
+                    "attribute_value": attribute_value.id,
+                    "name": attribute_value.value,
+                    "hex_code": attribute_value.hex_code or "#D1D5DB",
+                    "count": count,
+                }
+            )
+        return Response({"colors": colors})
 
     @action(detail=True, methods=["get"])
     def addons(self, request, pk=None):
@@ -122,6 +224,36 @@ class ProductImageViewSet(viewsets.ModelViewSet):
     queryset = ProductImage.objects.all().select_related("product", "variation")
     serializer_class = ProductImageSerializer
     permission_classes = [IsAdminOrReadOnly]
+
+
+class ProductColorViewSet(viewsets.ModelViewSet):
+    queryset = ProductColor.objects.select_related(
+        "product", "attribute_value__attribute"
+    ).order_by("sort_order", "id")
+    serializer_class = ProductColorSerializer
+    permission_classes = [IsAdminOrReadOnly]
+    parser_classes = [MultiPartParser, FormParser, JSONParser]
+    filterset_fields = ["product", "is_active"]
+    ordering_fields = ["sort_order"]
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        if VariationAttributeValue.objects.filter(
+            variation__product=instance.product,
+            attribute_value=instance.attribute_value,
+        ).exists():
+            return Response(
+                {
+                    "detail": "This color is used by product variations. "
+                    "Remove it from the variations first."
+                },
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        ProductAttributeValue.objects.filter(
+            product=instance.product, attribute_value=instance.attribute_value
+        ).delete()
+        instance.delete()
+        return Response(status=status.HTTP_204_NO_CONTENT)
 
 
 class ProductAttributeValueViewSet(viewsets.ModelViewSet):
@@ -230,7 +362,6 @@ class DiscountShowcaseView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    PRODUCTS_PER_SECTION = 8
 
     def get(self, request):
         engine = PricingEngine()
@@ -247,11 +378,15 @@ class DiscountShowcaseView(APIView):
             )
             if not ids:
                 continue
-            shown = ids[: self.PRODUCTS_PER_SECTION]
             products = {
                 p.pk: p
-                for p in Product.objects.filter(pk__in=shown).prefetch_related(
-                    "categories", "images", "variations__images", "variations__variation_attribute_values"
+                for p in Product.objects.filter(pk__in=ids).prefetch_related(
+                    "categories",
+                    "images",
+                    "variations__images",
+                    "variations__variation_attribute_values__attribute_value__attribute",
+                    "product_attribute_values__attribute_value__attribute",
+                    "product_colors__attribute_value__attribute",
                 )
             }
             sections.append(
@@ -272,7 +407,7 @@ class DiscountShowcaseView(APIView):
                     "ends_at": datetime_field.to_representation(discount.ends_at),
                     "product_count": len(ids),
                     "products": ProductSerializer(
-                        [products[pk] for pk in shown if pk in products], many=True, context=context
+                        [products[pk] for pk in ids if pk in products], many=True, context=context
                     ).data,
                 }
             )

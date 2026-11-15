@@ -11,6 +11,7 @@ import {
   deleteDiscount,
   formatDiscountValue,
   listDiscounts,
+  notifyDiscountsChanged,
 } from "@/lib/discounts";
 import { formatDate } from "@/lib/format";
 import StatusBadge from "@/components/admin/StatusBadge";
@@ -89,6 +90,7 @@ export default function AdminDiscountsPage() {
     setDeletingId(discount.id);
     try {
       await deleteDiscount(discount.id);
+      notifyDiscountsChanged();
       toast.success("Discount deleted.");
       reload();
     } catch (err) {

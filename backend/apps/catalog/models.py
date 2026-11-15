@@ -49,6 +49,7 @@ class Attribute(models.Model):
 class AttributeValue(models.Model):
     attribute = models.ForeignKey(Attribute, on_delete=models.CASCADE, related_name="values")
     value = models.CharField(max_length=100)
+    hex_code = models.CharField(max_length=7, blank=True)
     sort_order = models.PositiveIntegerField(default=0)
 
     class Meta:
@@ -58,6 +59,13 @@ class AttributeValue(models.Model):
 
     def __str__(self):
         return f"{self.attribute.name}: {self.value}"
+
+
+COLOR_ATTRIBUTE_NAMES = {"color", "colour"}
+
+
+def is_color_attribute(name):
+    return (name or "").strip().lower() in COLOR_ATTRIBUTE_NAMES
 
 
 class Product(models.Model):
@@ -170,6 +178,37 @@ class ProductImage(models.Model):
 
     def __str__(self):
         return f"{self.product.name} image {self.id}"
+
+
+class ProductColor(models.Model):
+    """Product-specific presentation config for a Color attribute value.
+
+    The actual color identity stays in AttributeValue (shared by variations);
+    this row only owns the product's color image, active state and order."""
+
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, related_name="product_colors")
+    attribute_value = models.ForeignKey(
+        AttributeValue, on_delete=models.CASCADE, related_name="product_colors"
+    )
+    image = models.ImageField(upload_to="products/colors/", blank=True, null=True)
+    is_active = models.BooleanField(default=True)
+    sort_order = models.PositiveIntegerField(default=0)
+
+    class Meta:
+        db_table = "product_colors"
+        ordering = ["sort_order", "id"]
+        unique_together = ("product", "attribute_value")
+
+    @property
+    def name(self):
+        return self.attribute_value.value
+
+    @property
+    def hex_code(self):
+        return self.attribute_value.hex_code
+
+    def __str__(self):
+        return f"{self.product.name} - {self.attribute_value.value}"
 
 
 class ProductAddon(models.Model):

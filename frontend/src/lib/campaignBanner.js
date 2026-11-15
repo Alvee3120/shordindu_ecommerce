@@ -1,33 +1,39 @@
-// lib/campaignBanner.js — homepage campaign banner (content managed by admins).
+// lib/campaignBanner.js — homepage campaign banners (content managed by admins).
 import { apiFetch } from "./api";
 
-// How long the homepage may serve a cached banner before re-checking the
-// backend. Bounds how quickly admin edits and schedule start/end times show.
-export const BANNER_REVALIDATE_SECONDS = 60;
+/** Slots, in homepage order. Kept in sync with the backend CampaignBanner.Slot. */
+export const CAMPAIGN_BANNER_SLOTS = [
+  { value: 1, label: "Banner 1 — After categories" },
+  { value: 2, label: "Banner 2 — Before Men" },
+];
 
 /**
- * The banner to show right now, or null (disabled, outside its schedule, or
- * the backend is unreachable — the homepage simply renders without it).
- * Server-side: cached and revalidated every BANNER_REVALIDATE_SECONDS.
+ * Banners to show right now, ordered by slot. Disabled, scheduled-in-the-future
+ * and expired banners come back omitted. Always fresh, so an admin's save
+ * shows on the next homepage load. Returns [] if the backend is unreachable.
  */
-export async function getActiveCampaignBanner() {
+export async function getActiveCampaignBanners() {
   try {
-    const data = await apiFetch("/campaign-banner/", {
+    const data = await apiFetch("/campaign-banners/", {
       method: "GET",
-      next: { revalidate: BANNER_REVALIDATE_SECONDS },
+      cache: "no-store",
     });
-    return data?.active ? data.banner : null;
+    return Array.isArray(data?.banners) ? data.banners : [];
   } catch {
-    return null;
+    return [];
   }
 }
 
-/** Admin only: the full configuration, including schedule and status. */
-export function getCampaignBannerConfig() {
-  return apiFetch("/campaign-banner/manage/", { method: "GET" });
+/** Admin only: the configuration of every banner slot. */
+export function getCampaignBannerConfigs() {
+  return apiFetch("/campaign-banners/manage/", { method: "GET" });
 }
 
-/** Admin only: save + publish. `formData` carries text fields and any new image files. */
-export function updateCampaignBanner(formData) {
-  return apiFetch("/campaign-banner/manage/", { method: "PUT", body: formData, isFormData: true });
+/** Admin only: save + publish one slot. `formData` carries text fields and new image files. */
+export function updateCampaignBanner(slot, formData) {
+  return apiFetch(`/campaign-banners/manage/${slot}/`, {
+    method: "PUT",
+    body: formData,
+    isFormData: true,
+  });
 }

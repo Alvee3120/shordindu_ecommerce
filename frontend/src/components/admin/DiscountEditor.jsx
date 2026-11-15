@@ -11,6 +11,7 @@ import {
   createDiscount,
   getDiscount,
   isBasketDiscount,
+  notifyDiscountsChanged,
   updateDiscount,
 } from "@/lib/discounts";
 import { formatBDT } from "@/lib/format";
@@ -304,6 +305,7 @@ export default function DiscountEditor({ discountId }) {
     try {
       if (isNew) await createDiscount(payload);
       else await updateDiscount(discountId, payload);
+      notifyDiscountsChanged();
       toast.success(isNew ? "Discount created." : "Discount updated.");
       router.push(LIST_PATH);
     } catch (err) {
