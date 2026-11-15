@@ -3,11 +3,16 @@ from django.utils import timezone
 
 
 class CampaignBanner(models.Model):
-    """Singleton (always pk=1): the homepage campaign banner, edited by admins.
+    """A fixed homepage campaign banner slot, edited by admins.
 
-    Images are stored through the configured media storage (local MEDIA_ROOT
-    or S3); the database only keeps their storage paths.
+    Slot 1 renders after the category section; slot 2 renders before the Men
+    collection. Images are stored through the configured media storage (local
+    MEDIA_ROOT or S3); the database only keeps their storage paths.
     """
+
+    class Slot(models.IntegerChoices):
+        AFTER_CATEGORIES = 1, "After categories"
+        BEFORE_MEN = 2, "Before Men"
 
     class ImageMode(models.TextChoices):
         RESPONSIVE = "responsive", "Desktop image on desktop, mobile image on mobile"
@@ -20,6 +25,9 @@ class CampaignBanner(models.Model):
         LIVE = "live", "Live"
         ENDED = "ended", "Ended"
 
+    slot = models.PositiveSmallIntegerField(
+        choices=Slot.choices, unique=True, default=Slot.AFTER_CATEGORIES
+    )
     is_enabled = models.BooleanField(default=True)
     image_mode = models.CharField(max_length=20, choices=ImageMode.choices, default=ImageMode.RESPONSIVE)
     desktop_image = models.ImageField(upload_to="campaign/", blank=True)
@@ -30,6 +38,11 @@ class CampaignBanner(models.Model):
     # Newlines are rendered as line breaks in the banner heading.
     heading = models.CharField(max_length=120)
     description = models.TextField(max_length=300, blank=True)
+
+    # Admin-picked colours (hex), applied to the overlay text and the button.
+    text_color = models.CharField(max_length=7, default="#FFFFFF")
+    button_background_color = models.CharField(max_length=7, default="#FFFFFF")
+    button_text_color = models.CharField(max_length=7, default="#171717")
 
     button_enabled = models.BooleanField(default=True)
     button_label = models.CharField(max_length=40, blank=True)
@@ -47,17 +60,14 @@ class CampaignBanner(models.Model):
 
     class Meta:
         db_table = "campaign_banner"
+        ordering = ["slot"]
 
     def __str__(self):
-        return "Campaign banner"
-
-    def save(self, *args, **kwargs):
-        self.pk = 1
-        super().save(*args, **kwargs)
+        return f"Campaign banner — {self.get_slot_display()}"
 
     @classmethod
-    def load(cls):
-        banner, _ = cls.objects.get_or_create(pk=1, defaults={"heading": "Campaign"})
+    def load(cls, slot=Slot.AFTER_CATEGORIES):
+        banner, _ = cls.objects.get_or_create(slot=slot, defaults={"heading": "Campaign"})
         return banner
 
     def status_at(self, now=None):

@@ -546,19 +546,25 @@ read and at checkout (cart items gain `original_unit_price` / `discount`), and o
 
 `GET /api/discount-showcases/` (public) — the homepage sections: every live discount
 `{id, name, type, value, target_type, category, starts_at, ends_at, product_count, products: [...]}`
-with up to 8 products (normal product objects, effective prices included). A product is listed
-under the discount that actually prices it; discounts with no eligible products are omitted.
+with every product the discount currently prices (normal product objects, effective prices
+included). A product is listed under the discount that actually prices it; discounts with no
+eligible products are omitted.
 `GET /api/products/?discount=<id>` lists all of a live discount's products ("View All").
 
-### Campaign banner
-`GET /api/campaign-banner/` (public) — `{"active": true, "banner": {image_mode, desktop_image_url,
-mobile_image_url, image_alt, eyebrow, heading, description, button_enabled, button_label,
-button_url, updated_at}}`, or `{"active": false, "banner": null}` when it's disabled or outside its
-start/end dates (Asia/Dhaka). `heading` uses `
+### Campaign banners
+Two fixed slots, managed by admins: `slot` `1` renders after the homepage category section, `2`
+renders before the Men collection.
+
+`GET /api/campaign-banners/` (public) — `{"banners": [{slot, image_mode, desktop_image_url,
+mobile_image_url, image_alt, eyebrow, heading, description, text_color, button_enabled,
+button_label, button_url, button_background_color, button_text_color, updated_at}]}` — only
+banners that are live right now (disabled and out-of-schedule slots are omitted). Colours are
+`#RRGGBB`. `heading` uses `
 ` for line breaks.
 
-`/api/campaign-banner/manage/` (admin only) — `GET` the full config (adds `is_enabled`,
-`starts_at`, `ends_at`, `status`: `live|scheduled|ended|disabled`). `PUT`/`PATCH` as
+`GET /api/campaign-banners/manage/` (admin only) — every slot's full config (adds `is_enabled`,
+`starts_at`, `ends_at`, `status`: `live|scheduled|ended|disabled`).
+`GET/PUT/PATCH /api/campaign-banners/manage/<slot>/` reads or updates one slot as
 `multipart/form-data`: the text fields, optional `desktop_image` / `mobile_image` files (JPEG, PNG
 or WebP, max 5 MB) and `remove_desktop_image` / `remove_mobile_image` flags. `button_url` must be a
 site path (`/shop`) or an `http(s)://` URL.
@@ -670,8 +676,9 @@ product** (a second `POST` for the same product returns `400 non_field_errors`).
 | GET/PUT | `/api/delivery-charges/` | read: —, write: admin |
 | GET/POST/PATCH/DELETE | `/api/discounts/[:id/]` | admin only |
 | GET | `/api/discount-showcases/` | — |
-| GET | `/api/campaign-banner/` | — |
-| GET/PUT/PATCH | `/api/campaign-banner/manage/` | admin only |
+| GET | `/api/campaign-banners/` | — |
+| GET | `/api/campaign-banners/manage/` | admin only |
+| GET/PUT/PATCH | `/api/campaign-banners/manage/<slot>/` | admin only |
 | GET/POST/PATCH/DELETE | `/api/reviews/[:id/]` | read: —, write: ✓ (own only) |
 
 ("—" = no auth needed; "✓" = must be logged in)

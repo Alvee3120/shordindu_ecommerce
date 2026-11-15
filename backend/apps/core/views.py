@@ -1,5 +1,6 @@
 from django.db import transaction
 from django.db.models import Max
+from django.http import Http404
 from rest_framework import generics, permissions
 from rest_framework.exceptions import ValidationError
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
@@ -18,41 +19,65 @@ from .serializers import (
 )
 
 
-class PublicCampaignBannerView(APIView):
-    """The banner the homepage should show right now.
+class PublicCampaignBannersView(APIView):
+    """The campaign banners the homepage should show right now, by slot.
 
-    ``{"active": false, "banner": null}`` when it's disabled or outside its
-    schedule, so unpublished/upcoming campaign content isn't exposed.
+    Disabled, scheduled-in-the-future and expired banners are omitted so
+    unpublished campaign content is never exposed.
     """
 
     permission_classes = [permissions.AllowAny]
 
     def get(self, request):
-        banner = CampaignBanner.load()
-        if not banner.is_live:
-            return Response({"active": False, "banner": None})
-        data = PublicCampaignBannerSerializer(banner, context={"request": request}).data
-        return Response({"active": True, "banner": data})
+        banners = [banner for banner in CampaignBanner.objects.order_by("slot") if banner.is_live]
+        return Response(
+            {
+                "banners": PublicCampaignBannerSerializer(
+                    banners, many=True, context={"request": request}
+                ).data
+            }
+        )
+
+
+class CampaignBannersManageView(APIView):
+    """Admin-only list of every banner slot's configuration."""
+
+    permission_classes = [IsAdminOnly]
+
+    def get(self, request):
+        banners = CampaignBanner.objects.order_by("slot")
+        return Response(
+            CampaignBannerAdminSerializer(
+                banners, many=True, context={"request": request}
+            ).data
+        )
 
 
 class CampaignBannerManageView(APIView):
-    """Admin-only read/update of the single banner configuration."""
+    """Admin-only read/update of one banner slot (created if it doesn't exist)."""
 
     permission_classes = [IsAdminOnly]
     parser_classes = [MultiPartParser, FormParser, JSONParser]
 
-    def get(self, request):
-        banner = CampaignBanner.load()
+    VALID_SLOTS = {CampaignBanner.Slot.AFTER_CATEGORIES, CampaignBanner.Slot.BEFORE_MEN}
+
+    def _banner(self, slot):
+        if slot not in self.VALID_SLOTS:
+            raise Http404
+        return CampaignBanner.load(slot)
+
+    def get(self, request, slot):
+        banner = self._banner(slot)
         return Response(CampaignBannerAdminSerializer(banner, context={"request": request}).data)
 
-    def put(self, request):
-        return self._update(request, partial=False)
+    def put(self, request, slot):
+        return self._update(request, slot, partial=False)
 
-    def patch(self, request):
-        return self._update(request, partial=True)
+    def patch(self, request, slot):
+        return self._update(request, slot, partial=True)
 
-    def _update(self, request, partial):
-        banner = CampaignBanner.load()
+    def _update(self, request, slot, partial):
+        banner = self._banner(slot)
         serializer = CampaignBannerAdminSerializer(
             banner, data=request.data, partial=partial, context={"request": request}
         )

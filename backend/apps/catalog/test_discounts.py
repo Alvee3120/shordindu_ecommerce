@@ -442,6 +442,16 @@ class DiscountShowcaseTests(DiscountFixtures, APITestCase):
         self.discount(categories=[self.other], name="Too Big", type="fixed", value="600")  # > ৳500 bag
         self.assertEqual(self.sections(), {})
 
+    def test_section_includes_every_discounted_product(self):
+        products = [
+            self.make_product(f"Bulk Item {index}", self.other, "100.00", sku=f"BULK-{index}")
+            for index in range(10)
+        ]
+        self.discount(products=products, name="Bulk Deal")
+        section = self.sections()["Bulk Deal"]
+        self.assertEqual(section["product_count"], 10)
+        self.assertEqual(len(section["products"]), 10)
+
     def test_admin_edits_are_reflected(self):
         discount = self.discount(products=[self.serum], name="Summer Sale")
         self.assertIn("Summer Sale", self.sections())

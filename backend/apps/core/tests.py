@@ -25,8 +25,11 @@ def image_upload(name="banner.png", fmt="PNG", size=(40, 20)):
 
 @override_settings(MEDIA_ROOT=TEMP_MEDIA)
 class CampaignBannerApiTests(APITestCase):
-    PUBLIC = "/api/campaign-banner/"
-    MANAGE = "/api/campaign-banner/manage/"
+    PUBLIC = "/api/campaign-banners/"
+    MANAGE = "/api/campaign-banners/manage/"
+
+    def detail(self, slot):
+        return f"{self.MANAGE}{slot}/"
 
     @classmethod
     def tearDownClass(cls):
@@ -38,12 +41,17 @@ class CampaignBannerApiTests(APITestCase):
         self.cce = User.objects.create_user(email="cce@x.com", password="pw", name="CCE", role=User.Role.CCE)
         self.customer = User.objects.create_user(email="c@x.com", password="pw", name="Customer")
         # Known state, independent of whatever the seed migration found on disk.
-        banner = CampaignBanner.load()
+        banner = CampaignBanner.load(CampaignBanner.Slot.AFTER_CATEGORIES)
         banner.is_enabled = True
         banner.desktop_image = image_upload()
         banner.mobile_image = ""
         banner.starts_at = banner.ends_at = None
         banner.save()
+        second = CampaignBanner.load(CampaignBanner.Slot.BEFORE_MEN)
+        second.is_enabled = False
+        second.heading = "Second Campaign"
+        second.desktop_image = image_upload("second.jpg", "JPEG")
+        second.save()
 
     def valid_payload(self, **overrides):
         payload = {
@@ -59,30 +67,41 @@ class CampaignBannerApiTests(APITestCase):
         payload.update(overrides)
         return payload
 
-    def put(self, user=None, **overrides):
+    def put(self, user=None, slot=1, **overrides):
         if user:
             self.client.force_authenticate(user)
-        return self.client.put(self.MANAGE, self.valid_payload(**overrides), format="multipart")
+        return self.client.put(self.detail(slot), self.valid_payload(**overrides), format="multipart")
 
     # -- seed / public --------------------------------------------------------
 
     def test_seeded_defaults_match_the_old_hardcoded_banner(self):
-        banner = CampaignBanner.load()
+        banner = CampaignBanner.load(CampaignBanner.Slot.AFTER_CATEGORIES)
         self.assertEqual(banner.eyebrow, "SEASONAL OFFER")
         self.assertEqual(banner.heading, "Mid Year\nClearance\nSale")
         self.assertEqual(banner.button_url, "/shop")
-        self.assertEqual(CampaignBanner.objects.count(), 1)
+        self.assertEqual(CampaignBanner.objects.count(), 2)
+        self.assertEqual(
+            set(CampaignBanner.objects.values_list("slot", flat=True)),
+            {CampaignBanner.Slot.AFTER_CATEGORIES, CampaignBanner.Slot.BEFORE_MEN},
+        )
 
-    def test_public_endpoint_returns_live_banner(self):
+    def test_public_endpoint_returns_live_banners_by_slot(self):
         response = self.client.get(self.PUBLIC)
         self.assertEqual(response.status_code, 200)
-        self.assertTrue(response.data["active"])
-        banner = response.data["banner"]
+        self.assertEqual(len(response.data["banners"]), 1)
+        banner = response.data["banners"][0]
+        self.assertEqual(banner["slot"], CampaignBanner.Slot.AFTER_CATEGORIES)
         self.assertTrue(banner["desktop_image_url"].startswith("http://testserver/media/campaign/"))
         self.assertIsNone(banner["mobile_image_url"])
         self.assertEqual(banner["image_alt"], "Mid Year Clearance Sale")
         for admin_field in ("is_enabled", "starts_at", "status", "updated_by_name"):
             self.assertNotIn(admin_field, banner)
+
+        # Both slots can be live independently.
+        self.put(self.admin, slot=2, heading="Men Campaign")
+        banners = self.client.get(self.PUBLIC).data["banners"]
+        self.assertEqual([b["slot"] for b in banners], [1, 2])
+        self.assertEqual(banners[1]["heading"], "Men Campaign")
 
     def test_disabled_and_out_of_schedule_banners_are_hidden(self):
         now = timezone.now()
@@ -92,33 +111,35 @@ class CampaignBannerApiTests(APITestCase):
             {"ends_at": now - timedelta(minutes=1)},
         ]
         for changes in cases:
-            CampaignBanner.objects.filter(pk=1).update(
+            CampaignBanner.objects.filter(slot=1).update(
                 **{"is_enabled": True, "starts_at": None, "ends_at": None, **changes}
             )
             response = self.client.get(self.PUBLIC)
-            self.assertEqual(response.data, {"active": False, "banner": None}, changes)
+            self.assertEqual(response.data, {"banners": []}, changes)
 
-        CampaignBanner.objects.filter(pk=1).update(
+        CampaignBanner.objects.filter(slot=1).update(
             starts_at=now - timedelta(hours=1), ends_at=now + timedelta(hours=1)
         )
-        self.assertTrue(self.client.get(self.PUBLIC).data["active"])
+        self.assertEqual(len(self.client.get(self.PUBLIC).data["banners"]), 1)
 
     def test_status_reported_to_admin(self):
         now = timezone.now()
-        CampaignBanner.objects.filter(pk=1).update(starts_at=now + timedelta(days=1))
+        CampaignBanner.objects.filter(slot=1).update(starts_at=now + timedelta(days=1))
         self.client.force_authenticate(self.admin)
-        self.assertEqual(self.client.get(self.MANAGE).data["status"], "scheduled")
+        self.assertEqual(self.client.get(self.detail(1)).data["status"], "scheduled")
 
     # -- permissions ----------------------------------------------------------
 
     def test_only_admins_can_read_or_change_the_configuration(self):
         self.assertEqual(self.client.get(self.MANAGE).status_code, 401)
+        self.assertEqual(self.client.get(self.detail(1)).status_code, 401)
         self.assertEqual(self.put().status_code, 401)
         for user in (self.cce, self.customer):
             self.client.force_authenticate(user)
             self.assertEqual(self.client.get(self.MANAGE).status_code, 403)
+            self.assertEqual(self.client.get(self.detail(1)).status_code, 403)
             self.assertEqual(self.put(heading="Hacked").status_code, 403)
-            self.assertEqual(self.client.patch(self.MANAGE, {"heading": "Hacked"}).status_code, 403)
+            self.assertEqual(self.client.patch(self.detail(1), {"heading": "Hacked"}).status_code, 403)
         self.assertNotEqual(CampaignBanner.load().heading, "Hacked")
 
     # -- updates --------------------------------------------------------------
@@ -135,7 +156,9 @@ class CampaignBannerApiTests(APITestCase):
         self.assertEqual(response.data["image_alt"], "Eid collection")
         self.assertTrue(response.data["mobile_image_url"].endswith(".jpg"))
         self.assertEqual(response.data["updated_by_name"], "Admin")
-        self.assertEqual(CampaignBanner.objects.count(), 1)
+        self.assertEqual(CampaignBanner.objects.count(), 2)
+        # The other slot is untouched.
+        self.assertEqual(CampaignBanner.load(2).heading, "Second Campaign")
 
         response = self.put(remove_mobile_image="true")
         self.assertEqual(response.status_code, 200, response.data)
@@ -147,6 +170,25 @@ class CampaignBannerApiTests(APITestCase):
         self.assertEqual(response.data["heading"], "Mid Year\nClearance\nSale")
         self.assertEqual(self.put(heading=" \n ").status_code, 400)
         self.assertEqual(self.put(heading="a\nb\nc\nd\ne").status_code, 400)
+
+    def test_colours_are_saved_and_validated(self):
+        response = self.put(
+            self.admin,
+            text_color="#000000",
+            button_background_color="#FF0000",
+            button_text_color="#FFFFFF",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["text_color"], "#000000")
+        self.assertEqual(response.data["button_background_color"], "#FF0000")
+        self.assertEqual(response.data["button_text_color"], "#FFFFFF")
+
+        public = self.client.get(self.PUBLIC).data["banners"][0]
+        self.assertEqual(public["text_color"], "#000000")
+        self.assertEqual(public["button_background_color"], "#FF0000")
+
+        self.assertEqual(self.put(text_color="black").status_code, 400)
+        self.assertEqual(self.put(button_text_color="#fff").status_code, 400)
 
     def test_button_url_validation(self):
         self.client.force_authenticate(self.admin)

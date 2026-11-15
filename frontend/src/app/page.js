@@ -13,11 +13,13 @@ export default function Home() {
   <div className="">
     <Banner />
     <CategoryShowcase />
+    {/* Admin-managed campaign banners (/dashboard/admin/campaign-banner). */}
+    <CampaignBanner slot={1} />
     {/* One section per live automatic discount (admin-managed). */}
     <DiscountShowcases />
     <NewArrivals />
     <Saree />
-    <CampaignBanner />
+    <CampaignBanner slot={2} />
     <Men />
     <Bag />
     <CustomerReviews />

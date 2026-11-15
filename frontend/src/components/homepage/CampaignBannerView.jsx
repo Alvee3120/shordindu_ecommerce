@@ -80,12 +80,15 @@ export default function CampaignBannerView({ banner, variant = "responsive", con
   const headingLines = (banner.heading || "").split("\n").filter((line) => line.trim());
   const alt = banner.image_alt || headingLines.join(" ");
   const showButton = banner.button_enabled && banner.button_label && banner.button_url;
-  const buttonClass = `inline-block rounded-md bg-(--primary) transition-transform hover:scale-105 px-6 py-3 ${s.button} font-semibold tracking-wide text-white uppercase`;
+  const textColor = banner.text_color || "#FFFFFF";
+  const buttonBackground = banner.button_background_color || "#FFFFFF";
+  const buttonText = banner.button_text_color || "#171717";
+  const buttonClass = `inline-block rounded-sm px-8 py-3 ${s.button} font-semibold tracking-[0.2em] uppercase transition-opacity hover:opacity-90`;
 
   return (
     <section
       aria-label={alt || "Campaign"}
-      className={`relative flex ${s.height} items-center overflow-hidden bg-neutral-200 ${
+      className={`relative flex ${s.height} items-end justify-center overflow-hidden bg-neutral-200 ${
         // mt-16 matches the pt-16 gap the homepage product sections leave above themselves.
         contained ? "w-full" : "left-1/2 right-1/2 mx-[-50vw] mt-16 w-screen"
       }`}
@@ -98,16 +101,22 @@ export default function CampaignBannerView({ banner, variant = "responsive", con
         <BannerImage src={images.mobile} alt={alt} priority={priority} className="object-cover object-[75%_center]" />
       </div>
 
-      {/* Left text content */}
-      <div className={`relative z-10 mx-auto w-full max-w-7xl ${s.padding}`}>
-        <div className="max-w-md">
+      {/* Centered text content */}
+      <div className={`relative z-10 mx-auto w-full max-w-7xl pb-10 text-center sm:pb-14 ${s.padding}`}>
+        <div className="mx-auto max-w-2xl">
           {banner.eyebrow && (
-            <p className={`font-sora mb-3 ${s.eyebrow} font-semibold tracking-[0.2em] text-white/70`}>
+            <p
+              className={`font-sora mb-3 ${s.eyebrow} font-medium tracking-[0.18em]`}
+              style={{ color: textColor, opacity: 0.85 }}
+            >
               {banner.eyebrow}
             </p>
           )}
 
-          <h2 className={`font-sora mb-4 ${s.heading} leading-[1.05] font-extrabold tracking-tight text-white`}>
+          <h2
+            className={`font-sora mb-6 ${s.heading} leading-[1.05] font-semibold tracking-tight`}
+            style={{ color: textColor }}
+          >
             {headingLines.map((line, index) => (
               <span key={index}>
                 {index > 0 && <br />}
@@ -117,18 +126,31 @@ export default function CampaignBannerView({ banner, variant = "responsive", con
           </h2>
 
           {banner.description && (
-            <p className={`mb-6 max-w-xs ${s.description} leading-relaxed whitespace-pre-line text-white/70`}>
+            <p
+              className={`mx-auto mb-6 max-w-md ${s.description} leading-relaxed whitespace-pre-line`}
+              style={{ color: textColor, opacity: 0.85 }}
+            >
               {banner.description}
             </p>
           )}
 
           {showButton &&
             (isExternal(banner.button_url) ? (
-              <a href={banner.button_url} target="_blank" rel="noopener noreferrer" className={buttonClass}>
+              <a
+                href={banner.button_url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className={buttonClass}
+                style={{ backgroundColor: buttonBackground, color: buttonText }}
+              >
                 {banner.button_label}
               </a>
             ) : (
-              <Link href={banner.button_url} className={buttonClass}>
+              <Link
+                href={banner.button_url}
+                className={buttonClass}
+                style={{ backgroundColor: buttonBackground, color: buttonText }}
+              >
                 {banner.button_label}
               </Link>
             ))}

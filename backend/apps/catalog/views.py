@@ -362,7 +362,6 @@ class DiscountShowcaseView(APIView):
     """
 
     permission_classes = [permissions.AllowAny]
-    PRODUCTS_PER_SECTION = 8
 
     def get(self, request):
         engine = PricingEngine()
@@ -379,11 +378,15 @@ class DiscountShowcaseView(APIView):
             )
             if not ids:
                 continue
-            shown = ids[: self.PRODUCTS_PER_SECTION]
             products = {
                 p.pk: p
-                for p in Product.objects.filter(pk__in=shown).prefetch_related(
-                    "categories", "images", "variations__images", "variations__variation_attribute_values"
+                for p in Product.objects.filter(pk__in=ids).prefetch_related(
+                    "categories",
+                    "images",
+                    "variations__images",
+                    "variations__variation_attribute_values__attribute_value__attribute",
+                    "product_attribute_values__attribute_value__attribute",
+                    "product_colors__attribute_value__attribute",
                 )
             }
             sections.append(
@@ -404,7 +407,7 @@ class DiscountShowcaseView(APIView):
                     "ends_at": datetime_field.to_representation(discount.ends_at),
                     "product_count": len(ids),
                     "products": ProductSerializer(
-                        [products[pk] for pk in shown if pk in products], many=True, context=context
+                        [products[pk] for pk in ids if pk in products], many=True, context=context
                     ).data,
                 }
             )

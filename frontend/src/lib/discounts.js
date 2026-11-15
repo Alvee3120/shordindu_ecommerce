@@ -30,20 +30,35 @@ export function deleteDiscount(id) {
   return apiFetch(`/discounts/${id}/`, { method: "DELETE" });
 }
 
-// How long the homepage may serve cached discount sections before
-// re-checking — bounds how quickly a discount's start/end or an admin edit shows.
-export const SHOWCASE_REVALIDATE_SECONDS = 60;
+/**
+ * Fired after any admin discount mutation (create / edit / activate / delete).
+ * The homepage discount section listens for it on both `window` (same tab) and
+ * a BroadcastChannel (other tabs) and refetches immediately.
+ */
+export const DISCOUNTS_CHANGED_EVENT = "shordindu:discounts-changed";
+export const DISCOUNTS_CHANNEL = "shordindu:discounts";
+
+export function notifyDiscountsChanged() {
+  if (typeof window === "undefined") return;
+  window.dispatchEvent(new Event(DISCOUNTS_CHANGED_EVENT));
+  if (typeof BroadcastChannel !== "undefined") {
+    const channel = new BroadcastChannel(DISCOUNTS_CHANNEL);
+    channel.postMessage("changed");
+    channel.close();
+  }
+}
 
 /**
  * Public: live discounts, each with the products it currently prices (already
  * carrying their effective prices). Discounts without products are omitted.
- * Returns [] if the backend can't be reached, so the homepage still renders.
+ * Always fresh (`no-store`) — the homepage must reflect admin changes and
+ * scheduled start/expiry without a reload.
  */
 export async function getDiscountShowcases() {
   try {
     const data = await apiFetch("/discount-showcases/", {
       method: "GET",
-      next: { revalidate: SHOWCASE_REVALIDATE_SECONDS },
+      cache: "no-store",
     });
     return Array.isArray(data) ? data : [];
   } catch {

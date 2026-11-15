@@ -97,7 +97,7 @@ export default function CategoryShowcase() {
                 key={category.id}
                 href={category.href}
                 data-card
-                className="group w-[44%] shrink-0 snap-start sm:w-[calc(32%-11px)] md:w-[calc(23.5%-12px)]"
+                className="group w-[calc(47%-8px)] shrink-0 snap-start md:w-[calc(32%-11px)] lg:w-[calc(23.5%-12px)]"
               >
                 <div className="relative aspect-[4/5] w-full overflow-hidden bg-neutral-200">
                   <Image
@@ -105,7 +105,7 @@ export default function CategoryShowcase() {
                     alt={category.label}
                     fill
                     className="object-cover object-top transition-transform duration-500 group-hover:scale-105"
-                    sizes="(max-width: 640px) 44vw, (max-width: 768px) 32vw, 23vw"
+                    sizes="(max-width: 768px) 47vw, (max-width: 1024px) 32vw, 24vw"
                     onError={() =>
                       setBrokenImages((prev) => new Set(prev).add(category.id))
                     }
