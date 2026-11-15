@@ -1,6 +1,7 @@
 import django_filters
+from django.db.models import Exists, OuterRef, Q
 
-from .models import Discount, Product
+from .models import Discount, Product, ProductColor
 from .pricing import PricingEngine, discounted_product_ids
 from .promotions import promotion_product_ids
 
@@ -9,9 +10,28 @@ class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
     """Accepts a comma-separated list of ids, e.g. ?category=1,2,3"""
 
 
+def color_condition(color_id):
+    """A product has this color when an active ProductColor, a product-level
+    color link, or an active in-stock variation carries it. An inactive
+    ProductColor config suppresses the color even if a variation still uses it."""
+    inactive_config = ProductColor.objects.filter(
+        product=OuterRef("pk"), attribute_value_id=color_id, is_active=False
+    )
+    return (
+        Q(product_colors__attribute_value_id=color_id, product_colors__is_active=True)
+        | Q(product_attribute_values__attribute_value_id=color_id)
+        | Q(
+            variations__variation_attribute_values__attribute_value_id=color_id,
+            variations__is_active=True,
+            variations__stock_quantity__gt=0,
+        )
+    ) & ~Exists(inactive_config)
+
+
 class ProductFilter(django_filters.FilterSet):
     category = NumberInFilter(field_name="categories", lookup_expr="in")
     attribute_value = django_filters.NumberFilter(field_name="product_attribute_values__attribute_value_id")
+    color = NumberInFilter(method="filter_colors")
     min_price = django_filters.NumberFilter(field_name="variations__price", lookup_expr="gte")
     max_price = django_filters.NumberFilter(field_name="variations__price", lookup_expr="lte")
     # Products a live automatic discount currently prices ("View All" from a
@@ -20,7 +40,23 @@ class ProductFilter(django_filters.FilterSet):
 
     class Meta:
         model = Product
-        fields = ["category", "product_type", "visibility_type", "status", "attribute_value", "discount"]
+        fields = [
+            "category",
+            "product_type",
+            "visibility_type",
+            "status",
+            "attribute_value",
+            "color",
+            "discount",
+        ]
+
+    def filter_colors(self, queryset, name, value):
+        if not value:
+            return queryset
+        conditions = Q()
+        for color_id in value:
+            conditions |= color_condition(color_id)
+        return queryset.filter(conditions).distinct()
 
     def filter_discount(self, queryset, name, value):
         engine = PricingEngine()

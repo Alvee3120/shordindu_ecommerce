@@ -1,6 +1,7 @@
+import re
 from decimal import Decimal
 
-from django.db.models import Avg, Min
+from django.db.models import Avg, Max, Min
 from rest_framework import serializers
 
 from .models import (
@@ -11,12 +12,33 @@ from .models import (
     Product,
     ProductAddon,
     ProductAttributeValue,
+    ProductColor,
     ProductImage,
     ProductVariation,
     StockNotification,
     VariationAttributeValue,
+    is_color_attribute,
 )
 from .pricing import categories_with_descendants, pricing_engine_for
+
+HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
+DEFAULT_COLOR_HEX = "#D1D5DB"
+
+
+def normalize_hex(value):
+    value = (value or "").strip()
+    if not value:
+        return ""
+    if not HEX_COLOR_RE.match(value):
+        raise serializers.ValidationError("Use a hex colour like #000000.")
+    return value.upper()
+
+
+def absolute_file_url(request, field_file):
+    if not field_file:
+        return None
+    url = field_file.url
+    return request.build_absolute_uri(url) if request else url
 
 
 class CategorySerializer(serializers.ModelSerializer):
@@ -36,7 +58,10 @@ class CategoryDetailSerializer(CategorySerializer):
 class AttributeValueSerializer(serializers.ModelSerializer):
     class Meta:
         model = AttributeValue
-        fields = ["id", "attribute", "value", "sort_order"]
+        fields = ["id", "attribute", "value", "hex_code", "sort_order"]
+
+    def validate_hex_code(self, value):
+        return normalize_hex(value)
 
 
 class AttributeSerializer(serializers.ModelSerializer):
@@ -53,22 +78,136 @@ class ProductImageSerializer(serializers.ModelSerializer):
         fields = ["id", "product", "variation", "image", "alt_text", "sort_order", "is_primary"]
 
 
+class ProductColorSerializer(serializers.ModelSerializer):
+    """Product-specific color config; the color identity is the shared
+    AttributeValue used by variations."""
+
+    product = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all())
+    attribute_value = serializers.IntegerField(source="attribute_value_id", read_only=True)
+    name = serializers.CharField(max_length=100)
+    hex_code = serializers.CharField(max_length=7, required=False, allow_blank=True)
+    image = serializers.ImageField(required=False, allow_null=True, write_only=True)
+    remove_image = serializers.BooleanField(required=False, default=False, write_only=True)
+    image_url = serializers.SerializerMethodField()
+
+    class Meta:
+        model = ProductColor
+        fields = [
+            "id",
+            "product",
+            "attribute_value",
+            "name",
+            "hex_code",
+            "image",
+            "remove_image",
+            "image_url",
+            "is_active",
+            "sort_order",
+        ]
+
+    def get_image_url(self, obj):
+        return absolute_file_url(self.context.get("request"), obj.image)
+
+    def validate_name(self, value):
+        value = (value or "").strip()
+        if not value:
+            raise serializers.ValidationError("Color name is required.")
+        return value
+
+    def validate_hex_code(self, value):
+        return normalize_hex(value)
+
+    def _color_attribute(self):
+        return Attribute.objects.filter(name__iexact="Color").first() or Attribute.objects.create(
+            name="Color"
+        )
+
+    def create(self, validated_data):
+        product = validated_data.pop("product")
+        name = validated_data.pop("name")
+        hex_code = validated_data.pop("hex_code", "")
+        validated_data.pop("remove_image", None)
+
+        attribute = self._color_attribute()
+        attribute_value = AttributeValue.objects.filter(
+            attribute=attribute, value__iexact=name
+        ).first()
+        if attribute_value is None:
+            attribute_value = AttributeValue.objects.create(
+                attribute=attribute, value=name, hex_code=hex_code
+            )
+        elif hex_code:
+            attribute_value.hex_code = hex_code
+            attribute_value.save(update_fields=["hex_code"])
+
+        if ProductColor.objects.filter(product=product, attribute_value=attribute_value).exists():
+            raise serializers.ValidationError(
+                {"name": ["This color is already added to the product."]}
+            )
+
+        ProductAttributeValue.objects.get_or_create(
+            product=product, attribute_value=attribute_value
+        )
+
+        if "sort_order" not in validated_data:
+            highest = ProductColor.objects.filter(product=product).aggregate(
+                value=Max("sort_order")
+            )["value"]
+            validated_data["sort_order"] = 0 if highest is None else highest + 1
+
+        return ProductColor.objects.create(
+            product=product, attribute_value=attribute_value, **validated_data
+        )
+
+    def update(self, instance, validated_data):
+        validated_data.pop("product", None)
+        name = validated_data.pop("name", None)
+        hex_code = validated_data.pop("hex_code", None)
+        if validated_data.pop("remove_image", False) and "image" not in validated_data:
+            validated_data["image"] = ""
+
+        attribute_value = instance.attribute_value
+        if name is not None and name != attribute_value.value:
+            conflict = (
+                AttributeValue.objects.filter(
+                    attribute=attribute_value.attribute, value__iexact=name
+                )
+                .exclude(pk=attribute_value.pk)
+                .exists()
+            )
+            if conflict:
+                raise serializers.ValidationError(
+                    {"name": ["Another color already uses this name."]}
+                )
+            attribute_value.value = name
+        if hex_code is not None:
+            attribute_value.hex_code = hex_code
+        attribute_value.save()
+
+        ProductAttributeValue.objects.get_or_create(
+            product=instance.product, attribute_value=attribute_value
+        )
+        return super().update(instance, validated_data)
+
+
 class ProductAttributeValueSerializer(serializers.ModelSerializer):
     attribute = serializers.CharField(source="attribute_value.attribute.name", read_only=True)
     value = serializers.CharField(source="attribute_value.value", read_only=True)
+    hex_code = serializers.CharField(source="attribute_value.hex_code", read_only=True)
 
     class Meta:
         model = ProductAttributeValue
-        fields = ["id", "product", "attribute_value", "attribute", "value"]
+        fields = ["id", "product", "attribute_value", "attribute", "value", "hex_code"]
 
 
 class VariationAttributeValueReadSerializer(serializers.ModelSerializer):
     attribute = serializers.CharField(source="attribute_value.attribute.name", read_only=True)
     value = serializers.CharField(source="attribute_value.value", read_only=True)
+    hex_code = serializers.CharField(source="attribute_value.hex_code", read_only=True)
 
     class Meta:
         model = VariationAttributeValue
-        fields = ["attribute_value", "attribute", "value"]
+        fields = ["attribute_value", "attribute", "value", "hex_code"]
 
 
 class ProductVariationSerializer(serializers.ModelSerializer):
@@ -184,6 +323,8 @@ class ProductSerializer(serializers.ModelSerializer):
     )
     variations = ProductVariationSerializer(many=True, required=False)
     images = ProductImageSerializer(many=True, read_only=True)
+    colors = serializers.SerializerMethodField()
+    has_addons = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
 
@@ -204,12 +345,66 @@ class ProductSerializer(serializers.ModelSerializer):
             "attribute_value_ids",
             "variations",
             "images",
+            "colors",
+            "has_addons",
             "average_rating",
             "review_count",
             "created_at",
             "updated_at",
         ]
         extra_kwargs = {"slug": {"required": False}}
+
+    def get_has_addons(self, obj):
+        count = getattr(obj, "addon_count", None)
+        return bool(count) if count is not None else obj.addon_links.exists()
+
+    def get_colors(self, obj):
+        request = self.context.get("request")
+        configs = {pc.attribute_value_id: pc for pc in obj.product_colors.all()}
+        values = {pc.attribute_value_id: pc.attribute_value for pc in configs.values()}
+
+        for product_value in obj.product_attribute_values.all():
+            attribute_value = product_value.attribute_value
+            if is_color_attribute(attribute_value.attribute.name):
+                values.setdefault(attribute_value.id, attribute_value)
+
+        variation_images = {}
+        for variation in obj.variations.all():
+            images = list(variation.images.all())
+            for variation_value in variation.variation_attribute_values.all():
+                attribute_value = variation_value.attribute_value
+                if is_color_attribute(attribute_value.attribute.name):
+                    values.setdefault(attribute_value.id, attribute_value)
+                    if images and attribute_value.id not in variation_images:
+                        variation_images[attribute_value.id] = images[0]
+
+        inactive = {
+            color.attribute_value_id for color in configs.values() if not color.is_active
+        }
+
+        colors = []
+        for attribute_value_id, attribute_value in values.items():
+            if attribute_value_id in inactive:
+                continue
+            config = configs.get(attribute_value_id)
+            image = (
+                config.image
+                if config and config.image
+                else variation_images.get(attribute_value_id)
+            )
+            colors.append(
+                {
+                    "attribute_value": attribute_value_id,
+                    "name": attribute_value.value,
+                    "hex_code": attribute_value.hex_code or DEFAULT_COLOR_HEX,
+                    "image_url": absolute_file_url(request, image),
+                    "is_active": True,
+                    "sort_order": config.sort_order if config else attribute_value.sort_order,
+                }
+            )
+
+        colors.sort(key=lambda color: (color["sort_order"], color["name"].lower()))
+        return colors
 
     def get_average_rating(self, obj):
         avg = obj.reviews.filter(status="approved").aggregate(avg=Avg("rating"))["avg"]

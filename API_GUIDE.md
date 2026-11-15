@@ -233,24 +233,30 @@ The big one. Full shape:
   "status": "active",
   "sku_prefix": "ABCDRS",
   "attribute_values": [
-    { "id": 1, "product": 1, "attribute_value": 1, "attribute": "Size", "value": "Unstitch" }
+    { "id": 1, "product": 1, "attribute_value": 1, "attribute": "Size", "value": "Unstitch", "hex_code": "" }
   ],
   "variations": [
     {
       "id": 1, "product": 1, "sku": "ABCDRS-UNSTITCH",
       "price": "1500.00", "compare_at_price": null,
       "stock_quantity": 10, "is_active": true,
-      "attribute_values": [ { "attribute_value": 1, "attribute": "Size", "value": "Unstitch" } ],
+      "attribute_values": [ { "attribute_value": 1, "attribute": "Size", "value": "Unstitch", "hex_code": "" } ],
       "images": []
     }
   ],
   "images": [ { "id": 1, "product": 1, "variation": null, "image": "http://.../x.jpg", "alt_text": "", "sort_order": 0, "is_primary": true } ],
+  "colors": [
+    { "attribute_value": 4, "name": "Black", "hex_code": "#000000", "image_url": null, "is_active": true, "sort_order": 0 }
+  ],
+  "has_addons": false,
   "average_rating": 4.5,
   "review_count": 2,
   "created_at": "...", "updated_at": "..."
 }
 ```
 
+- `colors` is the union of active product-level colors, variation-level colors and `ProductColor` configs; inactive colors are omitted. `hex_code` is `#RRGGBB` (legacy colors without one fall back to `#D1D5DB`).
+- `has_addons` tells the storefront whether the product has add-ons (use it to decide Add to Cart vs View Details).
 - `product_type`: `simple` | `variable`. `visibility_type`: `standalone` | `addon_only` | `both`.
   `status`: `draft` | `active` | `archived`.
 - **`categories`/`category_names` are lists** — a product can belong to more than one category. A
@@ -271,11 +277,40 @@ The big one. Full shape:
 | `visibility_type` | `?visibility_type=standalone` | |
 | `status` | `?status=active` | |
 | `attribute_value` | `?attribute_value=1` | products that offer this attribute value |
+| `color` | `?color=4` or `?color=4,7` | products with any of these colors (active color config, product-level color, or an active in-stock variation) |
 | `min_price` / `max_price` | `?min_price=500&max_price=2000` | filters on variation price |
 | `search` | `?search=dress` | matches name, description, sku_prefix |
 | `ordering` | `?ordering=-created_at` | or `name`, `created_at` (prefix `-` for desc) |
 
-Combine freely, e.g. `?category=3&min_price=1000&search=silk&ordering=-created_at`.
+Combine freely, e.g. `?category=3&color=4&min_price=1000&search=silk&ordering=-created_at`.
+
+`GET /api/products/color-facets/` returns every Color/Colour attribute value with its count under
+the current filters (the `color` param is ignored for facet counts, so options remain visible):
+```json
+{ "colors": [{ "attribute_value": 4, "name": "Black", "hex_code": "#000000", "count": 12 }] }
+```
+Only active products are counted. Colors with `count: 0` are returned so the UI can keep a
+currently-selected color visible; unselected zero-count colors are hidden client-side.
+
+### Product colors
+Colors are stored as the shared `Color` attribute value used by variations, plus a per-product
+`ProductColor` config (image, active, order). `GET/POST /api/product-colors/` and
+`GET/PATCH/DELETE /api/product-colors/{id}/` (admin writes; GET is public):
+- Create/edit as `multipart/form-data`: `product`, `name`, `hex_code` (`#RRGGBB`), optional
+  `image`, `is_active`, `sort_order`, `remove_image`.
+- Creating a color reuses/creates the global Color attribute value, sets its HEX, and creates the
+  product-level color link, so the variation editor can assign the same value.
+- A color used by any product variation cannot be deleted (`400`); remove it from the variations
+  first.
+
+`GET /api/attribute-values/color-library/?search=bl` returns the reusable global colors, with the
+number of products using each (direct link, variation or color config). Used by the admin color
+picker so the same color is never duplicated:
+```json
+[{ "id": 4, "name": "Black", "hex_code": "#000000", "usage_count": 7 }]
+```
+Only colors with `usage_count: 0` are safe to delete from the library
+(`DELETE /api/attribute-values/{id}/`).
 
 ### Product addons
 
@@ -620,6 +655,8 @@ product** (a second `POST` for the same product returns `400 non_field_errors`).
 | GET | `/api/products/:id/addons/` | — |
 | GET/POST/PATCH/DELETE | `/api/product-variations/[:id/]` | read: —, write: staff |
 | GET/POST/PATCH/DELETE | `/api/product-images/[:id/]` | read: —, write: staff |
+| GET/POST/PATCH/DELETE | `/api/product-colors/[:id/]` | read: —, write: staff |
+| GET | `/api/products/color-facets/` | — |
 | GET/POST/PATCH/DELETE | `/api/product-attribute-values/[:id/]` | read: —, write: staff |
 | GET/POST/PATCH/DELETE | `/api/product-addons/[:id/]` | read: —, write: staff |
 | GET | `/api/cart/` | — |
@@ -652,7 +689,8 @@ these will point at S3 instead (same field, same usage — nothing changes on th
 ## 10. Known gaps (not bugs, just not built yet)
 
 - No SSLCommerz/bKash — checkout is Cash on Delivery only.
-- No search/filter beyond what's listed above (no full-text search engine, no faceted nav).
+- No search/filter beyond what's listed above (no full-text search engine; color/category/price
+  facets are supported).
 - No rate limiting on auth endpoints yet.
 - No automated backend test suite yet — treat responses as documented here, but flag anything
   that doesn't match what you see from `/api/docs/`.

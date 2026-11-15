@@ -14,6 +14,10 @@ export default function MobileFilterDrawer({
   onPriceChange,
   onApply,
   onClear,
+  colorOptions,
+  selectedColors,
+  onToggleColor,
+  onClearColors,
 }) {
   useEffect(() => {
     document.body.style.overflow = open ? "hidden" : "";
@@ -60,6 +64,10 @@ export default function MobileFilterDrawer({
             onSelectParent={onSelectParent}
             onToggleChild={onToggleChild}
             onPriceChange={onPriceChange}
+            colorOptions={colorOptions}
+            selectedColors={selectedColors}
+            onToggleColor={onToggleColor}
+            onClearColors={onClearColors}
             onApply={() => {
               onApply();
               onClose();

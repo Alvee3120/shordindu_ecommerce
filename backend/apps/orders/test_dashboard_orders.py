@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework.test import APITestCase
 
 from apps.catalog.models import Category, InventoryLog, Product, ProductVariation
+from apps.cart.models import Cart, CartItem
 from apps.orders.models import Coupon, DeliveryChargeSettings, Order, OrderCoupon
 from apps.users.models import Address, User
 
@@ -277,8 +278,44 @@ class OrderStockIntegrityTests(OrderFixturesMixin, APITestCase):
         self.variation.refresh_from_db()
         return self.variation.stock_quantity
 
+    def test_cart_rejects_oversell(self):
+        self.client.force_authenticate(self.customer)
+        response = self.client.post(
+            "/api/cart/items/",
+            {
+                "product": self.variation.product_id,
+                "variation": self.variation.id,
+                "quantity": 6,
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 400)
+        self.assertIn("quantity", response.data)
+        self.assertEqual(Order.objects.count(), 0)
+        self.assertEqual(self._stock(), 5)
+
     def test_checkout_cannot_oversell(self):
-        response = self.checkout_as(self.customer, self.variation, 6, shipping_district="Khulna")
+        # A cart row can become over-committed after stock changes; checkout
+        # must still refuse to place the order.
+        cart, _ = Cart.objects.get_or_create(user=self.customer)
+        CartItem.objects.create(
+            cart=cart,
+            product=self.variation.product,
+            variation=self.variation,
+            quantity=6,
+            unit_price_snapshot=Decimal("500.00"),
+        )
+        self.client.force_authenticate(self.customer)
+        response = self.client.post(
+            "/api/checkout/",
+            {
+                "shipping_name": "Buyer",
+                "shipping_phone": "01712345678",
+                "shipping_address": "House 1, Road 2",
+                "shipping_district": "Khulna",
+            },
+            format="json",
+        )
         self.assertEqual(response.status_code, 400)
         self.assertEqual(Order.objects.count(), 0)
         self.assertEqual(self._stock(), 5)

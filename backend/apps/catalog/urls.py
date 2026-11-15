@@ -10,6 +10,7 @@ router.register("attribute-values", views.AttributeValueViewSet, basename="attri
 router.register("products", views.ProductViewSet, basename="product")
 router.register("product-variations", views.ProductVariationViewSet, basename="product-variation")
 router.register("product-images", views.ProductImageViewSet, basename="product-image")
+router.register("product-colors", views.ProductColorViewSet, basename="product-color")
 router.register(
     "product-attribute-values", views.ProductAttributeValueViewSet, basename="product-attribute-value"
 )

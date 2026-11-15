@@ -4,81 +4,205 @@ import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
 import { FiHeart } from "react-icons/fi";
+import { toast } from "sonner";
+import { useCart } from "@/context/CartContext";
+import { addCartItem } from "@/lib/cart";
 
-/**
- * product: { id, name, description, image, price, href,
- *            originalPrice?, discountLabel? }  (set when an automatic discount is live)
- */
-export default function ProductCard({ product, tall = false }) {
+const MAX_SWATCHES = 4;
+
+function isLightColor(hex) {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex || "");
+  if (!match) return true;
+  const value = parseInt(match[1], 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 200;
+}
+
+function ColorSwatches({ colors, selected, onSelect }) {
+  if (!colors.length) return null;
+  const visible = colors.slice(0, MAX_SWATCHES);
+  const extra = colors.length - visible.length;
+  return (
+    <div className="flex shrink-0 items-center gap-1" aria-label="Available colors">
+      {visible.map((color) => {
+        const isSelected = Number(selected) === Number(color.attribute_value);
+        return (
+          <button
+            key={color.attribute_value}
+            type="button"
+            onClick={(event) => {
+              event.preventDefault();
+              event.stopPropagation();
+              onSelect(color.attribute_value);
+            }}
+            aria-label={color.name}
+            aria-pressed={isSelected}
+            title={color.name}
+            className={`h-3.5 w-3.5 shrink-0 rounded-full border transition-transform hover:scale-110 sm:h-4 sm:w-4 ${
+              isSelected
+                ? "scale-110 ring-1 ring-neutral-500 ring-offset-1"
+                : isLightColor(color.hex_code)
+                  ? "border-neutral-300"
+                  : "border-black/10"
+            }`}
+            style={{ backgroundColor: color.hex_code }}
+          />
+        );
+      })}
+      {extra > 0 && (
+        <span className="text-[10px] font-medium text-neutral-400">+{extra}</span>
+      )}
+    </div>
+  );
+}
+
+export default function ProductCard({ product }) {
   const [wishlisted, setWishlisted] = useState(false);
-  const { name, description, image, price, originalPrice, discountLabel, href = "#" } = product;
+  const [selectedColorId, setSelectedColorId] = useState(
+    () => product.colors?.[0]?.attribute_value ?? null
+  );
+  const [adding, setAdding] = useState(false);
+  const { refreshCart } = useCart();
+
+  const {
+    name,
+    image,
+    price,
+    originalPrice,
+    discountLabel,
+    colors = [],
+    quickAdd = false,
+    variationId,
+    inStock,
+    href = "#",
+  } = product;
+
+  const selectedColor =
+    colors.find((color) => Number(color.attribute_value) === Number(selectedColorId)) ||
+    colors[0] ||
+    null;
+  const displayImage = selectedColor?.image || image;
+  const displayPrice = selectedColor?.price ?? price;
+  const displayOriginal = selectedColor?.originalPrice ?? originalPrice;
+  const displayDiscount = selectedColor?.discountLabel ?? discountLabel;
+  const canAdd = selectedColor ? selectedColor.inStock !== false : inStock !== false;
+  const addVariationId = selectedColor?.variationId ?? variationId;
+  const detailHref = selectedColor
+    ? `${href}?color=${selectedColor.attribute_value}`
+    : href;
+
+  const handleAddToCart = async (event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (adding) return;
+    if (!canAdd) {
+      toast.error("This item is out of stock.");
+      return;
+    }
+    if (!addVariationId) {
+      toast.error("This option is unavailable.");
+      return;
+    }
+    setAdding(true);
+    try {
+      await addCartItem({ product: product.id, variation: addVariationId, quantity: 1 });
+      await refreshCart();
+      toast.success("Added to cart.");
+    } catch (err) {
+      toast.error(err.message || "Could not add item to cart.");
+    } finally {
+      setAdding(false);
+    }
+  };
 
   return (
-    <div className="group relative flex h-full w-full flex-col overflow-hidden rounded-2xl border border-neutral-100 bg-white shadow-sm transition-shadow hover:shadow-lg sm:rounded-3xl">
-      <Link
-        href={href}
-        className={`relative block w-full overflow-hidden bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100 ${
-          tall ? "h-full min-h-[280px] flex-1" : "aspect-[4/5]"
-        }`}
-      >
-        {image ? (
-          <Image
-            src={image}
-            alt={name}
-            fill
-            className="object-cover transition-transform duration-500 group-hover:scale-105"
-            sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 280px"
-          />
-        ) : (
-          <div className="flex h-full items-center justify-center text-xs text-neutral-400 sm:text-sm">
-            No image
-          </div>
-        )}
-        {discountLabel && (
-          <span className="absolute top-2 left-2 rounded-full bg-(--primary) px-2 py-0.5 text-[9px] font-semibold tracking-wide text-white sm:top-3 sm:left-3 sm:px-2.5 sm:py-1 sm:text-[11px]">
-            {discountLabel}
-          </span>
-        )}
-      </Link>
-
-      <button
-        type="button"
-        onClick={() => setWishlisted((w) => !w)}
-        aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-        className="absolute top-2 right-2 flex h-7 w-7 items-center justify-center rounded-full bg-background/70 text-neutral-500 backdrop-blur-md transition-colors hover:text-red-500 sm:top-3 sm:right-3 sm:h-9 sm:w-9"
-      >
-        <FiHeart
-          className={`h-3.5 w-3.5 sm:h-4 sm:w-4 ${wishlisted ? "text-red-500" : ""}`}
-          fill={wishlisted ? "currentColor" : "none"}
-        />
-      </button>
-
-      <div className="flex flex-1 flex-col gap-1 p-2.5 sm:gap-1.5 sm:p-4">
-        <Link href={href}>
-          <h3 className=" line-clamp-1 text-sm font-semibold text-neutral-900 sm:text-base">
-            {name}
-          </h3>
+    <div className="group relative flex h-full w-full min-w-0 flex-col">
+      <div className="relative w-full overflow-hidden bg-neutral-100">
+        <Link href={detailHref} className="relative block aspect-[4/5] w-full">
+          {displayImage ? (
+            <Image
+              src={displayImage}
+              alt={name}
+              fill
+              className="object-cover transition-transform duration-500 group-hover:scale-105"
+              sizes="(max-width: 640px) 50vw, (max-width: 1024px) 33vw, 320px"
+            />
+          ) : (
+            <div className="flex h-full items-center justify-center text-xs text-neutral-400 sm:text-sm">
+              No image
+            </div>
+          )}
         </Link>
 
-        {description && (
-          <p className="line-clamp-2 text-[10px]  sm:text-sm text-neutral-500">{description}</p>
+        {displayDiscount && (
+          <span className="absolute top-0 left-0 z-10 bg-red-600 px-2 py-1 text-[9px] font-bold tracking-wide text-white uppercase sm:px-2.5 sm:text-[10px]">
+            {displayDiscount}
+          </span>
         )}
 
-        <div className="mt-1 flex items-center justify-between gap-1 sm:mt-2 sm:gap-2">
-          <span className="flex flex-wrap items-baseline gap-x-1.5">
-            <span className="text-[10px] font-bold text-neutral-900 sm:text-lg">
-              {price != null ? `৳ ${price}` : "—"}
-            </span>
-            {originalPrice != null && (
-              <span className="text-[9px] text-neutral-400 line-through sm:text-sm">৳ {originalPrice}</span>
-            )}
-          </span>
-          <Link
-            href={href}
-            className="rounded-full bg-neutral-900 px-2 py-1 text-[10px] font-semibold whitespace-nowrap text-white transition-colors hover:bg-(--primary) sm:px-4 sm:py-2 sm:text-xs"
-          >
-            View Options
+        <button
+          type="button"
+          onClick={() => setWishlisted((value) => !value)}
+          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          aria-pressed={wishlisted}
+          className="absolute top-2 right-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-neutral-500 shadow-sm backdrop-blur-md transition-colors hover:text-red-500 sm:h-9 sm:w-9"
+        >
+          <FiHeart
+            className={`h-4 w-4 ${wishlisted ? "text-red-500" : ""}`}
+            fill={wishlisted ? "currentColor" : "none"}
+          />
+        </button>
+
+        <div className="absolute inset-x-0 bottom-0 z-10 translate-y-0 opacity-100 transition-all duration-300 lg:translate-y-3 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:group-focus-within:translate-y-0 lg:group-focus-within:opacity-100">
+          {quickAdd ? (
+            <button
+              type="button"
+              onClick={handleAddToCart}
+              disabled={adding || !canAdd}
+              className="block w-full bg-black px-3 py-3.5 text-center text-[11px] font-semibold tracking-[0.12em] text-white uppercase transition-colors hover:bg-(--primary) disabled:cursor-not-allowed disabled:bg-neutral-700 sm:text-xs"
+            >
+              {adding ? "Adding..." : canAdd ? "Add to Cart" : "Out of Stock"}
+            </button>
+          ) : (
+            <Link
+              href={detailHref}
+              className="block w-full bg-black px-3 py-3.5 text-center text-[11px] font-semibold tracking-[0.12em] text-white uppercase transition-colors hover:bg-(--primary) sm:text-xs"
+            >
+              View Details
+            </Link>
+          )}
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col gap-1.5 pt-2.5">
+        <div className="flex items-center justify-between gap-2">
+          <Link href={detailHref} className="min-w-0 flex-1">
+            <h3 className="truncate text-[11px] font-semibold tracking-wide text-neutral-900 uppercase sm:text-sm">
+              {name}
+            </h3>
           </Link>
+          <ColorSwatches
+            colors={colors}
+            selected={selectedColor?.attribute_value}
+            onSelect={setSelectedColorId}
+          />
+        </div>
+
+        <div className="mt-auto flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
+          <span
+            className={`text-sm font-bold whitespace-nowrap sm:text-base ${
+              displayOriginal != null ? "text-red-600" : "text-neutral-900"
+            }`}
+          >
+            {displayPrice != null ? `৳ ${displayPrice}` : "—"}
+          </span>
+          {displayOriginal != null && (
+            <span className="text-[11px] whitespace-nowrap text-neutral-400 line-through sm:text-xs">
+              ৳ {displayOriginal}
+            </span>
+          )}
         </div>
       </div>
     </div>

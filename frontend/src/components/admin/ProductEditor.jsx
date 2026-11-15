@@ -14,10 +14,12 @@ import {
   removeProductAttributeValue,
   createProductImage,
   deleteProductImage,
+  createProductColor,
   listProducts,
 } from "@/lib/products";
 import { getCategories } from "@/lib/categories";
 import { listAttributes } from "@/lib/attributes";
+import ProductColorsSection from "@/components/admin/ProductColorsSection";
 import {
   listProductAddons,
   createProductAddon,
@@ -86,6 +88,7 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
 
   const [productAddons, setProductAddons] = useState([]);
   const [pendingAddons, setPendingAddons] = useState([]); // [{key, addon_product, is_required, min_select, max_select, price_override}] for "new" products
+  const [pendingColors, setPendingColors] = useState([]); // colors queued for a brand new product
   const [addonForm, setAddonForm] = useState(EMPTY_ADDON_FORM);
   const [savingAddon, setSavingAddon] = useState(false);
   const [deletingAddonId, setDeletingAddonId] = useState(null);
@@ -123,6 +126,12 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
 
     const addonLinks = await listProductAddons();
     setProductAddons(addonLinks.filter((a) => a.parent_product === full.id));
+  };
+
+  const refreshAttributes = () => {
+    listAttributes()
+      .then((data) => setAttributes(data))
+      .catch(() => {});
   };
 
   useEffect(() => {
@@ -487,6 +496,25 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
           }
           setPendingAddons([]);
         }
+        if (pendingColors.length > 0) {
+          for (let i = 0; i < pendingColors.length; i += 1) {
+            const color = pendingColors[i];
+            if (!color.name?.trim()) continue;
+            try {
+              await createProductColor({
+                product: created.id,
+                name: color.name.trim(),
+                hex_code: color.hex_code,
+                image: color.image,
+                is_active: color.is_active,
+                sort_order: i,
+              });
+            } catch (err) {
+              toast.error(`Failed to add the color "${color.name}": ${err.message}`);
+            }
+          }
+          setPendingColors([]);
+        }
         toast.success("Product created");
         onCreated?.(created);
       } else {
@@ -664,40 +692,63 @@ export default function ProductEditor({ productId, onCreated, onSaved }) {
         <label className="mb-1.5 block text-sm font-medium text-neutral-700">
           Product Attribute Values
         </label>
-        {attributes.length === 0 ? (
-          <p className="text-sm text-neutral-400">No attributes defined yet.</p>
+        {attributes.filter(
+          (attr) => !["color", "colour"].includes((attr.name || "").trim().toLowerCase())
+        ).length === 0 ? (
+          <p className="text-sm text-neutral-400">No non-color attributes defined yet.</p>
         ) : (
           <div className="flex flex-col gap-3 rounded-lg border border-neutral-200 p-4">
-            {attributes.map((attr) => (
-              <div key={attr.id}>
-                <p className="mb-1.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
-                  {attr.name}
-                </p>
-                <div className="flex flex-wrap gap-2">
-                  {attr.values.length === 0 && (
-                    <span className="text-xs text-neutral-400">No values</span>
-                  )}
-                  {attr.values.map((v) => {
-                    const checked = selectedValues[v.id] != null;
-                    return (
-                      <button
-                        type="button"
-                        key={v.id}
-                        onClick={() => toggleAttributeValue(v.id)}
-                        className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
-                          checked
-                            ? "border-(--primary) bg-(--primary)/10 text-(--primary)"
-                            : "border-neutral-300 text-neutral-600 hover:border-neutral-400"
-                        }`}
-                      >
-                        {v.value}
-                      </button>
-                    );
-                  })}
+            {attributes
+              .filter(
+                (attr) =>
+                  !["color", "colour"].includes((attr.name || "").trim().toLowerCase())
+              )
+              .map((attr) => (
+                <div key={attr.id}>
+                  <p className="mb-1.5 text-xs font-semibold tracking-wide text-neutral-500 uppercase">
+                    {attr.name}
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {attr.values.length === 0 && (
+                      <span className="text-xs text-neutral-400">No values</span>
+                    )}
+                    {attr.values.map((v) => {
+                      const checked = selectedValues[v.id] != null;
+                      return (
+                        <button
+                          type="button"
+                          key={v.id}
+                          onClick={() => toggleAttributeValue(v.id)}
+                          className={`rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                            checked
+                              ? "border-(--primary) bg-(--primary)/10 text-(--primary)"
+                              : "border-neutral-300 text-neutral-600 hover:border-neutral-400"
+                          }`}
+                        >
+                          {v.value}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
           </div>
+        )}
+      </div>
+
+      {/* Product colors */}
+      <div className="rounded-lg border border-neutral-200 p-4">
+        {isNew ? (
+          <ProductColorsSection
+            draftRows={pendingColors}
+            onDraftChange={setPendingColors}
+          />
+        ) : (
+          <ProductColorsSection
+            key={productId}
+            productId={productId}
+            onAttributesChanged={refreshAttributes}
+          />
         )}
       </div>
 

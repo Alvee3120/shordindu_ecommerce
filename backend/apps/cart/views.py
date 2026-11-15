@@ -6,7 +6,7 @@ from rest_framework.decorators import action
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from apps.catalog.models import ProductAddon
+from apps.catalog.models import Product, ProductAddon
 from apps.catalog.pricing import PricingEngine
 from apps.core.permissions import CanManageOrders
 
@@ -53,11 +53,27 @@ class CartItemViewSet(CartMixin, viewsets.ModelViewSet):
         variation = serializer.validated_data["variation"]
         quantity = serializer.validated_data["quantity"]
 
+        if product.status != Product.Status.ACTIVE or not variation.is_active:
+            return Response(
+                {"variation": ["This product is not available."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if variation.stock_quantity < quantity:
+            return Response(
+                {"quantity": [f"Only {variation.stock_quantity} left in stock."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         unit_price = PricingEngine().price(variation)
         existing = CartItem.objects.filter(
             cart=cart, product=product, variation=variation, parent_cart_item__isnull=True
         ).first()
         if existing:
+            if existing.quantity + quantity > variation.stock_quantity:
+                return Response(
+                    {"quantity": [f"Only {variation.stock_quantity} left in stock."]},
+                    status=status.HTTP_400_BAD_REQUEST,
+                )
             existing.quantity += quantity
             existing.unit_price_snapshot = unit_price
             existing.save(update_fields=["quantity", "unit_price_snapshot"])
@@ -88,6 +104,11 @@ class CartItemViewSet(CartMixin, viewsets.ModelViewSet):
                 {"product": ["This product is not a valid addon for the parent item."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
+        if product.status != Product.Status.ACTIVE or not variation.is_active:
+            return Response(
+                {"variation": ["This addon is not available."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
 
         existing_qty = CartItem.objects.filter(parent_cart_item=parent_item, product=product).aggregate(
             total=Sum("quantity")
@@ -95,6 +116,11 @@ class CartItemViewSet(CartMixin, viewsets.ModelViewSet):
         if existing_qty + quantity > addon_link.max_select:
             return Response(
                 {"quantity": [f"Max {addon_link.max_select} allowed for this addon."]},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+        if existing_qty + quantity > variation.stock_quantity:
+            return Response(
+                {"quantity": [f"Only {variation.stock_quantity} left in stock."]},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 

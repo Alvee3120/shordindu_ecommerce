@@ -7,7 +7,7 @@ import ProductCard from "@/components/ProductCard";
 import FilterSidebar from "@/components/shop/FilterSidebar";
 import MobileFilterDrawer from "@/components/shop/MobileFilterDrawer";
 import Pagination from "@/components/shop/Pagination";
-import { listProducts, toCardProduct } from "@/lib/products";
+import { listProducts, toCardProduct, getColorFacets } from "@/lib/products";
 import { getCategories } from "@/lib/categories";
 
 const PAGE_SIZE = 12;
@@ -22,6 +22,7 @@ function ShopPageContent() {
   const urlMinPrice = searchParams.get("min_price") || "";
   const urlMaxPrice = searchParams.get("max_price") || "";
   const urlDiscount = searchParams.get("discount") || ""; // "View All" from a homepage discount section
+  const urlColors = searchParams.get("colors") || "";
   const urlPage = Number(searchParams.get("page") || "1");
 
   const [categoryList, setCategoryList] = useState([]);
@@ -29,6 +30,7 @@ function ShopPageContent() {
   const [count, setCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  const [colorOptions, setColorOptions] = useState([]);
 
   // Draft filters (mirror URL, edited locally, committed via updateUrl/applyFilters)
   const [draftFilters, setDraftFilters] = useState({
@@ -36,6 +38,7 @@ function ShopPageContent() {
     childCategories: urlSubcategories ? urlSubcategories.split(",") : [],
     minPrice: urlMinPrice,
     maxPrice: urlMaxPrice,
+    colors: urlColors ? urlColors.split(",") : [],
   });
 
   useEffect(() => {
@@ -45,8 +48,9 @@ function ShopPageContent() {
       childCategories: urlSubcategories ? urlSubcategories.split(",") : [],
       minPrice: urlMinPrice,
       maxPrice: urlMaxPrice,
+      colors: urlColors ? urlColors.split(",") : [],
     });
-  }, [urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice]);
+  }, [urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlColors]);
 
   useEffect(() => {
     getCategories()
@@ -83,9 +87,11 @@ function ShopPageContent() {
       page_size: PAGE_SIZE,
       search: urlSearch || undefined,
       category: categoryParam,
+      colors: urlColors || undefined,
       min_price: urlMinPrice || undefined,
       max_price: urlMaxPrice || undefined,
       discount: urlDiscount || undefined,
+      status: "active",
     })
       .then((data) => {
         if (cancelled) return;
@@ -105,7 +111,32 @@ function ShopPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlDiscount, urlPage, resolveCategoryParam]);
+  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlDiscount, urlPage, urlColors, resolveCategoryParam]);
+
+  // Color facet counts under the current category/price/search/discount context.
+  useEffect(() => {
+    let cancelled = false;
+    const categoryParam = resolveCategoryParam(
+      urlParentCategories ? urlParentCategories.split(",") : [],
+      urlSubcategories ? urlSubcategories.split(",") : []
+    );
+    getColorFacets({
+      category: categoryParam,
+      min_price: urlMinPrice || undefined,
+      max_price: urlMaxPrice || undefined,
+      search: urlSearch || undefined,
+      discount: urlDiscount || undefined,
+    })
+      .then((data) => {
+        if (!cancelled) setColorOptions(Array.isArray(data?.colors) ? data.colors : []);
+      })
+      .catch(() => {
+        if (!cancelled) setColorOptions([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlDiscount, resolveCategoryParam]);
 
   // The discount's name, read from the products' own pricing info — no extra request.
   const discountName = useMemo(() => {
@@ -164,10 +195,25 @@ function ShopPageContent() {
     setDraftFilters((prev) => ({ ...prev, [key]: value }));
   };
 
+  const handleToggleColor = (colorId) => {
+    const id = String(colorId);
+    setDraftFilters((prev) => ({
+      ...prev,
+      colors: prev.colors.includes(id)
+        ? prev.colors.filter((color) => color !== id)
+        : [...prev.colors, id],
+    }));
+  };
+
+  const handleClearColors = () => {
+    setDraftFilters((prev) => ({ ...prev, colors: [] }));
+  };
+
   const applyFilters = () => {
     updateUrl({
       category: draftFilters.parentCategories.join(",") || undefined,
       subcategories: draftFilters.childCategories.join(",") || undefined,
+      colors: draftFilters.colors.join(",") || undefined,
       min_price: draftFilters.minPrice || undefined,
       max_price: draftFilters.maxPrice || undefined,
       page: 1,
@@ -175,7 +221,13 @@ function ShopPageContent() {
   };
 
   const clearFilters = () => {
-    setDraftFilters({ parentCategories: [], childCategories: [], minPrice: "", maxPrice: "" });
+    setDraftFilters({
+      parentCategories: [],
+      childCategories: [],
+      minPrice: "",
+      maxPrice: "",
+      colors: [],
+    });
     router.push("/shop");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
@@ -190,7 +242,8 @@ function ShopPageContent() {
         (urlSubcategories ? urlSubcategories.split(",") : []).join(",") ===
           draftFilters.childCategories.join(",") &&
         urlMinPrice === draftFilters.minPrice &&
-        urlMaxPrice === draftFilters.maxPrice;
+        urlMaxPrice === draftFilters.maxPrice &&
+        (urlColors ? urlColors.split(",") : []).join(",") === draftFilters.colors.join(",");
       if (!same) applyFilters();
     }, 300);
     return () => clearTimeout(timeout);
@@ -204,7 +257,7 @@ function ShopPageContent() {
   }, [urlSearch, discountName]);
 
   return (
-    <div className="mx-auto max-w-7xl px-4 pt-28 sm:pt-24 pb-16 sm:px-6">
+    <div className="mx-auto max-w-7xl px-4 pt-28 pb-16 sm:px-6 sm:pt-32">
       <div className="mb-6 flex items-center justify-between gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="font-sora truncate text-2xl font-bold text-neutral-900 sm:text-3xl">{heading}</h1>
@@ -250,20 +303,24 @@ function ShopPageContent() {
             onSelectParent={handleSelectParent}
             onToggleChild={handleToggleChild}
             onPriceChange={handlePriceChange}
+            colorOptions={colorOptions}
+            selectedColors={draftFilters.colors}
+            onToggleColor={handleToggleColor}
+            onClearColors={handleClearColors}
             onApply={applyFilters}
             onClear={clearFilters}
           />
         </aside>
 
-        <div className="sm:-mt-20 min-w-0 flex-1">
+        <div className="min-w-0 flex-1">
           {loading ? (
-            <div className="grid min-h-screen grid-cols-2 gap-6 sm:grid-cols-3 ">
+            <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
               {Array.from({ length: PAGE_SIZE }).map((_, i) => (
                 <div key={i} className="aspect-[4/5.6] animate-pulse rounded-3xl bg-(--primary)/10" />
               ))}
             </div>
           ) : products.length > 0 ? (
-            <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 ">
+            <div className="grid grid-cols-2 gap-6 lg:grid-cols-3">
               {products.map((product) => (
                 <ProductCard key={product.id} product={product} />
               ))}
@@ -291,6 +348,10 @@ function ShopPageContent() {
         onSelectParent={handleSelectParent}
         onToggleChild={handleToggleChild}
         onPriceChange={handlePriceChange}
+        colorOptions={colorOptions}
+        selectedColors={draftFilters.colors}
+        onToggleColor={handleToggleColor}
+        onClearColors={handleClearColors}
         onApply={applyFilters}
         onClear={clearFilters}
       />
