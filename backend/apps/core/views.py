@@ -7,16 +7,55 @@ from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.response import Response
 from rest_framework.views import APIView
 
-from .models import CampaignBanner, HeroBanner, HeroBannerSettings
+from .models import AnnouncementBar, CampaignBanner, HeroBanner, HeroBannerSettings
 from .permissions import IsAdminOnly
 from .serializers import (
+    AnnouncementBarAdminSerializer,
     CampaignBannerAdminSerializer,
     HeroBannerAdminSerializer,
     HeroBannerReorderSerializer,
     HeroBannerSettingsSerializer,
+    PublicAnnouncementBarSerializer,
     PublicCampaignBannerSerializer,
     PublicHeroBannerSerializer,
 )
+
+
+class PublicAnnouncementBarView(APIView):
+    """The announcement strip to show, or inactive when disabled/empty."""
+
+    permission_classes = [permissions.AllowAny]
+
+    def get(self, request):
+        bar = AnnouncementBar.load()
+        if not bar.is_live:
+            return Response({"active": False, "announcement": None})
+        return Response(
+            {"active": True, "announcement": PublicAnnouncementBarSerializer(bar).data}
+        )
+
+
+class AnnouncementBarManageView(APIView):
+    """Admin-only read/update of the single announcement strip."""
+
+    permission_classes = [IsAdminOnly]
+
+    def get(self, request):
+        return Response(AnnouncementBarAdminSerializer(AnnouncementBar.load()).data)
+
+    def put(self, request):
+        return self._update(request, partial=False)
+
+    def patch(self, request):
+        return self._update(request, partial=True)
+
+    def _update(self, request, partial):
+        serializer = AnnouncementBarAdminSerializer(
+            AnnouncementBar.load(), data=request.data, partial=partial
+        )
+        serializer.is_valid(raise_exception=True)
+        serializer.save(updated_by=request.user)
+        return Response(serializer.data)
 
 
 class PublicCampaignBannersView(APIView):

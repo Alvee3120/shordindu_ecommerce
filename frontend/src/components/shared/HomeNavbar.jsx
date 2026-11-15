@@ -19,7 +19,7 @@ const staticLinks = [
 ];
 const NAV_CATEGORY_NAMES = ["Men", "Women", "Bag"];
 
-export default function HomeNavbar() {
+export default function HomeNavbar({ announcement = null }) {
   const { user, isAuthenticated } = useAuth();
   const { cartCount } = useCart();
   const dashboardHrefByRole = {
@@ -121,6 +121,15 @@ export default function HomeNavbar() {
           isScrolled ? "bg-background/70 backdrop-blur-md shadow-sm" : "bg-transparent"
         }`}
       >
+        {announcement && (
+          <div
+            className={`overflow-hidden transition-all duration-300 ${
+              isScrolled ? "max-h-0 opacity-0" : "max-h-16 opacity-100"
+            }`}
+          >
+            {announcement}
+          </div>
+        )}
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           {/* Left: nav links (desktop) / hamburger (mobile) */}
           <div className="flex flex-1 items-center">

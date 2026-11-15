@@ -20,7 +20,7 @@ const staticLinks = [
 ];
 const NAV_CATEGORY_NAMES = ["Men", "Women", "Bag"];
 
-export default function Navbar() {
+export default function Navbar({ announcement = null }) {
   const pathname = usePathname();
   const isHome = pathname === "/";
   const { user, isAuthenticated } = useAuth();
@@ -124,6 +124,15 @@ export default function Navbar() {
           isTransparentState ? "bg-transparent" : "bg-background/70 backdrop-blur-md shadow-sm"
         }`}
       >
+        {announcement && (
+          <div
+            className={`overflow-hidden transition-all duration-300 ${
+              scrolled ? "max-h-0 opacity-0" : "max-h-16 opacity-100"
+            }`}
+          >
+            {announcement}
+          </div>
+        )}
         <nav className="mx-auto flex max-w-7xl items-center justify-between px-4 py-4 sm:px-6">
           {/* Left: nav links (desktop) / hamburger (mobile) */}
           <div className="flex flex-1 items-center">

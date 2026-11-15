@@ -34,4 +34,6 @@
 - For horizontal carousels/rows, wants explicit arrow controls for swiping plus a partially visible next card so it's obvious there is more content to scroll, applied consistently across all similar sections rather than some scrolling and some wrapping in a grid. Confidence: 0.7
 - Prefers native browser scrolling over JavaScript smooth-scroll libraries (e.g. Lenis): no scroll-hijacking wrapper in the root layout, keep scrolling working normally in modals/inner panes. Confidence: 0.6
 - When stubbing out a new UI section, use lorem ipsum placeholder copy instead of writing real marketing text. Confidence: 0.6
+- Site-wide announcement/promo strips belong at the very top of the page (first thing inside the fixed header, above the nav), not tucked above the footer where it requires scrolling to notice. Confidence: 0.7
+- Admin-entered content text must render exactly as typed: preserve explicit spacing/separators (don't let HTML whitespace collapsing strip them) while still keeping it on one line. Confidence: 0.6
 - Content changed in the admin must appear on the storefront without a manual hard refresh; fix the staleness at its root (targeted cache invalidation / refetch) instead of disabling caching wholesale. Confidence: 0.7

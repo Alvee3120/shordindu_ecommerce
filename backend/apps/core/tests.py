@@ -9,7 +9,7 @@ from django.utils import timezone
 from PIL import Image
 from rest_framework.test import APITestCase
 
-from apps.core.models import CampaignBanner, HeroBanner, HeroBannerSettings
+from apps.core.models import AnnouncementBar, CampaignBanner, HeroBanner, HeroBannerSettings
 from apps.users.models import User
 
 TEMP_MEDIA = tempfile.mkdtemp(prefix="banner-test-media-")
@@ -251,6 +251,58 @@ class CampaignBannerApiTests(APITestCase):
         self.assertEqual(self.put(image_mode="mobile").status_code, 400)
         # Disabled banners may be saved half-finished.
         self.assertEqual(self.put(is_enabled="false", remove_desktop_image="true").status_code, 200)
+
+
+class AnnouncementBarApiTests(APITestCase):
+    PUBLIC = "/api/announcement-bar/"
+    MANAGE = "/api/announcement-bar/manage/"
+
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="announce@x.com", password="pw", name="Ann Admin", role=User.Role.ADMIN
+        )
+
+    def test_public_is_inactive_until_enabled_with_text(self):
+        self.assertEqual(
+            self.client.get(self.PUBLIC).data, {"active": False, "announcement": None}
+        )
+        AnnouncementBar.objects.update_or_create(
+            pk=1, defaults={"is_enabled": True, "text": "   "}
+        )
+        self.assertFalse(self.client.get(self.PUBLIC).data["active"])
+
+        AnnouncementBar.objects.filter(pk=1).update(text="Extra 10% OFF")
+        data = self.client.get(self.PUBLIC).data
+        self.assertTrue(data["active"])
+        self.assertEqual(data["announcement"]["text"], "Extra 10% OFF")
+
+    def test_admin_updates_and_colours_are_validated(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.put(
+            self.MANAGE,
+            {
+                "is_enabled": True,
+                "text": "  Sale  ",
+                "background_color": "#003333",
+                "text_color": "#FFFFFF",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertEqual(response.data["text"], "Sale")
+        self.assertEqual(response.data["updated_by_name"], "Ann Admin")
+        self.assertEqual(self.client.get(self.PUBLIC).data["announcement"]["text"], "Sale")
+
+        bad = self.client.put(
+            self.MANAGE,
+            {"is_enabled": True, "text": "Sale", "text_color": "white"},
+            format="json",
+        )
+        self.assertEqual(bad.status_code, 400)
+        self.assertIn("text_color", bad.data)
+
+        self.client.force_authenticate(user=None)
+        self.assertEqual(self.client.get(self.MANAGE).status_code, 401)
 
 
 @override_settings(MEDIA_ROOT=TEMP_HERO_MEDIA)

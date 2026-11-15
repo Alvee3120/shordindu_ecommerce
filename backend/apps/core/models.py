@@ -85,6 +85,39 @@ class CampaignBanner(models.Model):
         return self.status_at() == self.Status.LIVE
 
 
+class AnnouncementBar(models.Model):
+    """Singleton announcement strip shown above the footer, edited by admins."""
+
+    is_enabled = models.BooleanField(default=False)
+    text = models.CharField(max_length=300, blank=True)
+    background_color = models.CharField(max_length=7, default="#003333")
+    text_color = models.CharField(max_length=7, default="#FFFFFF")
+
+    updated_at = models.DateTimeField(auto_now=True)
+    updated_by = models.ForeignKey(
+        "users.User", on_delete=models.SET_NULL, null=True, blank=True, related_name="+"
+    )
+
+    class Meta:
+        db_table = "announcement_bar"
+
+    def __str__(self):
+        return "Announcement bar"
+
+    def save(self, *args, **kwargs):
+        self.pk = 1
+        super().save(*args, **kwargs)
+
+    @classmethod
+    def load(cls):
+        bar, _ = cls.objects.get_or_create(pk=1)
+        return bar
+
+    @property
+    def is_live(self):
+        return bool(self.is_enabled and self.text.strip())
+
+
 class HeroBanner(models.Model):
     """One homepage hero slide. Admins can manage up to three, ordered by
     sort_order. Images live in the configured media storage (local or S3)."""

@@ -5,9 +5,13 @@ import HomeNavbar from "@/components/shared/HomeNavbar";
 import Navbar from "@/components/shared/Navbar";
 import { useSiteChrome } from "@/components/shared/useSiteChrome";
 
-export default function NavbarSwitcher() {
+export default function NavbarSwitcher({ announcement = null }) {
   const pathname = usePathname();
   const { showNavbar } = useSiteChrome();
   if (!showNavbar) return null;
-  return pathname === "/" ? <HomeNavbar /> : <Navbar />;
+  return pathname === "/" ? (
+    <HomeNavbar announcement={announcement} />
+  ) : (
+    <Navbar announcement={announcement} />
+  );
 }

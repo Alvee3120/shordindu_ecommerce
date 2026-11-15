@@ -3,6 +3,12 @@ from django.urls import path
 from . import views
 
 urlpatterns = [
+    path("announcement-bar/", views.PublicAnnouncementBarView.as_view(), name="announcement-bar"),
+    path(
+        "announcement-bar/manage/",
+        views.AnnouncementBarManageView.as_view(),
+        name="announcement-bar-manage",
+    ),
     path("campaign-banners/", views.PublicCampaignBannersView.as_view(), name="campaign-banners"),
     path("campaign-banners/manage/", views.CampaignBannersManageView.as_view(), name="campaign-banners-manage"),
     path("campaign-banners/manage/<int:slot>/", views.CampaignBannerManageView.as_view(), name="campaign-banner-manage"),

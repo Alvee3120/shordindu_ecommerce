@@ -3,7 +3,7 @@ from urllib.parse import urlsplit
 
 from rest_framework import serializers
 
-from .models import CampaignBanner, HeroBanner, HeroBannerSettings
+from .models import AnnouncementBar, CampaignBanner, HeroBanner, HeroBannerSettings
 
 MAX_IMAGE_BYTES = 5 * 1024 * 1024
 ALLOWED_IMAGE_FORMATS = {"JPEG", "PNG", "WEBP"}
@@ -55,6 +55,31 @@ def _absolute(request, field_file):
         return None
     url = field_file.url
     return request.build_absolute_uri(url) if request else url
+
+
+class PublicAnnouncementBarSerializer(serializers.ModelSerializer):
+    """The strip the site shows above the footer."""
+
+    class Meta:
+        model = AnnouncementBar
+        fields = ["text", "background_color", "text_color", "updated_at"]
+
+
+class AnnouncementBarAdminSerializer(PublicAnnouncementBarSerializer):
+    updated_by_name = serializers.CharField(source="updated_by.name", read_only=True, default=None)
+
+    class Meta(PublicAnnouncementBarSerializer.Meta):
+        fields = PublicAnnouncementBarSerializer.Meta.fields + ["is_enabled", "updated_by_name"]
+        read_only_fields = ["updated_at"]
+
+    def validate_text(self, value):
+        return value.strip()
+
+    def validate_background_color(self, value):
+        return validate_hex_color(value)
+
+    def validate_text_color(self, value):
+        return validate_hex_color(value)
 
 
 class PublicCampaignBannerSerializer(serializers.ModelSerializer):

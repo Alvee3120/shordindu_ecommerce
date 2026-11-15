@@ -30,6 +30,7 @@ import {
   FiChevronLeft,
   FiChevronRight,
   FiSettings,
+  FiVolume2,
 } from "react-icons/fi";
 import { useAuth } from "@/context/AuthContext";
 import { AnalyticsRangeProvider } from "@/components/admin/analytics/AnalyticsRangeContext";
@@ -66,6 +67,7 @@ const roleLinks = {
     { label: "Coupons", href: "/dashboard/admin/coupons", icon: FiTag },
     { label: "Delivery Charges", href: "/dashboard/admin/delivery-charges", icon: FiTruck },
     { label: "Campaign Banner", href: "/dashboard/admin/campaign-banner", icon: FiImage },
+    { label: "Announcement Bar", href: "/dashboard/admin/announcement-bar", icon: FiVolume2 },
     { label: "Hero Banners", href: "/dashboard/admin/banners", icon: FiImage },
     { label: "Reviews", href: "/dashboard/admin/reviews", icon: FiStar },
     { label: "Stock Notifications", href: "/dashboard/admin/stock-notifications", icon: FiBell },

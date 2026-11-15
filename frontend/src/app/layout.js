@@ -3,6 +3,7 @@ import localFont from "next/font/local";
 import "./globals.css";
 import NavbarSwitcher from "@/components/shared/NavbarSwitcher";
 import FooterSwitcher from "@/components/shared/FooterSwitcher";
+import AnnouncementBar from "@/components/shared/AnnouncementBar";
 import AppLoadingShell from "./AppLoadingShell";
 import { Toaster } from "sonner";
 import { AuthProvider } from "@/context/AuthContext";
@@ -55,7 +56,13 @@ export default function RootLayout({ children }) {
           <CartProvider>
             <AppLoadingShell brandText="shordindu">
               <Suspense fallback={null}>
-                <NavbarSwitcher />
+                <NavbarSwitcher
+                  announcement={
+                    <Suspense fallback={null}>
+                      <AnnouncementBar />
+                    </Suspense>
+                  }
+                />
               </Suspense>
               <main>{children}</main>
               {/* <Footer /> */}
