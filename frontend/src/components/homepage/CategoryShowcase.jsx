@@ -75,7 +75,7 @@ export default function CategoryShowcase() {
   if (!loading && categories.length === 0) return null;
 
   return (
-    <section className="w-full bg-background px-6 py-16 sm:px-8">
+    <section className="w-full bg-background px-6 pt-16 sm:px-8">
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-8">
           <h2 className="font-sora text-xl font-bold text-neutral-900 sm:text-2xl">
@@ -92,7 +92,17 @@ export default function CategoryShowcase() {
             onScroll={updateArrows}
             className="flex snap-x snap-mandatory gap-4 overflow-x-auto pb-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
           >
-            {categories.map((category) => (
+            {loading
+              ? Array.from({ length: 5 }).map((_, index) => (
+                  <div
+                    key={index}
+                    className="w-[calc(47%-8px)] shrink-0 md:w-[calc(32%-11px)] lg:w-[calc(23.5%-12px)]"
+                  >
+                    <div className="aspect-[4/5] w-full animate-pulse bg-neutral-100" />
+                    <div className="mt-3 h-4 w-2/3 animate-pulse rounded bg-neutral-100" />
+                  </div>
+                ))
+              : categories.map((category) => (
               <Link
                 key={category.id}
                 href={category.href}

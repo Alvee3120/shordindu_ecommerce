@@ -16,7 +16,8 @@
 - Do aggregation/filtering/pagination on the server; avoid fetching every record into frontend memory, and avoid N+1 queries. Confidence: 0.85
 - Protect admin/sensitive endpoints with the existing authentication and authorization; only authorized administrators access sensitive customer data, and role permissions are enforced server-side — a frontend guard alone is not acceptable. Confidence: 0.85
 - Do not show misleading metrics (e.g. suppress percentage change when the previous period is zero/unavailable rather than showing a fake value). Confidence: 0.85
-- Expects loading/skeleton states, clear empty states, and error messages with retry actions in data-driven UIs. Confidence: 0.85
+- Expects loading/skeleton states, clear empty states, and error messages with retry actions in data-driven UIs. Confidence: 0.9
+- Loading placeholders should be layout-accurate skeletons that preview the real cards (same aspect ratio, responsive widths, and label bars) rather than a generic spinner, so nothing shifts when data arrives. Confidence: 0.6
 - Expects fully responsive layouts (desktop/tablet/mobile) and accessible controls. Confidence: 0.85
 - Format currency as BDT (৳) when that matches the existing application. Confidence: 0.8
 - Prefers avoiding cluttered dashboards: show the most important metrics first, keep the layout compact with minimal whitespace and consistent card heights/spacing, prioritize useful information above the fold, and move secondary detail to dedicated pages. Confidence: 0.9
