@@ -31,4 +31,5 @@
 - Time-sensitive state (e.g. "abandoned/old" thresholds) must be derived server-side from real DB timestamps on each query — not stored as a flag field, not computed from localStorage/frontend clocks, and not driven by a cron job unless the architecture already requires one. Confidence: 0.7
 - When fixing a layout/responsive bug, scope the change to the affected breakpoint range only: the desktop layout (≥1024px) and mobile layout (<640px) must stay exactly as they are, with current colors, typography, card design, radii and shadows preserved. Confidence: 0.75
 - Wants premium, smooth motion in interactive UI (e.g. carousel transitions): no abrupt or distracting animations. Confidence: 0.65
+- For horizontal carousels/rows, wants explicit arrow controls for swiping plus a partially visible next card so it's obvious there is more content to scroll. Confidence: 0.6
 - Prefers native browser scrolling over JavaScript smooth-scroll libraries (e.g. Lenis): no scroll-hijacking wrapper in the root layout, keep scrolling working normally in modals/inner panes. Confidence: 0.6
