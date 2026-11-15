@@ -160,6 +160,42 @@ class ProductColorApiTests(APITestCase):
             401,
         )
 
+    def test_color_and_size_variations_are_not_duplicated(self):
+        color_attribute = Attribute.objects.create(name="Color")
+        black = AttributeValue.objects.create(
+            attribute=color_attribute, value="Black", hex_code="#000000"
+        )
+        size_attribute = Attribute.objects.create(name="Size")
+        small = AttributeValue.objects.create(attribute=size_attribute, value="S")
+        large = AttributeValue.objects.create(attribute=size_attribute, value="L")
+
+        product, _ = make_product("Color And Size", "COLOR-SIZE")
+        for index, size_value in enumerate((small, large)):
+            variation = ProductVariation.objects.create(
+                product=product,
+                sku=f"COLOR-SIZE-{index}",
+                price=Decimal("100.00"),
+                stock_quantity=5,
+                is_active=True,
+            )
+            VariationAttributeValue.objects.create(
+                variation=variation, attribute_value=black
+            )
+            VariationAttributeValue.objects.create(
+                variation=variation, attribute_value=size_value
+            )
+        self.create_color(product=product.id, name="Black", hex_code="#000000")
+
+        response = self.client.get(f"/api/products/?color={black.id}")
+        self.assertEqual(response.status_code, 200)
+        ids = [item["id"] for item in response.data["results"]]
+        self.assertEqual(ids.count(product.id), 1)
+        self.assertEqual(response.data["count"], 1)
+
+        facets = self.client.get("/api/products/color-facets/")
+        counts = {color["name"]: color["count"] for color in facets.data["colors"]}
+        self.assertEqual(counts["Black"], 1)
+
     def test_color_library_lists_shared_colors_with_usage(self):
         self.create_color(name="Black", hex_code="#000000")
         other, _ = make_product("Library Product", "COLOR-LIB")

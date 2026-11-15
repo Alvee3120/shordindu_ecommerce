@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import { FiChevronDown } from "react-icons/fi";
 import { buildCategoryTree } from "@/lib/categories";
+import { isLightColor } from "@/lib/products";
 
 const PRICE_BOUNDS = { min: 0, max: 5000, step: 50 };
 
@@ -188,7 +189,7 @@ export default function FilterSidebar({
               return (
                 <label
                   key={color.attribute_value}
-                  className="flex cursor-pointer items-center gap-2.5 text-sm text-neutral-600 hover:text-neutral-900"
+                  className="flex cursor-pointer items-center gap-2.5 py-1.5 text-sm text-neutral-600 hover:text-neutral-900"
                 >
                   <input
                     type="checkbox"
@@ -197,8 +198,12 @@ export default function FilterSidebar({
                     className="sr-only"
                   />
                   <span
-                    className={`h-4 w-4 shrink-0 rounded-full border border-neutral-300 transition-shadow ${
-                      checked ? "ring-1 ring-neutral-500 ring-offset-1" : ""
+                    className={`h-5 w-5 shrink-0 rounded-full border transition-shadow ${
+                      checked
+                        ? "border-transparent"
+                        : isLightColor(color.hex_code)
+                          ? "border-neutral-300"
+                          : "border-black/10"
                     }`}
                     style={{ backgroundColor: color.hex_code }}
                   />

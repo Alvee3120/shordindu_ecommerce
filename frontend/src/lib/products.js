@@ -81,6 +81,17 @@ function isColorAttributeName(name) {
   return ["color", "colour"].includes((name || "").trim().toLowerCase());
 }
 
+/** True for white-ish colors that need a visible border on light backgrounds. */
+export function isLightColor(hex) {
+  const match = /^#([0-9a-f]{6})$/i.exec(hex || "");
+  if (!match) return true;
+  const value = parseInt(match[1], 16);
+  const r = (value >> 16) & 255;
+  const g = (value >> 8) & 255;
+  const b = value & 255;
+  return 0.299 * r + 0.587 * g + 0.114 * b > 200;
+}
+
 function lowestPricedVariation(variations) {
   const priced = variations
     .map((variation) => ({ variation, pricing: variationPricing(variation) }))

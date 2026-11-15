@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { FaInstagram, FaFacebookF, FaTiktok } from "react-icons/fa";
-import { FiPhone, FiMail } from "react-icons/fi";
+import { FaInstagram, FaFacebookF } from "react-icons/fa";
+import { FaXTwitter, FaYoutube } from "react-icons/fa6";
+import { FiPhone, FiMail, FiMapPin } from "react-icons/fi";
 import { getCategories } from "@/lib/categories";
 
 const logoSrc = "/assets/logo/logoDark.png";
@@ -71,35 +72,6 @@ export default function FooterT() {
               Hello Beautiful, This is SHORDINDU — a youth-centric clothing
               brand that aims to promote ETHNICITY.
             </p>
-            <div className="flex items-center gap-3">
-              <a
-                href="https://www.instagram.com/wear_shordindu/"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Follow us on Instagram"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-600 text-gray-300 transition-colors hover:border-white hover:text-white"
-              >
-                <FaInstagram size={16} />
-              </a>
-              <a
-                href="https://facebook.com/shordindu"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Follow us on Facebook"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-600 text-gray-300 transition-colors hover:border-white hover:text-white"
-              >
-                <FaFacebookF size={15} />
-              </a>
-              <a
-                href="https://www.tiktok.com/@wear_shordindu"
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label="Follow us on Facebook"
-                className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-600 text-gray-300 transition-colors hover:border-white hover:text-white"
-              >
-                <FaTiktok size={15} />
-              </a>
-            </div>
           </div>
 
           {/* Column 2: Category */}
@@ -186,8 +158,60 @@ export default function FooterT() {
           </div>
         </div>
 
+        {/* Follow Us */}
+        <div className="mt-5 flex flex-wrap items-center gap-x-5 gap-y-3">
+          <span className="text-[13px] whitespace-nowrap text-gray-300">Follow Us</span>
+
+          <div className="flex items-center gap-4">
+            <a
+              href="https://facebook.com/shordindu"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow us on Facebook"
+              className="text-gray-300 transition-colors hover:text-white"
+            >
+              <FaFacebookF size={15} />
+            </a>
+            <a
+              href="https://x.com/shordindu"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow us on X"
+              className="text-gray-300 transition-colors hover:text-white"
+            >
+              <FaXTwitter size={15} />
+            </a>
+            <a
+              href="https://www.instagram.com/wear_shordindu/"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Follow us on Instagram"
+              className="text-gray-300 transition-colors hover:text-white"
+            >
+              <FaInstagram size={16} />
+            </a>
+            <a
+              href="https://www.youtube.com/@shordindu"
+              target="_blank"
+              rel="noopener noreferrer"
+              aria-label="Subscribe on YouTube"
+              className="text-gray-300 transition-colors hover:text-white"
+            >
+              <FaYoutube size={17} />
+            </a>
+          </div>
+
+          <Link
+            href="/footerLinks/locations"
+            className="inline-flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-[10px] font-semibold tracking-widest whitespace-nowrap text-gray-100 uppercase transition-colors hover:bg-white/20"
+          >
+            <FiMapPin size={13} className="text-(--moon)" />
+            Store Locations
+          </Link>
+        </div>
+
         {/* Divider */}
-        <div className="mt-14 border-t border-gray-700" />
+        <div className="mt-8 border-t border-gray-700" />
 
         {/* Bottom bar */}
         <div className="flex flex-col items-start justify-between gap-4 pt-8 sm:flex-row sm:items-center">

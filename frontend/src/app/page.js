@@ -7,7 +7,6 @@ import Men from "@/components/homepage/Men";
 import Bag from "@/components/homepage/Bag";
 import DiscountShowcases from "@/components/homepage/DiscountShowcases";
 import CustomerReviews from "@/components/homepage/CustomerReviews";
-import StoreLocator from "@/components/homepage/StoreLocator";
 
 export default function Home() {
   return (
@@ -21,7 +20,6 @@ export default function Home() {
     <CampaignBanner />
     <Men />
     <Bag />
-    <StoreLocator />
     <CustomerReviews />
   </div>
   );

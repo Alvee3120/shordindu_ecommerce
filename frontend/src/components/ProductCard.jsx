@@ -7,18 +7,9 @@ import { FiHeart } from "react-icons/fi";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { addCartItem } from "@/lib/cart";
+import { isLightColor } from "@/lib/products";
 
 const MAX_SWATCHES = 4;
-
-function isLightColor(hex) {
-  const match = /^#([0-9a-f]{6})$/i.exec(hex || "");
-  if (!match) return true;
-  const value = parseInt(match[1], 16);
-  const r = (value >> 16) & 255;
-  const g = (value >> 8) & 255;
-  const b = value & 255;
-  return 0.299 * r + 0.587 * g + 0.114 * b > 200;
-}
 
 function ColorSwatches({ colors, selected, onSelect }) {
   if (!colors.length) return null;
@@ -42,7 +33,7 @@ function ColorSwatches({ colors, selected, onSelect }) {
             title={color.name}
             className={`h-3.5 w-3.5 shrink-0 rounded-full border transition-transform hover:scale-110 sm:h-4 sm:w-4 ${
               isSelected
-                ? "scale-110 ring-1 ring-neutral-500 ring-offset-1"
+                ? "scale-110 border-transparent"
                 : isLightColor(color.hex_code)
                   ? "border-neutral-300"
                   : "border-black/10"
@@ -137,7 +128,7 @@ export default function ProductCard({ product }) {
         </Link>
 
         {displayDiscount && (
-          <span className="absolute top-0 left-0 z-10 bg-red-600 px-2 py-1 text-[9px] font-bold tracking-wide text-white uppercase sm:px-2.5 sm:text-[10px]">
+          <span className="absolute top-2 left-2 z-10 bg-red-600 px-2 py-1 text-[9px] font-bold tracking-wide text-white uppercase sm:top-3 sm:left-3 sm:px-2.5 sm:text-[10px]">
             {displayDiscount}
           </span>
         )}
