@@ -615,8 +615,9 @@ banner returns `400`.
 
 ## 7. Reviews
 
-Base path: `/api/reviews/`. Public read, auth required to write, and **one review per user per
-product** (a second `POST` for the same product returns `400 non_field_errors`).
+Base path: `/api/reviews/`. Public read, auth required to write. A user may leave **multiple
+reviews for the same product**; each `POST` creates an independent record (newest first in
+listings), and every approved review counts towards the product's rating.
 
 ```json
 { "id": 1, "product": 1, "display_name": "Ayesha", "user_name": "Ayesha", "avatar_url": null, "rating": 5, "title": "My favourite", "comment": "Great!", "image": "http://.../reviews/x.jpg", "images": ["http://.../reviews/x.jpg"], "is_verified_purchase": true, "review_date": "2026-11-14", "created_at": "..." }
