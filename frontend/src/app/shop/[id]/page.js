@@ -639,9 +639,9 @@ function ProductDetailsContent() {
             {inStock === null ? (
               <span className="text-neutral-400">Select options to see availability</span>
             ) : inStock ? (
-              <span className="text-emerald-600">In stock ({displayStock} available)</span>
+              <span className="text-emerald-600">In Stock</span>
             ) : (
-              <span className="text-red-600">Out of stock</span>
+              <span className="text-red-600">Out of Stock</span>
             )}
           </p>
 
