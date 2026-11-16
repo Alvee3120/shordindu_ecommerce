@@ -32,6 +32,7 @@ fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ -f "$APP_DIR/backend/manage.py" ] || fail "no existing install at $APP_DIR/backend"
 [ -f "$APP_DIR/frontend/server.js" ] || fail "no built frontend at $APP_DIR/frontend/server.js"
+command -v rsync >/dev/null 2>&1 || fail "rsync is required (apt-get install -y rsync)"
 
 # ------------------------------------------------------------------ layout
 log "Creating the release layout"
@@ -70,17 +71,27 @@ if [ -L "$APP_DIR/current" ]; then
 else
     log "Snapshotting the live install as the first release"
     install -d -m 755 "$SEED"
-    cp -a "$APP_DIR/backend" "$APP_DIR/frontend" "$SEED/"
+    # Copy code but not .venv: the copied venv's script shebangs point at the
+    # original path, so reuse the existing venv in place instead.
+    for d in backend frontend; do
+        rsync -a --exclude '.venv' --exclude 'media' --exclude '__pycache__' \
+            "$APP_DIR/$d/" "$SEED/$d/"
+    done
     # point the copy at the shared state
-    rm -rf "$SEED/backend/media"
     ln -sfn "$APP_DIR/shared/media" "$SEED/backend/media"
     ln -sfn "$APP_DIR/shared/backend.env" "$SEED/backend/.env"
-    # reuse the venv that already exists in the live tree
-    echo "$SEED/backend/.venv" >"$SEED/.venv-path"
+    # keep using the venv that already exists in the live tree
+    echo "$APP_DIR/backend/.venv" >"$SEED/.venv-path"
     chown -R ubuntu:ubuntu "$SEED"
     ln -sfn "$SEED" "$APP_DIR/current"
     echo "current -> $SEED"
 fi
+
+# The units exec from shared/venv/current, so it must exist before they start.
+log "Pointing shared/venv/current at the live venv"
+ln -sfn "$APP_DIR/backend/.venv" "$APP_DIR/shared/venv/current"
+[ -x "$APP_DIR/shared/venv/current/bin/gunicorn" ] \
+    || fail "no gunicorn in $APP_DIR/backend/.venv (was the venv built?)"
 
 # ---------------------------------------------------------------- scripts
 log "Installing deploy scripts"
@@ -106,8 +117,10 @@ systemctl enable $SERVICES >/dev/null 2>&1
 systemctl restart $SERVICES
 
 healthy=0
+# /api/health/ only exists in the new code; the live release predates it. Check
+# an endpoint both releases serve so adoption cannot fail spuriously.
 for _ in $(seq 1 20); do
-    if curl -fsS -m 5 http://127.0.0.1:8001/api/health/ >/dev/null 2>&1 \
+    if curl -fsS -m 5 'http://127.0.0.1:8001/api/products/?page_size=1' >/dev/null 2>&1 \
         && curl -fsS -m 5 http://127.0.0.1:3001/ >/dev/null 2>&1; then
         healthy=1
         break
