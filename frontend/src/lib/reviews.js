@@ -1,27 +1,29 @@
 // lib/reviews.js
 import { apiFetch } from "./api";
 
-export function listReviews({ page, product, status } = {}) {
+export function listReviews({ page, page_size, product, status } = {}) {
   const params = new URLSearchParams();
   if (page) params.set("page", page);
+  if (page_size) params.set("page_size", page_size);
   if (product) params.set("product", product);
   if (status) params.set("status", status);
   const query = params.toString();
   return apiFetch(`/reviews/${query ? `?${query}` : ""}`, { method: "GET" });
 }
 
-export function createReview({ product, rating, comment, image }) {
+export function createReview({ product, rating, title, comment, image }) {
   if (image) {
     const form = new FormData();
     form.append("product", product);
     form.append("rating", rating);
+    form.append("title", title ?? "");
     form.append("comment", comment ?? "");
     form.append("image", image);
     return apiFetch("/reviews/", { method: "POST", body: form, isFormData: true });
   }
   return apiFetch("/reviews/", {
     method: "POST",
-    body: { product, rating, comment: comment ?? "" },
+    body: { product, rating, title: title ?? "", comment: comment ?? "" },
   });
 }
 

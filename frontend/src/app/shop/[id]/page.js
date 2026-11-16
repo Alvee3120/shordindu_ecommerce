@@ -6,11 +6,11 @@ import Image from "next/image";
 import Link from "next/link";
 import { toast } from "sonner";
 import { FiChevronLeft, FiChevronRight, FiMinus, FiPlus, FiTruck, FiShield, FiMaximize2, FiX } from "react-icons/fi";
-import { getProduct, getProductAddons, listProducts, toCardProduct, variationPricing } from "@/lib/products";
+import { getProduct, getProductAddons, variationPricing } from "@/lib/products";
 import { addCartItem, addCartItemAddon, getCart, updateCartItem, deleteCartItem } from "@/lib/cart";
 import { useCart } from "@/context/CartContext";
-import ProductCard from "@/components/ProductCard";
 import ProductReviews from "@/components/ProductReviews";
+import ProductRecommendations from "@/components/shop/ProductRecommendations";
 import ImageZoom from "@/components/ImageZoom";
 import NotifyMeModal from "@/components/shop/NotifyMeModal";
 
@@ -33,7 +33,6 @@ function ProductDetailsContent() {
   const { refreshCart } = useCart();
   const [product, setProduct] = useState(null);
   const [addons, setAddons] = useState([]);
-  const [relatedProducts, setRelatedProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeImage, setActiveImage] = useState(0);
@@ -104,31 +103,6 @@ function ProductDetailsContent() {
       cancelled = true;
     };
   }, [id, requestedColor]);
-
-  const categoryFilterKey = product?.categories?.join(",") || "";
-
-  useEffect(() => {
-    if (!categoryFilterKey) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- clearing stale related products when there's no category
-      setRelatedProducts([]);
-      return;
-    }
-    let cancelled = false;
-    listProducts({ category: categoryFilterKey, page_size: 8, status: "active" })
-      .then((data) => {
-        if (cancelled) return;
-        const results = Array.isArray(data) ? data : data?.results ?? [];
-        setRelatedProducts(
-          results.filter((p) => p.id !== product.id).slice(0, 4).map(toCardProduct)
-        );
-      })
-      .catch(() => {
-        if (!cancelled) setRelatedProducts([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [categoryFilterKey, product?.id]);
 
   useEffect(() => {
     const imageCount = product?.images?.length || 0;
@@ -639,9 +613,9 @@ function ProductDetailsContent() {
             {inStock === null ? (
               <span className="text-neutral-400">Select options to see availability</span>
             ) : inStock ? (
-              <span className="text-emerald-600">In stock ({displayStock} available)</span>
+              <span className="text-emerald-600">In Stock</span>
             ) : (
-              <span className="text-red-600">Out of stock</span>
+              <span className="text-red-600">Out of Stock</span>
             )}
           </p>
 
@@ -813,22 +787,11 @@ function ProductDetailsContent() {
         </div>
       </div>
 
-      {product && (
-        <ProductReviews
-          productId={product.id}
-          averageRating={product.average_rating}
-          reviewCount={product.review_count}
-        />
-      )}
+      {product && <ProductReviews productId={product.id} />}
 
-      {relatedProducts.length > 0 && (
+      {product && (
         <div className="mt-16 border-t border-neutral-100 pt-10">
-          <h2 className="font-sora mb-6 text-2xl font-bold text-neutral-900">You may also like</h2>
-          <div className="grid grid-cols-2 gap-6 sm:grid-cols-3 lg:grid-cols-4">
-            {relatedProducts.map((relatedProduct) => (
-              <ProductCard key={relatedProduct.id} product={relatedProduct} />
-            ))}
-          </div>
+          <ProductRecommendations product={product} />
         </div>
       )}
 

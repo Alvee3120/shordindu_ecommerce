@@ -38,3 +38,5 @@
 - Site-wide announcement/promo strips belong at the very top of the page (first thing inside the fixed header, above the nav), not tucked above the footer where it requires scrolling to notice. Confidence: 0.7
 - Admin-entered content text must render exactly as typed: preserve explicit spacing/separators (don't let HTML whitespace collapsing strip them) while still keeping it on one line. Confidence: 0.6
 - Content changed in the admin must appear on the storefront without a manual hard refresh; fix the staleness at its root (targeted cache invalidation / refetch) instead of disabling caching wholesale. Confidence: 0.7
+- Optional/secondary sections (e.g. recommendation rows) should be hidden entirely when no item qualifies for them, and the same product should not be repeated across multiple recommendation sections. Confidence: 0.6
+- Customer-facing availability labels should show only status wording (e.g. "In Stock" / "Out of Stock") and never expose exact inventory quantities, while internal stock validation and admin inventory data stay unchanged. Confidence: 0.6

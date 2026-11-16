@@ -45,8 +45,12 @@ class Review(models.Model):
 
     class Meta:
         db_table = "reviews"
-        unique_together = ("product", "user")
         ordering = ["-review_date", "-created_at", "-id"]
+        indexes = [
+            # Plain (non-unique) index: a user may now leave several reviews for
+            # the same product, so lookups are still fast without the constraint.
+            models.Index(fields=["product", "user"], name="reviews_product_user_idx"),
+        ]
 
     def __str__(self):
         name = self.customer_name or (self.user.name if self.user_id else "Customer")

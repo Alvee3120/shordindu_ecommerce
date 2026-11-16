@@ -325,17 +325,54 @@ class ReviewManagementTests(APITestCase):
 
     # -- customer compatibility -------------------------------------------
 
-    def test_customer_submission_still_pending_and_unique(self):
+    def test_customer_submission_is_pending_until_approved(self):
         self.client.force_authenticate(self.customer)
         payload = {"product": self.product.id, "rating": 5, "comment": "Customer review."}
         created = self.client.post(self.PUBLIC, payload, format="json")
         self.assertEqual(created.status_code, 201, created.data)
         self.assertEqual(created.data["status"], "pending")
-        self.assertEqual(
-            self.client.post(self.PUBLIC, payload, format="json").status_code, 400
-        )
 
         self.client.force_authenticate(self.admin)
         self.client.post(f"{self.PUBLIC}{created.data['id']}/approve/")
         public = self.client.get(f"{self.PUBLIC}?product={self.product.id}&status=approved")
         self.assertEqual(public.data["count"], 1)
+
+    def test_customer_can_submit_multiple_reviews_for_same_product(self):
+        self.client.force_authenticate(self.customer)
+        first = self.client.post(
+            self.PUBLIC,
+            {"product": self.product.id, "rating": 5, "comment": "First take."},
+            format="json",
+        )
+        second = self.client.post(
+            self.PUBLIC,
+            {"product": self.product.id, "rating": 2, "comment": "Second take."},
+            format="json",
+        )
+        self.assertEqual(first.status_code, 201, first.data)
+        self.assertEqual(second.status_code, 201, second.data)
+        self.assertNotEqual(first.data["id"], second.data["id"])
+        self.assertEqual(
+            Review.objects.filter(product=self.product, user=self.customer).count(), 2
+        )
+
+        # The second submission must not have modified the first record.
+        original = Review.objects.get(pk=first.data["id"])
+        self.assertEqual(original.rating, 5)
+        self.assertEqual(original.comment, "First take.")
+
+    def test_all_published_reviews_count_towards_product_rating(self):
+        self.client.force_authenticate(self.customer)
+        for rating in (5, 3):
+            created = self.client.post(
+                self.PUBLIC,
+                {"product": self.product.id, "rating": rating, "comment": "Again."},
+                format="json",
+            )
+            self.client.force_authenticate(self.admin)
+            self.client.post(f"{self.PUBLIC}{created.data['id']}/approve/")
+            self.client.force_authenticate(self.customer)
+
+        serialized = ProductSerializer(self.product).data
+        self.assertEqual(serialized["review_count"], 2)
+        self.assertEqual(serialized["average_rating"], 4.0)

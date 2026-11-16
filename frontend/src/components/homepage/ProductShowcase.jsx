@@ -18,7 +18,8 @@ const ROW_CARD =
  * with the next card peeking in to show there is more. Arrow buttons scroll by
  * one card. Used by the category sections (Saree, Men, Bag, Women) and the
  * automatic-discount sections. `products` are ProductCard-shaped
- * (see toCardProduct in lib/products).
+ * (see toCardProduct in lib/products). `flush` drops the homepage section
+ * padding so it can be embedded inside another container (product details page).
  */
 export default function ProductShowcase({
   title,
@@ -26,6 +27,7 @@ export default function ProductShowcase({
   products = [],
   loading = false,
   viewAllHref = null,
+  flush = false,
 }) {
   const scrollRef = useRef(null);
   const [canPrev, setCanPrev] = useState(false);
@@ -60,7 +62,7 @@ export default function ProductShowcase({
   };
 
   return (
-    <section className="w-full bg-background px-6 pt-16 sm:px-8">
+    <section className={flush ? "w-full" : "w-full bg-background px-6 pt-16 sm:px-8"}>
       <div className="mx-auto w-full max-w-7xl">
         <div className="mb-10 flex items-center justify-between gap-3">
           <div className="flex min-w-0 flex-col gap-2">
