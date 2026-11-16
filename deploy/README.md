@@ -1,6 +1,6 @@
 # Deployment
 
-Push to `main` → GitHub Actions builds → the box serves the new release.
+Push to `main` → GitHub Actions builds → GitHub pushes a release to the box.
 Target host: **http://13.236.66.156**.
 
 ```
@@ -11,23 +11,26 @@ GitHub Actions                       13.236.66.156
 │ tar → artifact     │              │   flip `current` → restart services  │
 └────────────────────┘              └──────────────────────────────────────┘
 
-nginx :80
-  /               → 127.0.0.1:3000   node server.js   (shordindu-web)
-  /api/ /admin/   → 127.0.0.1:8000   gunicorn         (shordindu-api)
+nginx :80  (/etc/nginx/sites-available/shordindu)
+  /               → 127.0.0.1:3001   node server.js   (shordindu-frontend)
+  /api/ /admin/   → 127.0.0.1:8001   gunicorn         (shordindu-backend)
   /static/        → current/backend/staticfiles/
   /media/         → shared/media/
-                    celery worker    (shordindu-worker)
+                    celery worker    (shordindu-celery)
 ```
+
+Ports 3001/8001 (not 3000/8000) so a second site can take 3002/8002 in its own
+nginx server block.
 
 ## Layout on the server
 
 ```
-/var/www/shordindu/
+/opt/shordindu/
   releases/<sha>/{backend,frontend}   # one directory per deploy
   current -> releases/<sha>           # atomic symlink flip
   shared/
-    backend.env                       # production secrets (chmod 600)
-    media/                            # user uploads — survives every deploy
+    backend.env                       # production secrets (chmod 600, ubuntu)
+    media/                            # uploads — survives every deploy
     venv/<req-hash>/                  # one venv per requirements.txt revision
     venv/current -> venv/<req-hash>
     backups/pre-<sha>.dump            # pg_dump taken before each migrate
@@ -38,46 +41,56 @@ nginx :80
 
 | File | Where it ends up | Who runs it |
 |---|---|---|
-| `bootstrap-server.sh` | run once, over SSH | you, manually |
+| `adopt-server.sh` | run once, over SSH, **as root** | you, manually |
 | `deploy.sh` | `/usr/local/bin/shordindu-deploy.sh` | the workflow, via `sudo` |
 | `rollback.sh` | `/usr/local/bin/shordindu-rollback.sh` | the workflow or you |
-| `nginx/shordindu.conf` | `/etc/nginx/conf.d/shordindu.conf` | nginx |
+| `nginx/shordindu.conf` | `/etc/nginx/sites-available/shordindu` | nginx |
 | `systemd/*.service` | `/etc/systemd/system/` | systemd |
-| `env.production.example` | copied to `shared/backend.env` | — |
+| `env.production.example` | reference for `shared/backend.env` | — |
 
-## First-time setup
+There is no `bootstrap-server.sh`: the box was already provisioned by hand with
+the app in `/opt/shordindu`. `adopt-server.sh` is the migration path into the
+release layout, and it preserves the existing env and uploads.
 
-1. **Provision the host** (once, as root):
+## First-time adoption (once)
 
-   ```bash
-   scp -r deploy root@13.236.66.156:/root/shordindu-deploy
-   ssh root@13.236.66.156 'bash /root/shordindu-deploy/bootstrap-server.sh'
-   ```
-
-2. **Fill in `/var/www/shordindu/shared/backend.env`** — `SECRET_KEY`,
-   `DATABASE_URL`, `ALLOWED_HOSTS`, `CSRF_TRUSTED_ORIGINS`, and keep
-   `AUTH_COOKIE_SECURE=False` until the site is on HTTPS. Values must have no
-   spaces or quotes (the deploy script sources this file).
-
-3. **Deploy key** (the runner holds this, nothing else):
+1. Copy the scripts over:
 
    ```bash
-   ssh-keygen -t ed25519 -C gh-deploy -f gh_deploy
-   ssh root@13.236.66.156 "echo '$(cat gh_deploy.pub)' >> /home/deploy/.ssh/authorized_keys"
+   scp -r deploy ubuntu@13.236.66.156:/tmp/shordindu-deploy
    ```
 
-4. **GitHub → Settings → Secrets and variables → Actions**:
+2. Run it as root. It moves the live install into `releases/` + `current/`,
+   copies `backend/.env` to `shared/backend.env`, moves uploads to
+   `shared/media/`, installs the units and sudoers rule, then health-checks:
+
+   ```bash
+   ssh ubuntu@13.236.66.156 'sudo bash /tmp/shordindu-deploy/adopt-server.sh'
+   ```
+
+3. Authorize the CI deploy key for `ubuntu`:
+
+   ```bash
+   ssh ubuntu@13.236.66.156
+   mkdir -p /home/ubuntu/.ssh && chmod 700 /home/ubuntu/.ssh
+   echo 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIFfYEd3u3csxEnYgEYW50ltWFp3fsGW+q3HJ0r3wKPHE gh-deploy-shordindu' \
+     >> /home/ubuntu/.ssh/authorized_keys
+   chmod 600 /home/ubuntu/.ssh/authorized_keys
+   chown -R ubuntu:ubuntu /home/ubuntu/.ssh
+   ```
+
+4. GitHub → Settings → **Environments → production** already holds the secrets:
 
    | Secret | Value |
    |---|---|
    | `SSH_HOST` | `13.236.66.156` |
-   | `SSH_USER` | `deploy` |
+   | `SSH_USER` | `ubuntu` |
    | `SSH_PORT` | `22` |
-   | `SSH_KEY` | contents of `gh_deploy` (the private key) |
+   | `SSH_KEY` | the private key matching the public key above |
 
-5. **Stop whatever used to serve port 80** and run *Actions → Deploy → Run workflow*.
+   Repo variable `NEXT_PUBLIC_MEDIA_HOSTNAME` holds the R2 public host.
 
-6. Protect `main` (PR + review required) so merges are the only way to deploy.
+5. Run **Actions → Deploy → Run workflow**.
 
 ## Day to day
 
@@ -95,7 +108,7 @@ covers the case where the deploy script itself died.
 Manual:
 
 ```bash
-ssh deploy@13.236.66.156 'sudo /usr/local/bin/shordindu-rollback.sh'
+ssh ubuntu@13.236.66.156 'sudo /usr/local/bin/shordindu-rollback.sh'
 ```
 
 **Code rolls back; the database does not.** Migrations run before activation, so
@@ -103,15 +116,15 @@ keep migrations backward-compatible for one release and use
 `shared/backups/pre-<sha>.dump` if you need the data back:
 
 ```bash
-pg_restore --clean --no-owner -d "$DATABASE_URL" /var/www/shordindu/shared/backups/pre-<sha>.dump
+pg_restore --clean --no-owner -d "$DATABASE_URL" /opt/shordindu/shared/backups/pre-<sha>.dump
 ```
 
 ## Logs
 
 ```bash
-journalctl -u shordindu-api -f      # gunicorn
-journalctl -u shordindu-worker -f   # celery
-journalctl -u shordindu-web -f      # next
+journalctl -u shordindu-backend -f   # gunicorn
+journalctl -u shordindu-celery -f    # celery
+journalctl -u shordindu-frontend -f  # next
 tail -f /var/log/nginx/error.log
 ```
 
@@ -121,16 +134,11 @@ tail -f /var/log/nginx/error.log
   it in `.github/workflows/deploy.yml` and redeploy; restarting isn't enough.
 * `backend/media/` is a symlink to `shared/media/` inside every release, so
   uploads never live in a directory that gets replaced.
-* New/changed images on the API host must be whitelisted in
+* New/changed image hosts must be whitelisted in
   `frontend/next.config.mjs` → `images.remotePatterns`, or `next/image` 400s.
 * Media can live in Cloudflare R2 instead of `shared/media/`: set `USE_S3=True`
   and the `AWS_*` keys in `shared/backend.env`, then
   `python manage.py upload_media_to_storage --commit` to copy existing uploads.
-  Set the `NEXT_PUBLIC_MEDIA_HOSTNAME` repository variable to the public bucket
-  host so the frontend build whitelists it.
 * If `DATABASE_URL` points at a pooled endpoint (Neon's `-pooler` host, pgbouncer,
   etc.), the pre-deploy `pg_dump` backup in `deploy.sh` will fail or produce an
-  incomplete archive. Use the direct (non-pooled) host in `backend.env`, or
-  point the backup at a `DATABASE_URL_DIRECT` variable.
-* Our nginx site uses `listen 80 default_server`; the bootstrap script disables
-  the distro's default site to avoid the conflict.
+  incomplete archive. Use the direct (non-pooled) host in `backend.env`.

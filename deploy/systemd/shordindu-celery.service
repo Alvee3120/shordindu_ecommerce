@@ -1,0 +1,18 @@
+[Unit]
+Description=Shordindu Celery worker
+After=network.target redis-server.service postgresql.service
+Wants=redis-server.service postgresql.service
+
+[Service]
+Type=simple
+User=ubuntu
+Group=ubuntu
+WorkingDirectory=/opt/shordindu/current/backend
+EnvironmentFile=/opt/shordindu/shared/backend.env
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/shordindu/shared/venv/current/bin/celery -A config worker -l info --concurrency=2
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target

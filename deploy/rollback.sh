@@ -8,9 +8,9 @@
 #
 set -euo pipefail
 
-APP_DIR=/var/www/shordindu
+APP_DIR=/opt/shordindu
 SHARED="$APP_DIR/shared"
-SERVICES="shordindu-api shordindu-worker shordindu-web"
+SERVICES="shordindu-backend shordindu-celery shordindu-frontend"
 
 log() { printf '\n==> %s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
@@ -32,8 +32,8 @@ ln -sfn "$VENV" "$SHARED/venv/current"
 systemctl restart $SERVICES
 
 for _ in $(seq 1 15); do
-    if curl -fsS -m 5 http://127.0.0.1:8000/api/health/ >/dev/null 2>&1 \
-        && curl -fsS -m 5 http://127.0.0.1:3000/ >/dev/null 2>&1; then
+    if curl -fsS -m 5 http://127.0.0.1:8001/api/health/ >/dev/null 2>&1 \
+        && curl -fsS -m 5 http://127.0.0.1:3001/ >/dev/null 2>&1; then
         [ -n "${CURRENT:-}" ] && echo "$CURRENT" >"$SHARED/previous_release"
         log "Rolled back to $TARGET"
         exit 0
@@ -42,5 +42,5 @@ for _ in $(seq 1 15); do
 done
 
 echo "ERROR: $TARGET is not healthy either" >&2
-journalctl -u shordindu-api -u shordindu-web -n 40 --no-pager >&2 || true
+journalctl -u shordindu-backend -u shordindu-frontend -n 40 --no-pager >&2 || true
 exit 1
