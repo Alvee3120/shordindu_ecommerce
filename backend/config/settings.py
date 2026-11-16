@@ -6,6 +6,7 @@ from datetime import timedelta
 from pathlib import Path
 
 import environ
+from django.core.exceptions import ImproperlyConfigured
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 
@@ -128,26 +129,66 @@ USE_TZ = True
 # Static & media files
 # --------------------------------------------------------------------------
 
-STATIC_URL = "static/"
+STATIC_URL = "/static/"
 STATIC_ROOT = BASE_DIR / "staticfiles"
 
-MEDIA_URL = "media/"
+MEDIA_URL = "/media/"
 MEDIA_ROOT = BASE_DIR / "media"
 
+# Wired for Cloudflare R2's S3 API, but the same keys work for AWS S3, MinIO or
+# any S3-compatible store. Leave USE_S3=False to keep uploads on local disk.
 USE_S3 = env("USE_S3")
 
 if USE_S3:
     AWS_ACCESS_KEY_ID = env("AWS_ACCESS_KEY_ID", default="")
     AWS_SECRET_ACCESS_KEY = env("AWS_SECRET_ACCESS_KEY", default="")
     AWS_STORAGE_BUCKET_NAME = env("AWS_STORAGE_BUCKET_NAME", default="")
-    AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="")
-    # Set this to a MinIO endpoint (e.g. http://localhost:9000) for local dev,
-    # or leave unset to use AWS S3 directly.
-    AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None)
-    AWS_S3_CUSTOM_DOMAIN = env("AWS_S3_CUSTOM_DOMAIN", default=None)
+    # R2 has no regions but boto3 insists on one; "auto" is what Cloudflare
+    # documents. AWS S3 users must set the real bucket region instead.
+    AWS_S3_REGION_NAME = env("AWS_S3_REGION_NAME", default="auto")
+    # R2: https://<ACCOUNT_ID>.r2.cloudflarestorage.com
+    # MinIO: http://localhost:9000. Unset falls back to AWS S3.
+    AWS_S3_ENDPOINT_URL = env("AWS_S3_ENDPOINT_URL", default=None) or None
+    # Public host without a scheme — either the pub-<hash>.r2.dev domain or a
+    # custom domain attached to the bucket. When set, .url() returns that
+    # CDN-style URL instead of one signed against the endpoint.
+    AWS_S3_CUSTOM_DOMAIN = (env("AWS_S3_CUSTOM_DOMAIN", default="") or "").strip()
+    # django-storages prepends the protocol itself; a pasted "https://" would
+    # produce "https://https://…" and every image would break.
+    if "://" in AWS_S3_CUSTOM_DOMAIN:
+        AWS_S3_CUSTOM_DOMAIN = AWS_S3_CUSTOM_DOMAIN.split("://", 1)[1]
+    AWS_S3_CUSTOM_DOMAIN = AWS_S3_CUSTOM_DOMAIN.rstrip("/") or None
+    # R2 only speaks SigV4. "path" keeps the bucket in the URL path, which is
+    # what Cloudflare's boto3 examples use and what avoids TLS wildcard issues
+    # for bucket names containing dots. "virtual" also works on R2.
+    AWS_S3_SIGNATURE_VERSION = env("AWS_S3_SIGNATURE_VERSION", default="s3v4")
+    AWS_S3_ADDRESSING_STYLE = env("AWS_S3_ADDRESSING_STYLE", default="path")
     AWS_S3_OBJECT_PARAMETERS = {"CacheControl": "max-age=86400"}
     AWS_DEFAULT_ACL = None
-    AWS_QUERYSTRING_AUTH = False
+    # False suits a public bucket. Set True if the bucket stays private, so
+    # .url() hands out time-limited signed links instead of dead 403s.
+    AWS_QUERYSTRING_AUTH = env.bool("AWS_QUERYSTRING_AUTH", default=False)
+    # Otherwise a second upload of "image.jpg" silently replaces the first.
+    AWS_S3_FILE_OVERWRITE = env.bool("AWS_S3_FILE_OVERWRITE", default=False)
+
+    # R2's S3 endpoint (…r2.cloudflarestorage.com) never serves objects
+    # anonymously — public reads only happen through the bucket's r2.dev domain
+    # or a custom domain. Without one, FILEBROWSER-style unsigned .url() values
+    # would point at endpoints that 403, so fail at boot instead of shipping
+    # broken image links.
+    if (
+        AWS_S3_ENDPOINT_URL
+        and "r2.cloudflarestorage.com" in AWS_S3_ENDPOINT_URL
+        and not AWS_S3_CUSTOM_DOMAIN
+        and not AWS_QUERYSTRING_AUTH
+    ):
+        raise ImproperlyConfigured(
+            "USE_S3 is on with a Cloudflare R2 endpoint but neither "
+            "AWS_S3_CUSTOM_DOMAIN nor AWS_QUERYSTRING_AUTH=True is set. Set "
+            "AWS_S3_CUSTOM_DOMAIN to the bucket's public host (pub-<hash>.r2.dev "
+            "or your custom domain) for a public bucket, or AWS_QUERYSTRING_AUTH="
+            "True to serve signed URLs from a private bucket."
+        )
 
     STORAGES = {
         "default": {
@@ -169,6 +210,10 @@ else:
     }
 
 DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
+
+# Tests always use local media storage, even when .env enables S3/R2 — otherwise
+# a `manage.py test` run uploads fixture images into the real bucket.
+TEST_RUNNER = "config.test_runner.LocalStorageDiscoverRunner"
 
 
 # --------------------------------------------------------------------------

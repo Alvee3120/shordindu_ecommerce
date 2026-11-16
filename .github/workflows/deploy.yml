@@ -1,0 +1,152 @@
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: production
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+env:
+  SITE_URL: http://13.236.66.156
+  # Inlined into the frontend bundle at build time — changing it requires a
+  # rebuild, not a restart.
+  NEXT_PUBLIC_API_BASE_URL: http://13.236.66.156/api
+  # Host that serves uploads once media lives in R2 (no scheme). Also baked in
+  # at build time; it whitelists the host for next/image in next.config.mjs.
+  NEXT_PUBLIC_MEDIA_HOSTNAME: ${{ vars.NEXT_PUBLIC_MEDIA_HOSTNAME }}
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        # --include=dev: tailwind/postcss/babel plugins are devDependencies and
+        # next build needs them, so never let an NODE_ENV/npmrc setting drop them.
+        run: npm ci --include=dev
+
+      - name: Build frontend (standalone)
+        working-directory: frontend
+        run: npm run build
+
+      - name: Verify standalone build
+        run: |
+          set -euo pipefail
+          if [ ! -f frontend/.next/standalone/server.js ]; then
+            echo "frontend/.next/standalone/server.js missing."
+            echo "Check that output is set to standalone in frontend/next.config.mjs."
+            exit 1
+          fi
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+
+      - name: Install backend dependencies
+        run: pip install -r backend/requirements.txt
+
+      - name: Django system checks
+        working-directory: backend
+        env:
+          SECRET_KEY: ci-only-placeholder-never-used-in-production
+          DATABASE_URL: postgres://ci:ci@127.0.0.1:5432/ci
+          DEBUG: "False"
+        run: python manage.py check
+
+      - name: Stage release
+        run: |
+          set -euo pipefail
+          rm -rf stage
+          mkdir -p stage/frontend
+
+          # Backend: source only — never .env, uploads or generated statics.
+          rsync -a \
+            --exclude '.env' --exclude 'media/' --exclude 'staticfiles/' \
+            --exclude '__pycache__/' --exclude '*.pyc' --exclude '.venv/' \
+            backend/ stage/backend/
+
+          # Frontend: the standalone server bundle plus assets it references.
+          cp -a frontend/.next/standalone/. stage/frontend/
+          mkdir -p stage/frontend/.next
+          cp -a frontend/.next/static stage/frontend/.next/static
+          if [ -d frontend/public ]; then cp -a frontend/public stage/frontend/public; fi
+
+          du -sh stage/backend stage/frontend
+          tar -czf release.tgz -C stage .
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release
+          path: release.tgz
+          retention-days: 3
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: release
+
+      - name: Prepare SSH
+        run: |
+          set -euo pipefail
+          mkdir -p ~/.ssh
+          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Upload release and deploy
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          set -euo pipefail
+          scp -i ~/.ssh/deploy_key -P "$SSH_PORT" release.tgz \
+            "$SSH_USER@$SSH_HOST:/var/www/shordindu/incoming/${{ github.sha }}.tar.gz"
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "sudo /usr/local/bin/shordindu-deploy.sh ${{ github.sha }}"
+
+      - name: Smoke test the public site
+        run: |
+          set -euo pipefail
+          for attempt in $(seq 1 8); do
+            frontend=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$SITE_URL/" || true)
+            api=$(curl -s -o /dev/null -w '%{http_code}' --max-time 10 "$SITE_URL/api/health/" || true)
+            if [ "$frontend" = "200" ] && [ "$api" = "200" ]; then
+              echo "frontend=$frontend api=$api"
+              exit 0
+            fi
+            echo "attempt $attempt: frontend=$frontend api=$api"
+            sleep 3
+          done
+          echo "smoke test failed" >&2
+          exit 1
+
+      - name: Roll back on failure
+        if: failure()
+        env:
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
+          SSH_USER: ${{ secrets.SSH_USER }}
+        run: |
+          ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
+            "sudo /usr/local/bin/shordindu-rollback.sh" || true

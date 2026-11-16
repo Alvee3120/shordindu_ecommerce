@@ -19,7 +19,7 @@ const otherLinks = [
   { label: "Order & Delivery Process", href: "/order-delivery" },
 ];
 
-const FOOTER_CATEGORY_NAMES = ["Men", "Women", "Dress", "Saree", "Bag"];
+const FOOTER_CATEGORY_NAMES = ["Dress", "Panjabi", "Sharee", "Bag"];
 
 export default function Footer() {
   const [categoryLinks, setCategoryLinks] = useState([]);

@@ -182,7 +182,7 @@ class Command(BaseCommand):
                 address = self._address_for(customer, district, zone)
 
                 order = Order.objects.create(
-                    order_number=generate_order_number(),
+                    order_number=generate_order_number(when=placed_at),
                     user=customer,
                     guest_email=None if customer else f"guest{random.randint(1000, 9999)}@example.com",
                     status=status,

@@ -18,7 +18,7 @@ const staticLinks = [
   { label: "Home", href: "/" },
   { label: "Shop", href: "/shop" },
 ];
-const NAV_CATEGORY_NAMES = ["Men", "Women", "Bag"];
+const NAV_CATEGORY_NAMES = ["Dress", "Panjabi", "Sharee", "Bag"];
 
 export default function Navbar({ announcement = null }) {
   const pathname = usePathname();

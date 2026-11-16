@@ -17,7 +17,7 @@ const staticLinks = [
   { label: "Home", href: "/" },
   { label: "Shop", href: "/shop" },
 ];
-const NAV_CATEGORY_NAMES = ["Men", "Women", "Bag"];
+const NAV_CATEGORY_NAMES = ["Dress", "Panjabi", "Sharee", "Bag"];
 
 export default function HomeNavbar({ announcement = null }) {
   const { user, isAuthenticated } = useAuth();
