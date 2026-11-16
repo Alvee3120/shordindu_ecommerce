@@ -18,6 +18,7 @@ djangorestframework==3.16.1
 djangorestframework_simplejwt==5.5.1
 drf-spectacular==0.28.0
 et-xmlfile==2.0.0
+gunicorn==23.0.0
 inflection==0.5.1
 jmespath==1.1.0
 jsonschema==4.26.0

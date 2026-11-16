@@ -1,4 +1,4 @@
-from django.db import transaction
+from django.db import connection, transaction
 from django.db.models import Max
 from django.http import Http404
 from rest_framework import generics, permissions
@@ -19,6 +19,17 @@ from .serializers import (
     PublicCampaignBannerSerializer,
     PublicHeroBannerSerializer,
 )
+
+
+class HealthView(APIView):
+    """Readiness probe used by the deploy pipeline's smoke test."""
+
+    permission_classes = [permissions.AllowAny]
+    authentication_classes = []
+
+    def get(self, request):
+        connection.ensure_connection()
+        return Response({"status": "ok"})
 
 
 class PublicAnnouncementBarView(APIView):

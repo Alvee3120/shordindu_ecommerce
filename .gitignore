@@ -17,8 +17,17 @@ backend/*.log
 *.env
 !.env.example
 
+# Database dumps — contain real user rows and password hashes, never commit
+*.dump
+*.sql
+!backend/apps/**/migrations/*.sql
+db_backup/
+
 # Local test artifacts
 cookies.txt
+
+# Source images for the demo catalogue — already uploaded to R2
+sample_product_images/
 
 # Editors / OS
 .vscode/
