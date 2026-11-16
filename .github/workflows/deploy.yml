@@ -108,10 +108,17 @@ jobs:
       - name: Prepare SSH
         run: |
           set -euo pipefail
+          : "${SSH_KEY:?SSH_KEY secret is empty}"
+          : "${SSH_HOST:?SSH_HOST secret is empty}"
+          : "${SSH_PORT:?SSH_PORT secret is empty}"
           mkdir -p ~/.ssh
-          printf '%s\n' "${{ secrets.SSH_KEY }}" > ~/.ssh/deploy_key
+          printf '%s\n' "$SSH_KEY" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p "${{ secrets.SSH_PORT }}" -H "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+          ssh-keyscan -p "$SSH_PORT" -H "$SSH_HOST" >> ~/.ssh/known_hosts 2>/dev/null
+        env:
+          SSH_KEY: ${{ secrets.SSH_KEY }}
+          SSH_HOST: ${{ secrets.SSH_HOST }}
+          SSH_PORT: ${{ secrets.SSH_PORT }}
 
       - name: Upload release and deploy
         env:
@@ -121,7 +128,7 @@ jobs:
         run: |
           set -euo pipefail
           scp -i ~/.ssh/deploy_key -P "$SSH_PORT" release.tgz \
-            "$SSH_USER@$SSH_HOST:/var/www/shordindu/incoming/${{ github.sha }}.tar.gz"
+            "$SSH_USER@$SSH_HOST:/opt/shordindu/incoming/${{ github.sha }}.tar.gz"
           ssh -i ~/.ssh/deploy_key -p "$SSH_PORT" "$SSH_USER@$SSH_HOST" \
             "sudo /usr/local/bin/shordindu-deploy.sh ${{ github.sha }}"
 

@@ -3,17 +3,19 @@
 # Runs ON THE SERVER as root (invoked by .github/workflows/deploy.yml).
 #   sudo /usr/local/bin/shordindu-deploy.sh <release-sha>
 #
-# Layout:
-#   /var/www/shordindu/releases/<sha>/{backend,frontend}
-#   /var/www/shordindu/current -> releases/<sha>      (atomic flip = rollback)
-#   /var/www/shordindu/shared/{media,backend.env,venv,backups,logs}
+# Layout (matches the existing install under /opt/shordindu):
+#   /opt/shordindu/releases/<sha>/{backend,frontend}
+#   /opt/shordindu/current -> releases/<sha>          (atomic flip = rollback)
+#   /opt/shordindu/shared/{backend.env,media,venv,backups,logs}
 #
 set -euo pipefail
 
-APP_DIR=/var/www/shordindu
+APP_DIR=/opt/shordindu
 RELEASES="$APP_DIR/releases"
 SHARED="$APP_DIR/shared"
-SERVICES="shordindu-api shordindu-worker shordindu-web"
+SERVICES="shordindu-backend shordindu-celery shordindu-frontend"
+API_URL=http://127.0.0.1:8001/api/health/
+WEB_URL=http://127.0.0.1:3001/
 KEEP_RELEASES=5
 
 SHA="${1:?usage: shordindu-deploy.sh <release-sha>}"
@@ -24,10 +26,11 @@ log() { printf '\n==> %s\n' "$*"; }
 fail() { printf 'ERROR: %s\n' "$*" >&2; exit 1; }
 
 [ -f "$INCOMING" ] || fail "missing artifact $INCOMING"
-[ -f "$SHARED/backend.env" ] || fail "missing $SHARED/backend.env (copy deploy/env.production.example)"
+[ -f "$SHARED/backend.env" ] || fail "missing $SHARED/backend.env (run deploy/adopt-server.sh first)"
+[ -L "$APP_DIR/current" ] || fail "missing $APP_DIR/current symlink (run deploy/adopt-server.sh first)"
 
 install -d -m 755 "$RELEASES" "$SHARED/backups" "$SHARED/logs" "$SHARED/venv" "$APP_DIR/incoming"
-install -d -m 755 -o deploy -g deploy "$SHARED/media"
+install -d -m 755 -o ubuntu -g ubuntu "$SHARED/media"
 
 # ---------------------------------------------------------------- DB backup
 log "Backing up the database before migrating"
@@ -56,6 +59,7 @@ log "Linking shared state"
 rm -rf "$RELEASE/backend/media"            # never ship uploads inside a release
 ln -sfn "$SHARED/media" "$RELEASE/backend/media"
 ln -sfn "$SHARED/backend.env" "$RELEASE/backend/.env"
+chown -R ubuntu:ubuntu "$RELEASE"
 
 # ------------------------------------------------------------- python venv
 log "Resolving the Python environment"
@@ -92,8 +96,8 @@ systemctl restart $SERVICES
 log "Smoke testing"
 healthy=0
 for _ in $(seq 1 15); do
-    if curl -fsS -m 5 http://127.0.0.1:8000/api/health/ >/dev/null 2>&1 \
-        && curl -fsS -m 5 http://127.0.0.1:3000/ >/dev/null 2>&1; then
+    if curl -fsS -m 5 "$API_URL" >/dev/null 2>&1 \
+        && curl -fsS -m 5 "$WEB_URL" >/dev/null 2>&1; then
         healthy=1
         break
     fi
@@ -102,7 +106,7 @@ done
 
 if [ "$healthy" -ne 1 ]; then
     echo "ERROR: smoke test failed after activating $SHA" >&2
-    journalctl -u shordindu-api -u shordindu-web -n 40 --no-pager >&2 || true
+    journalctl -u shordindu-backend -u shordindu-frontend -n 40 --no-pager >&2 || true
     if [ -n "$PREV" ] && [ -d "$PREV" ]; then
         echo "Rolling back to $PREV" >&2
         ln -sfn "$PREV" "$APP_DIR/current.next"
