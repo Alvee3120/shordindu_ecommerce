@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { FiHeart } from "react-icons/fi";
 import { toast } from "sonner";
 import { useCart } from "@/context/CartContext";
 import { addCartItem } from "@/lib/cart";
@@ -50,7 +49,6 @@ function ColorSwatches({ colors, selected, onSelect }) {
 }
 
 export default function ProductCard({ product }) {
-  const [wishlisted, setWishlisted] = useState(false);
   const [selectedColorId, setSelectedColorId] = useState(
     () => product.colors?.[0]?.attribute_value ?? null
   );
@@ -132,19 +130,6 @@ export default function ProductCard({ product }) {
             {displayDiscount}
           </span>
         )}
-
-        <button
-          type="button"
-          onClick={() => setWishlisted((value) => !value)}
-          aria-label={wishlisted ? "Remove from wishlist" : "Add to wishlist"}
-          aria-pressed={wishlisted}
-          className="absolute top-2 right-2 z-20 flex h-8 w-8 items-center justify-center rounded-full bg-white/85 text-neutral-500 shadow-sm backdrop-blur-md transition-colors hover:text-red-500 sm:h-9 sm:w-9"
-        >
-          <FiHeart
-            className={`h-4 w-4 ${wishlisted ? "text-red-500" : ""}`}
-            fill={wishlisted ? "currentColor" : "none"}
-          />
-        </button>
 
         <div className="absolute inset-x-0 bottom-0 z-10 translate-y-0 opacity-100 transition-all duration-300 lg:translate-y-3 lg:opacity-0 lg:group-hover:translate-y-0 lg:group-hover:opacity-100 lg:group-focus-within:translate-y-0 lg:group-focus-within:opacity-100">
           {quickAdd ? (
