@@ -7,6 +7,7 @@ import ProductCard from "@/components/ProductCard";
 import FilterSidebar from "@/components/shop/FilterSidebar";
 import MobileFilterDrawer from "@/components/shop/MobileFilterDrawer";
 import Pagination from "@/components/shop/Pagination";
+import SortSelect, { SORT_OPTIONS } from "@/components/shop/SortSelect";
 import { listProducts, toCardProduct, getColorFacets } from "@/lib/products";
 import { getCategories } from "@/lib/categories";
 
@@ -23,6 +24,10 @@ function ShopPageContent() {
   const urlMaxPrice = searchParams.get("max_price") || "";
   const urlDiscount = searchParams.get("discount") || ""; // "View All" from a homepage discount section
   const urlColors = searchParams.get("colors") || "";
+  const urlOrderingParam = searchParams.get("ordering") || "";
+  const urlOrdering = SORT_OPTIONS.some((option) => option.value === urlOrderingParam)
+    ? urlOrderingParam
+    : "";
   const urlPage = Number(searchParams.get("page") || "1");
 
   const [categoryList, setCategoryList] = useState([]);
@@ -91,6 +96,7 @@ function ShopPageContent() {
       min_price: urlMinPrice || undefined,
       max_price: urlMaxPrice || undefined,
       discount: urlDiscount || undefined,
+      ordering: urlOrdering || undefined,
       status: "active",
     })
       .then((data) => {
@@ -111,7 +117,7 @@ function ShopPageContent() {
     return () => {
       cancelled = true;
     };
-  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlDiscount, urlPage, urlColors, resolveCategoryParam]);
+  }, [urlSearch, urlParentCategories, urlSubcategories, urlMinPrice, urlMaxPrice, urlDiscount, urlOrdering, urlPage, urlColors, resolveCategoryParam]);
 
   // Color facet counts under the current category/price/search/discount context.
   useEffect(() => {
@@ -220,6 +226,10 @@ function ShopPageContent() {
     });
   };
 
+  const handleSortChange = (value) => {
+    updateUrl({ ordering: value || undefined, page: 1 });
+  };
+
   const clearFilters = () => {
     setDraftFilters({
       parentCategories: [],
@@ -228,7 +238,10 @@ function ShopPageContent() {
       maxPrice: "",
       colors: [],
     });
-    router.push("/shop");
+    const params = new URLSearchParams();
+    if (urlOrdering) params.set("ordering", urlOrdering);
+    const query = params.toString();
+    router.push(query ? `/shop?${query}` : "/shop");
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -258,19 +271,22 @@ function ShopPageContent() {
 
   return (
     <div className="mx-auto max-w-7xl px-4 pt-28 pb-16 sm:px-6 sm:pt-32">
-      <div className="mb-6 flex items-center justify-between gap-4">
+      <div className="mb-6 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4">
         <div className="min-w-0 flex-1">
           <h1 className="font-sora truncate text-2xl font-bold text-neutral-900 sm:text-3xl">{heading}</h1>
           <p className="mt-1 text-sm text-neutral-500">{count} products found</p>
         </div>
-        <button
-          type="button"
-          onClick={() => setDrawerOpen(true)}
-          className="flex shrink-0 items-center gap-2 rounded-full border border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-(--primary) hover:text-white lg:hidden"
-        >
-          <FiFilter size={16} />
-          Filter
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setDrawerOpen(true)}
+            className="flex shrink-0 items-center gap-2 rounded-full border border-neutral-200 px-4 py-2.5 text-sm font-semibold text-neutral-700 transition-colors hover:bg-(--primary) hover:text-white lg:hidden"
+          >
+            <FiFilter size={16} />
+            Filter
+          </button>
+          <SortSelect value={urlOrdering} onChange={handleSortChange} />
+        </div>
       </div>
 
       {urlDiscount && (

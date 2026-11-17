@@ -1,8 +1,10 @@
-from django.db.models import Count, Q
+from django.db.models import Count, Prefetch, Q
+from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
@@ -121,6 +123,64 @@ class AttributeValueViewSet(viewsets.ModelViewSet):
         )
 
 
+PRICE_ORDERINGS = ("price", "-price")
+NAME_ORDERINGS = ("name", "-name")
+
+
+def _lowest_effective_price(product, engine):
+    """The cheapest price a shopper can pay for ``product`` right now.
+
+    In-stock variations win, matching the storefront's color pricing; when
+    nothing is in stock the whole active set still gives the product a price.
+    """
+    variations = list(product.variations.all())
+    pool = [variation for variation in variations if variation.stock_quantity > 0] or variations
+    prices = []
+    for variation in pool:
+        try:
+            price = engine.price(variation)
+            valid = price is not None and price >= 0
+        except (ArithmeticError, TypeError, ValueError):
+            valid = False
+        if valid:
+            prices.append(price)
+    return min(prices) if prices else None
+
+
+def _product_ids_by_price(queryset, descending=False):
+    """Product ids ordered by their lowest live selling price.
+
+    Discounts are computed in Python by ``PricingEngine``, so only the page is
+    fetched with the full serializer prefetches afterwards. Products with no
+    valid price are always listed last.
+    """
+    products = (
+        Product.objects.filter(pk__in=queryset.order_by().values("pk"))
+        .only("id", "name")
+        .prefetch_related(
+            Prefetch(
+                "variations",
+                queryset=ProductVariation.objects.filter(is_active=True)
+                .select_related("product")
+                .prefetch_related("product__categories"),
+            )
+        )
+    )
+    engine = PricingEngine()
+    priced, unpriced = [], []
+    for product in products:
+        price = _lowest_effective_price(product, engine)
+        if price is None:
+            unpriced.append(product)
+        else:
+            priced.append((price, product))
+
+    priced.sort(key=lambda entry: (entry[1].name.casefold(), entry[1].pk))
+    priced.sort(key=lambda entry: entry[0], reverse=descending)
+    unpriced.sort(key=lambda product: (product.name.casefold(), product.pk))
+    return [product.pk for _, product in priced] + [product.pk for product in unpriced]
+
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = (
         Product.objects.annotate(addon_count=Count("addon_links", distinct=True))
@@ -148,6 +208,38 @@ class ProductViewSet(viewsets.ModelViewSet):
         if self.action == "list" and not is_admin(self.request.user):
             queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
         return queryset.distinct()
+
+    def filter_queryset(self, queryset):
+        if self.action != "list":
+            return super().filter_queryset(queryset)
+        ordering = self.request.query_params.get("ordering")
+        if ordering in PRICE_ORDERINGS:
+            self._price_ordering = ordering
+            return self._apply_filter_backends(queryset, skip=(OrderingFilter,))
+        if ordering in NAME_ORDERINGS:
+            queryset = self._apply_filter_backends(queryset, skip=(OrderingFilter,))
+            if ordering == "name":
+                return queryset.order_by(Lower("name"), "id")
+            return queryset.order_by(Lower("name").desc(), "-id")
+        return super().filter_queryset(queryset)
+
+    def _apply_filter_backends(self, queryset, skip=()):
+        for backend in self.filter_backends:
+            if backend in skip:
+                continue
+            queryset = backend().filter_queryset(self.request, queryset, self)
+        return queryset
+
+    def paginate_queryset(self, queryset):
+        ordering = getattr(self, "_price_ordering", None)
+        if ordering is None or self.paginator is None:
+            return super().paginate_queryset(queryset)
+        ordered_ids = _product_ids_by_price(queryset, descending=ordering == "-price")
+        page_ids = self.paginator.paginate_queryset(ordered_ids, self.request, view=self)
+        if page_ids is None:
+            return None
+        products = {product.pk: product for product in queryset.filter(pk__in=page_ids)}
+        return [products[pk] for pk in page_ids if pk in products]
 
     @action(detail=False, methods=["get"], url_path="color-facets")
     def color_facets(self, request):

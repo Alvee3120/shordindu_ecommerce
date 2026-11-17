@@ -280,9 +280,13 @@ The big one. Full shape:
 | `color` | `?color=4` or `?color=4,7` | products with any of these colors (active color config, product-level color, or an active in-stock variation) |
 | `min_price` / `max_price` | `?min_price=500&max_price=2000` | filters on variation price |
 | `search` | `?search=dress` | matches name, description, sku_prefix |
-| `ordering` | `?ordering=-created_at` | or `name`, `created_at` (prefix `-` for desc) |
+| `ordering` | `?ordering=-created_at` | or `name`, `created_at`, `price` (prefix `-` for desc) |
 
 Combine freely, e.g. `?category=3&color=4&min_price=1000&search=silk&ordering=-created_at`.
+
+`name` ordering is case-insensitive. `price` ordering uses each product's lowest live selling
+price after automatic discounts (in-stock variations first), and products with no valid price
+are listed last; it is applied before pagination like any other ordering.
 
 `GET /api/products/color-facets/` returns every Color/Colour attribute value with its count under
 the current filters (the `color` param is ignored for facet counts, so options remain visible):

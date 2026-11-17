@@ -29,7 +29,7 @@ export default function ImageZoom({ src, alt, sizes, priority }) {
       onMouseLeave={() => setZooming(false)}
       onMouseMove={handleMouseMove}
     >
-      <Image src={src} alt={alt} fill className="object-cover" sizes={sizes} priority={priority} />
+      <Image src={src} alt={alt} fill className="object-contain" sizes={sizes} priority={priority} />
 
       <div
         ref={lensRef}

@@ -1,10 +1,19 @@
 import io
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from openpyxl import Workbook
 from rest_framework.test import APITestCase
 
-from apps.catalog.models import Category, Product, ProductAddon, ProductVariation, StockNotification
+from apps.catalog.models import (
+    Category,
+    Discount,
+    Product,
+    ProductAddon,
+    ProductVariation,
+    StockNotification,
+)
 from apps.users.models import User
 
 PRODUCTS_HEADER = [
@@ -319,3 +328,97 @@ class StockNotificationAPITests(APITestCase):
         self.assertEqual(request.customer_name, "Amina Account")
         self.assertEqual(request.phone, "01800000000")
         self.assertEqual(request.note, "Please notify me after restocking.")
+
+
+class ProductSortingAPITests(APITestCase):
+    def setUp(self):
+        self.shirts = Category.objects.create(name="Shirts")
+        self.shoes = Category.objects.create(name="Shoes")
+
+    def create_product(self, name, price=None, category=None):
+        product = Product.objects.create(
+            name=name,
+            status=Product.Status.ACTIVE,
+            sku_prefix=name.upper().replace(" ", "-"),
+        )
+        if category is not None:
+            product.categories.add(category)
+        if price is not None:
+            ProductVariation.objects.create(
+                product=product,
+                sku=f"{product.sku_prefix}-DEFAULT",
+                price=price,
+                stock_quantity=5,
+            )
+        return product
+
+    def names(self, query):
+        response = self.client.get(f"/api/products/?status=active&{query}")
+        self.assertEqual(response.status_code, 200, response.data)
+        return [product["name"] for product in response.data["results"]]
+
+    def test_name_sorting_is_case_insensitive(self):
+        self.create_product("banana", "10.00")
+        self.create_product("Apple", "10.00")
+        self.create_product("cherry", "10.00")
+
+        self.assertEqual(self.names("ordering=name"), ["Apple", "banana", "cherry"])
+        self.assertEqual(self.names("ordering=-name"), ["cherry", "banana", "Apple"])
+
+    def test_price_sorting_uses_lowest_active_variation(self):
+        bravo = self.create_product("Bravo", "1200.00")
+        ProductVariation.objects.create(
+            product=bravo, sku="BRAVO-SMALL", price="900.00", stock_quantity=1
+        )
+        ProductVariation.objects.create(
+            product=bravo, sku="BRAVO-OLD", price="100.00", stock_quantity=1, is_active=False
+        )
+        self.create_product("Charlie", "1000.00")
+        self.create_product("Alpha", "800.00")
+
+        self.assertEqual(self.names("ordering=price"), ["Alpha", "Bravo", "Charlie"])
+        self.assertEqual(self.names("ordering=-price"), ["Charlie", "Bravo", "Alpha"])
+
+    def test_price_sorting_uses_live_discounts(self):
+        self.create_product("Discounted", "1000.00", category=self.shirts)
+        self.create_product("Regular", "700.00", category=self.shoes)
+        discount = Discount.objects.create(
+            name="Shirt sale",
+            type=Discount.Type.PERCENT,
+            value="50.00",
+            target_type=Discount.Target.CATEGORY,
+            starts_at=timezone.now() - timedelta(days=1),
+            ends_at=timezone.now() + timedelta(days=1),
+        )
+        discount.categories.add(self.shirts)
+
+        self.assertEqual(self.names("ordering=price"), ["Discounted", "Regular"])
+        self.assertEqual(self.names("ordering=-price"), ["Regular", "Discounted"])
+
+    def test_products_without_a_valid_price_sort_last(self):
+        self.create_product("Priced", "500.00")
+        self.create_product("No price")
+
+        self.assertEqual(self.names("ordering=price"), ["Priced", "No price"])
+        self.assertEqual(self.names("ordering=-price"), ["Priced", "No price"])
+
+    def test_sorting_combines_with_filters(self):
+        self.create_product("Shirt Low", "300.00", category=self.shirts)
+        self.create_product("Shirt High", "900.00", category=self.shirts)
+        self.create_product("Shoe", "100.00", category=self.shoes)
+
+        self.assertEqual(
+            self.names(f"category={self.shirts.id}&ordering=price"),
+            ["Shirt Low", "Shirt High"],
+        )
+
+    def test_price_sorting_is_applied_before_pagination(self):
+        for index, price in enumerate(["500.00", "100.00", "400.00", "200.00", "300.00"]):
+            self.create_product(f"Product {index}", price)
+
+        first = self.client.get("/api/products/?status=active&ordering=price&page_size=2&page=1")
+        second = self.client.get("/api/products/?status=active&ordering=price&page_size=2&page=2")
+
+        self.assertEqual(first.data["count"], 5)
+        self.assertEqual([product["name"] for product in first.data["results"]], ["Product 1", "Product 3"])
+        self.assertEqual([product["name"] for product in second.data["results"]], ["Product 4", "Product 2"])
