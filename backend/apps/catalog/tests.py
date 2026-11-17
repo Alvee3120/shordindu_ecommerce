@@ -1,10 +1,23 @@
 import io
+from datetime import timedelta
 
 from django.core.files.uploadedfile import SimpleUploadedFile
+from django.utils import timezone
 from openpyxl import Workbook
 from rest_framework.test import APITestCase
 
-from apps.catalog.models import Category, Product, ProductAddon, ProductVariation, StockNotification
+from apps.catalog.models import (
+    Attribute,
+    AttributeValue,
+    Category,
+    Discount,
+    Product,
+    ProductAddon,
+    ProductColor,
+    ProductVariation,
+    StockNotification,
+    VariationAttributeValue,
+)
 from apps.users.models import User
 
 PRODUCTS_HEADER = [
@@ -319,3 +332,302 @@ class StockNotificationAPITests(APITestCase):
         self.assertEqual(request.customer_name, "Amina Account")
         self.assertEqual(request.phone, "01800000000")
         self.assertEqual(request.note, "Please notify me after restocking.")
+
+
+class ProductSortingAPITests(APITestCase):
+    def setUp(self):
+        self.shirts = Category.objects.create(name="Shirts")
+        self.shoes = Category.objects.create(name="Shoes")
+
+    def create_product(self, name, price=None, category=None):
+        product = Product.objects.create(
+            name=name,
+            status=Product.Status.ACTIVE,
+            sku_prefix=name.upper().replace(" ", "-"),
+        )
+        if category is not None:
+            product.categories.add(category)
+        if price is not None:
+            ProductVariation.objects.create(
+                product=product,
+                sku=f"{product.sku_prefix}-DEFAULT",
+                price=price,
+                stock_quantity=5,
+            )
+        return product
+
+    def names(self, query):
+        response = self.client.get(f"/api/products/?status=active&{query}")
+        self.assertEqual(response.status_code, 200, response.data)
+        return [product["name"] for product in response.data["results"]]
+
+    def test_name_sorting_is_case_insensitive(self):
+        self.create_product("banana", "10.00")
+        self.create_product("Apple", "10.00")
+        self.create_product("cherry", "10.00")
+
+        self.assertEqual(self.names("ordering=name"), ["Apple", "banana", "cherry"])
+        self.assertEqual(self.names("ordering=-name"), ["cherry", "banana", "Apple"])
+
+    def test_price_sorting_uses_lowest_active_variation(self):
+        bravo = self.create_product("Bravo", "1200.00")
+        ProductVariation.objects.create(
+            product=bravo, sku="BRAVO-SMALL", price="900.00", stock_quantity=1
+        )
+        ProductVariation.objects.create(
+            product=bravo, sku="BRAVO-OLD", price="100.00", stock_quantity=1, is_active=False
+        )
+        self.create_product("Charlie", "1000.00")
+        self.create_product("Alpha", "800.00")
+
+        self.assertEqual(self.names("ordering=price"), ["Alpha", "Bravo", "Charlie"])
+        self.assertEqual(self.names("ordering=-price"), ["Charlie", "Bravo", "Alpha"])
+
+    def test_price_sorting_uses_live_discounts(self):
+        self.create_product("Discounted", "1000.00", category=self.shirts)
+        self.create_product("Regular", "700.00", category=self.shoes)
+        discount = Discount.objects.create(
+            name="Shirt sale",
+            type=Discount.Type.PERCENT,
+            value="50.00",
+            target_type=Discount.Target.CATEGORY,
+            starts_at=timezone.now() - timedelta(days=1),
+            ends_at=timezone.now() + timedelta(days=1),
+        )
+        discount.categories.add(self.shirts)
+
+        self.assertEqual(self.names("ordering=price"), ["Discounted", "Regular"])
+        self.assertEqual(self.names("ordering=-price"), ["Regular", "Discounted"])
+
+    def test_products_without_a_valid_price_sort_last(self):
+        self.create_product("Priced", "500.00")
+        self.create_product("No price")
+
+        self.assertEqual(self.names("ordering=price"), ["Priced", "No price"])
+        self.assertEqual(self.names("ordering=-price"), ["Priced", "No price"])
+
+    def test_sorting_combines_with_filters(self):
+        self.create_product("Shirt Low", "300.00", category=self.shirts)
+        self.create_product("Shirt High", "900.00", category=self.shirts)
+        self.create_product("Shoe", "100.00", category=self.shoes)
+
+        self.assertEqual(
+            self.names(f"category={self.shirts.id}&ordering=price"),
+            ["Shirt Low", "Shirt High"],
+        )
+
+    def test_price_sorting_is_applied_before_pagination(self):
+        for index, price in enumerate(["500.00", "100.00", "400.00", "200.00", "300.00"]):
+            self.create_product(f"Product {index}", price)
+
+        first = self.client.get("/api/products/?status=active&ordering=price&page_size=2&page=1")
+        second = self.client.get("/api/products/?status=active&ordering=price&page_size=2&page=2")
+
+        self.assertEqual(first.data["count"], 5)
+        self.assertEqual([product["name"] for product in first.data["results"]], ["Product 1", "Product 3"])
+        self.assertEqual([product["name"] for product in second.data["results"]], ["Product 4", "Product 2"])
+
+
+class ColorFacetAPITests(APITestCase):
+    def setUp(self):
+        self.women = Category.objects.create(name="Women")
+        self.men = Category.objects.create(name="Men")
+        color_attribute = Attribute.objects.create(name="Color")
+        self.pink = AttributeValue.objects.create(
+            attribute=color_attribute, value="Pink", hex_code="#FFC0CB"
+        )
+        self.black = AttributeValue.objects.create(
+            attribute=color_attribute, value="Black", hex_code="#000000"
+        )
+
+    def make_product(self, name, color=None, source="variation", stock=0, category=None):
+        product = Product.objects.create(
+            name=name,
+            status=Product.Status.ACTIVE,
+            sku_prefix=name.upper().replace(" ", "-"),
+        )
+        product.categories.add(category or self.women)
+        variation = ProductVariation.objects.create(
+            product=product,
+            sku=f"{product.sku_prefix}-DEFAULT",
+            price="500.00",
+            stock_quantity=stock,
+        )
+        if color is not None:
+            if source == "variation":
+                VariationAttributeValue.objects.create(
+                    variation=variation, attribute_value=color
+                )
+            else:
+                ProductColor.objects.create(
+                    product=product, attribute_value=color, is_active=True
+                )
+        return product, variation
+
+    def facet_count(self, color, query=""):
+        response = self.client.get(f"/api/products/color-facets/?{query}")
+        self.assertEqual(response.status_code, 200, response.data)
+        return next(
+            entry["count"]
+            for entry in response.data["colors"]
+            if entry["attribute_value"] == color.id
+        )
+
+    def test_counts_every_product_with_the_color_assigned(self):
+        self.make_product("Pink Config", self.pink, "config", stock=0)
+        self.make_product("Pink Out Of Stock", self.pink, "variation", stock=0)
+        self.make_product("Pink In Stock", self.pink, "variation", stock=5)
+
+        self.assertEqual(self.facet_count(self.pink), 3)
+
+        response = self.client.get(f"/api/products/?status=active&color={self.pink.id}")
+        self.assertEqual(response.data["count"], 3)
+        ids = [product["id"] for product in response.data["results"]]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_duplicate_color_sources_count_once(self):
+        product, variation = self.make_product("Pink Twice", self.pink, "config", stock=0)
+        VariationAttributeValue.objects.create(
+            variation=variation, attribute_value=self.pink
+        )
+
+        self.assertEqual(self.facet_count(self.pink), 1)
+        response = self.client.get(f"/api/products/?status=active&color={self.pink.id}")
+        self.assertEqual(response.data["count"], 1)
+
+    def test_facets_follow_the_selected_category(self):
+        self.make_product("Pink Women", self.pink, "variation", stock=0, category=self.women)
+        self.make_product("Pink Men", self.pink, "variation", stock=0, category=self.men)
+
+        self.assertEqual(self.facet_count(self.pink), 2)
+        self.assertEqual(self.facet_count(self.pink, f"category={self.women.id}"), 1)
+        self.assertEqual(self.facet_count(self.pink, f"category={self.men.id}"), 1)
+
+    def test_selected_color_does_not_hide_other_colors(self):
+        self.make_product("Pink Women", self.pink, "variation", stock=0)
+        self.make_product("Black Women", self.black, "variation", stock=0)
+
+        self.assertEqual(
+            self.facet_count(self.black, f"category={self.women.id}&color={self.pink.id}"),
+            1,
+        )
+        self.assertEqual(
+            self.facet_count(self.pink, f"category={self.women.id}&color={self.pink.id}"),
+            1,
+        )
+
+    def test_multiple_colors_use_or_and_return_unique_products(self):
+        self.make_product("Pink Women", self.pink, "variation", stock=0)
+        self.make_product("Black Women", self.black, "variation", stock=0)
+        _, variation = self.make_product("Pink And Black", self.pink, "config", stock=0)
+        VariationAttributeValue.objects.create(
+            variation=variation, attribute_value=self.black
+        )
+        self.make_product("Pink Men", self.pink, "variation", stock=0, category=self.men)
+
+        response = self.client.get(
+            f"/api/products/?status=active&category={self.women.id}"
+            f"&color={self.pink.id},{self.black.id}"
+        )
+        self.assertEqual(response.data["count"], 3)
+        ids = [product["id"] for product in response.data["results"]]
+        self.assertEqual(len(ids), len(set(ids)))
+
+    def test_search_applies_to_color_facets(self):
+        self.make_product("Pink Dress", self.pink, "variation", stock=0)
+        self.make_product("Pink Shirt", self.pink, "variation", stock=0)
+
+        self.assertEqual(self.facet_count(self.pink), 2)
+        self.assertEqual(self.facet_count(self.pink, "search=Dress"), 1)
+
+    def test_inactive_color_config_suppresses_the_color(self):
+        product, _ = self.make_product("Hidden Pink", self.pink, "variation", stock=5)
+        ProductColor.objects.create(
+            product=product, attribute_value=self.pink, is_active=False
+        )
+
+        self.assertEqual(self.facet_count(self.pink), 0)
+        response = self.client.get(f"/api/products/?status=active&color={self.pink.id}")
+        self.assertEqual(response.data["count"], 0)
+
+    def test_pagination_does_not_change_facet_counts(self):
+        for index in range(3):
+            self.make_product(f"Pink Product {index}", self.pink, "variation", stock=0)
+
+        self.assertEqual(self.facet_count(self.pink, "page=1&page_size=1"), 3)
+
+
+class CategoryProductCountAPITests(APITestCase):
+    def setUp(self):
+        self.admin = User.objects.create_user(
+            email="category-admin@example.com",
+            password="pw",
+            name="Admin",
+            role=User.Role.ADMIN,
+            is_staff=True,
+        )
+        self.client.force_authenticate(self.admin)
+        self.women = Category.objects.create(name="Women")
+        self.child = Category.objects.create(name="Saree", parent=self.women)
+        self.grandchild = Category.objects.create(name="Jamdani", parent=self.child)
+        self.men = Category.objects.create(name="Men")
+
+    def make_product(self, name, categories, status=Product.Status.ACTIVE):
+        product = Product.objects.create(
+            name=name,
+            status=status,
+            sku_prefix=name.upper().replace(" ", "-"),
+        )
+        product.categories.set(categories)
+        ProductVariation.objects.create(
+            product=product,
+            sku=f"{product.sku_prefix}-A",
+            price="100.00",
+            stock_quantity=1,
+        )
+        ProductVariation.objects.create(
+            product=product,
+            sku=f"{product.sku_prefix}-B",
+            price="120.00",
+            stock_quantity=1,
+        )
+        return product
+
+    def counts(self):
+        response = self.client.get("/api/categories/?page_size=100")
+        self.assertEqual(response.status_code, 200, response.data)
+        return {category["name"]: category["products_count"] for category in response.data["results"]}
+
+    def test_counts_active_products_once_including_descendants(self):
+        self.make_product("Direct Parent", [self.women])
+        self.make_product("Child Only", [self.child])
+        self.make_product("Grandchild", [self.grandchild])
+        self.make_product("Parent And Child", [self.women, self.child])
+        self.make_product("Draft Child", [self.child], status=Product.Status.DRAFT)
+
+        counts = self.counts()
+        self.assertEqual(counts["Women"], 4)
+        self.assertEqual(counts["Saree"], 3)
+        self.assertEqual(counts["Jamdani"], 1)
+        self.assertEqual(counts["Men"], 0)
+
+    def test_counts_update_when_products_change(self):
+        product = self.make_product("Changing Product", [self.child])
+        self.assertEqual(self.counts()["Women"], 1)
+
+        product.status = Product.Status.DRAFT
+        product.save(update_fields=["status"])
+        self.assertEqual(self.counts()["Women"], 0)
+
+        product.status = Product.Status.ACTIVE
+        product.save(update_fields=["status"])
+        self.assertEqual(self.counts()["Women"], 1)
+
+        product.delete()
+        self.assertEqual(self.counts()["Women"], 0)
+
+    def test_parent_name_is_returned(self):
+        response = self.client.get("/api/categories/?page_size=100")
+        categories = {category["name"]: category for category in response.data["results"]}
+        self.assertEqual(categories["Saree"]["parent_name"], "Women")
+        self.assertIsNone(categories["Women"]["parent_name"])

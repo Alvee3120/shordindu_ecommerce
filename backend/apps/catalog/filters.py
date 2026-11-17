@@ -12,19 +12,17 @@ class NumberInFilter(django_filters.BaseInFilter, django_filters.NumberFilter):
 
 def color_condition(color_id):
     """A product has this color when an active ProductColor, a product-level
-    color link, or an active in-stock variation carries it. An inactive
-    ProductColor config suppresses the color even if a variation still uses it."""
+    color link, or any variation carries it. Stock and variation activity do
+    not remove an assigned color: the storefront still shows the swatch. An
+    inactive ProductColor config suppresses the color even if a variation
+    still uses it."""
     inactive_config = ProductColor.objects.filter(
         product=OuterRef("pk"), attribute_value_id=color_id, is_active=False
     )
     return (
         Q(product_colors__attribute_value_id=color_id, product_colors__is_active=True)
         | Q(product_attribute_values__attribute_value_id=color_id)
-        | Q(
-            variations__variation_attribute_values__attribute_value_id=color_id,
-            variations__is_active=True,
-            variations__stock_quantity__gt=0,
-        )
+        | Q(variations__variation_attribute_values__attribute_value_id=color_id)
     ) & ~Exists(inactive_config)
 
 

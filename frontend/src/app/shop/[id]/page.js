@@ -424,7 +424,7 @@ function ProductDetailsContent() {
       <div className="grid gap-10 lg:grid-cols-2">
         {/* Gallery */}
         <div className="flex flex-col gap-3">
-          <div className="group relative h-120 w-full overflow-hidden rounded-2xl bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100">
+          <div className="group relative aspect-square w-full overflow-hidden rounded-2xl bg-gradient-to-br from-rose-100 via-violet-100 to-amber-100">
             {images[activeImage] ? (
               <ImageZoom
                 src={images[activeImage].image}

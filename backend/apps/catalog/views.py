@@ -1,8 +1,12 @@
-from django.db.models import Count, Q
+from collections import defaultdict
+
+from django.db.models import Count, Prefetch, Q
+from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
@@ -45,14 +49,62 @@ from .serializers import (
 )
 
 
+def _category_product_counts():
+    """Active product counts for every category, including its descendants.
+
+    One query reads the category tree and one reads the active product-category
+    links. Counting unique product ids in each subtree keeps a product that is
+    linked to both a parent and a child from being counted twice.
+    """
+    parents = dict(Category.objects.values_list("id", "parent_id"))
+    children = defaultdict(list)
+    for category_id, parent_id in parents.items():
+        if parent_id is not None:
+            children[parent_id].append(category_id)
+
+    direct_products = defaultdict(set)
+    links = Product.categories.through.objects.filter(
+        product__status=Product.Status.ACTIVE
+    )
+    for product_id, category_id in links.values_list("product_id", "category_id"):
+        direct_products[category_id].add(product_id)
+
+    counts = {}
+
+    def collect(category_id, visiting):
+        if category_id in visiting:
+            return set()
+        visiting.add(category_id)
+        product_ids = set(direct_products[category_id])
+        for child_id in children.get(category_id, ()):
+            product_ids |= collect(child_id, visiting)
+        visiting.discard(category_id)
+        counts[category_id] = len(product_ids)
+        return product_ids
+
+    for category_id, parent_id in parents.items():
+        if parent_id is None:
+            collect(category_id, set())
+    for category_id in parents:
+        if category_id not in counts:
+            collect(category_id, set())
+    return counts
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all().order_by("name")
+    queryset = Category.objects.select_related("parent").order_by("name")
     permission_classes = [IsAdminOrReadOnly]
 
     def get_serializer_class(self):
         if self.action == "retrieve":
             return CategoryDetailSerializer
         return CategorySerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if is_admin(self.request.user):
+            context["category_product_counts"] = _category_product_counts()
+        return context
 
 
 class AttributeViewSet(viewsets.ModelViewSet):
@@ -121,6 +173,64 @@ class AttributeValueViewSet(viewsets.ModelViewSet):
         )
 
 
+PRICE_ORDERINGS = ("price", "-price")
+NAME_ORDERINGS = ("name", "-name")
+
+
+def _lowest_effective_price(product, engine):
+    """The cheapest price a shopper can pay for ``product`` right now.
+
+    In-stock variations win, matching the storefront's color pricing; when
+    nothing is in stock the whole active set still gives the product a price.
+    """
+    variations = list(product.variations.all())
+    pool = [variation for variation in variations if variation.stock_quantity > 0] or variations
+    prices = []
+    for variation in pool:
+        try:
+            price = engine.price(variation)
+            valid = price is not None and price >= 0
+        except (ArithmeticError, TypeError, ValueError):
+            valid = False
+        if valid:
+            prices.append(price)
+    return min(prices) if prices else None
+
+
+def _product_ids_by_price(queryset, descending=False):
+    """Product ids ordered by their lowest live selling price.
+
+    Discounts are computed in Python by ``PricingEngine``, so only the page is
+    fetched with the full serializer prefetches afterwards. Products with no
+    valid price are always listed last.
+    """
+    products = (
+        Product.objects.filter(pk__in=queryset.order_by().values("pk"))
+        .only("id", "name")
+        .prefetch_related(
+            Prefetch(
+                "variations",
+                queryset=ProductVariation.objects.filter(is_active=True)
+                .select_related("product")
+                .prefetch_related("product__categories"),
+            )
+        )
+    )
+    engine = PricingEngine()
+    priced, unpriced = [], []
+    for product in products:
+        price = _lowest_effective_price(product, engine)
+        if price is None:
+            unpriced.append(product)
+        else:
+            priced.append((price, product))
+
+    priced.sort(key=lambda entry: (entry[1].name.casefold(), entry[1].pk))
+    priced.sort(key=lambda entry: entry[0], reverse=descending)
+    unpriced.sort(key=lambda product: (product.name.casefold(), product.pk))
+    return [product.pk for _, product in priced] + [product.pk for product in unpriced]
+
+
 class ProductViewSet(viewsets.ModelViewSet):
     queryset = (
         Product.objects.annotate(addon_count=Count("addon_links", distinct=True))
@@ -149,6 +259,38 @@ class ProductViewSet(viewsets.ModelViewSet):
             queryset = queryset.exclude(visibility_type=Product.VisibilityType.ADDON_ONLY)
         return queryset.distinct()
 
+    def filter_queryset(self, queryset):
+        if self.action != "list":
+            return super().filter_queryset(queryset)
+        ordering = self.request.query_params.get("ordering")
+        if ordering in PRICE_ORDERINGS:
+            self._price_ordering = ordering
+            return self._apply_filter_backends(queryset, skip=(OrderingFilter,))
+        if ordering in NAME_ORDERINGS:
+            queryset = self._apply_filter_backends(queryset, skip=(OrderingFilter,))
+            if ordering == "name":
+                return queryset.order_by(Lower("name"), "id")
+            return queryset.order_by(Lower("name").desc(), "-id")
+        return super().filter_queryset(queryset)
+
+    def _apply_filter_backends(self, queryset, skip=()):
+        for backend in self.filter_backends:
+            if backend in skip:
+                continue
+            queryset = backend().filter_queryset(self.request, queryset, self)
+        return queryset
+
+    def paginate_queryset(self, queryset):
+        ordering = getattr(self, "_price_ordering", None)
+        if ordering is None or self.paginator is None:
+            return super().paginate_queryset(queryset)
+        ordered_ids = _product_ids_by_price(queryset, descending=ordering == "-price")
+        page_ids = self.paginator.paginate_queryset(ordered_ids, self.request, view=self)
+        if page_ids is None:
+            return None
+        products = {product.pk: product for product in queryset.filter(pk__in=page_ids)}
+        return [products[pk] for pk in page_ids if pk in products]
+
     @action(detail=False, methods=["get"], url_path="color-facets")
     def color_facets(self, request):
         """Available colors with product counts for the shop color filter."""
@@ -157,7 +299,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         base = Product.objects.filter(status=Product.Status.ACTIVE).exclude(
             visibility_type=Product.VisibilityType.ADDON_ONLY
         )
-        filtered = ProductFilter(params, queryset=base).qs.distinct()
+        filtered = ProductFilter(params, queryset=base).qs
+        filtered = SearchFilter().filter_queryset(request, filtered, self).distinct()
 
         color_values = [
             attribute_value
@@ -169,7 +312,12 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         colors = []
         for attribute_value in color_values:
-            count = filtered.filter(color_condition(attribute_value.id)).distinct().count()
+            count = (
+                filtered.filter(color_condition(attribute_value.id))
+                .values("pk")
+                .distinct()
+                .count()
+            )
             colors.append(
                 {
                     "attribute_value": attribute_value.id,

@@ -21,11 +21,10 @@ const EMPTY_FORM = { name: "", parent: "", description: "" };
 
 export default function AdminCategoriesPage() {
   const { query, label, isReady } = useAnalyticsRange();
-  const [catSort, setCatSort] = useState("revenue");
   const catKey = JSON.stringify(query);
   const performance = useAnalyticsResource(
-    () => getCategorySales(query, { sort: catSort }),
-    [catKey, catSort],
+    () => getCategorySales(query),
+    [catKey],
     { enabled: isReady }
   );
 
@@ -53,6 +52,7 @@ export default function AdminCategoriesPage() {
   };
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect -- initial category fetch
     load();
   }, []);
 
@@ -128,7 +128,7 @@ export default function AdminCategoriesPage() {
     try {
       await deleteCategory(id);
       toast.success("Category deleted");
-      setCategories((prev) => prev.filter((c) => c.id !== id));
+      await load();
     } catch (err) {
       toast.error(err.message);
     } finally {
@@ -136,12 +136,41 @@ export default function AdminCategoriesPage() {
     }
   };
 
+  const parentLabel = (cat) =>
+    cat.parent_name || categories.find((c) => c.id === cat.parent)?.name || "—";
+
+  const renderActions = (cat) => (
+    <div className="flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => openEditForm(cat)}
+        aria-label={`Edit ${cat.name}`}
+        title="Edit"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-neutral-500 transition-colors hover:bg-neutral-100 hover:text-(--primary)"
+      >
+        <FiEdit2 size={16} />
+      </button>
+      <button
+        type="button"
+        onClick={() => handleDelete(cat.id)}
+        disabled={deletingId === cat.id}
+        aria-label={deletingId === cat.id ? `Deleting ${cat.name}` : `Delete ${cat.name}`}
+        title="Delete"
+        className="flex h-8 w-8 items-center justify-center rounded-lg text-red-500 transition-colors hover:bg-red-50 hover:text-red-700 disabled:cursor-not-allowed disabled:opacity-40"
+      >
+        <FiTrash2 size={16} />
+      </button>
+    </div>
+  );
+
   return (
     <div>
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold text-neutral-900">Categories</h1>
-          <p className="mt-1 text-sm text-neutral-500">Performance for {label}</p>
+          <p className="mt-1 text-sm text-neutral-500">
+            Manage categories and performance for {label}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-3">
           <RangeFilter />
@@ -154,67 +183,6 @@ export default function AdminCategoriesPage() {
               <FiPlus size={16} />
               Add Category
             </button>
-          )}
-        </div>
-      </div>
-
-      <div className="mb-8 grid gap-5 lg:grid-cols-2">
-        <ChartCard
-          title="Category Revenue"
-          subtitle="Net sales by category"
-          loading={performance.loading}
-          error={performance.error}
-          onRetry={performance.reload}
-          isEmpty={!(performance.data?.results ?? []).length}
-          height={280}
-        >
-          <CategoryBarChart data={performance.data?.results} />
-        </ChartCard>
-
-        <div className="rounded-xl border border-neutral-200 bg-white p-5">
-          <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-            <h3 className="font-semibold text-neutral-900">Category Performance</h3>
-            <select
-              value={catSort}
-              onChange={(event) => setCatSort(event.target.value)}
-              className="rounded-lg border border-neutral-300 px-3 py-1.5 text-sm outline-none focus:ring-2 focus:ring-(--primary)"
-            >
-              <option value="revenue">Net sales</option>
-              <option value="units">Units sold</option>
-              <option value="orders">Orders</option>
-            </select>
-          </div>
-          {performance.loading ? (
-            <p className="py-6 text-center text-sm text-neutral-500">Loading…</p>
-          ) : performance.error ? (
-            <p className="py-6 text-center text-sm text-red-600">{performance.error}</p>
-          ) : (performance.data?.results ?? []).length === 0 ? (
-            <p className="py-6 text-center text-sm text-neutral-500">No category sales in this period.</p>
-          ) : (
-            <div className="max-h-[220px] overflow-y-auto">
-              <table className="w-full text-left text-sm">
-                <thead className="sticky top-0 bg-white">
-                  <tr className="border-b border-neutral-200 text-neutral-500">
-                    <th className="px-3 py-2 font-medium">Category</th>
-                    <th className="px-3 py-2 font-medium">Units</th>
-                    <th className="px-3 py-2 font-medium">Orders</th>
-                    <th className="px-3 py-2 font-medium">Net</th>
-                    <th className="px-3 py-2 font-medium">Share</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {performance.data.results.map((category) => (
-                    <tr key={category.id} className="border-b border-neutral-100 last:border-0">
-                      <td className="px-3 py-2 font-medium text-neutral-900">{category.name}</td>
-                      <td className="px-3 py-2 text-neutral-600">{category.units_sold}</td>
-                      <td className="px-3 py-2 text-neutral-600">{category.orders}</td>
-                      <td className="px-3 py-2 font-medium text-neutral-900">{formatBDT(category.net_sales)}</td>
-                      <td className="px-3 py-2 text-neutral-600">{category.contribution_pct}%</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
           )}
         </div>
       </div>
@@ -326,73 +294,147 @@ export default function AdminCategoriesPage() {
         </form>
       )}
 
-      {loading ? (
-        <p className="flex min-h-screen items-center justify-center text-sm text-neutral-500">
-          Loading categories...
-        </p>
-      ) : categories.length === 0 ? (
-        <p className="text-sm text-neutral-500">No categories yet.</p>
-      ) : (
-        <div className="overflow-x-auto rounded-xl border border-neutral-200 bg-white">
-          <table className="w-full text-left text-sm">
-            <thead>
-              <tr className="border-b border-neutral-200 text-neutral-500">
-                <th className="px-5 py-3 font-medium">Image</th>
-                <th className="px-5 py-3 font-medium">Name</th>
-                <th className="px-5 py-3 font-medium">Parent</th>
-                <th className="px-5 py-3 font-medium">Slug</th>
-                <th className="px-5 py-3 font-medium text-right">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {categories.map((cat) => (
-                <tr key={cat.id} className="border-b border-neutral-100 last:border-0">
-                  <td className="px-5 py-3">
-                    <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
-                      {cat.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
-                          src={cat.image}
-                          alt={cat.name}
-                          className="h-full w-full object-cover"
-                        />
-                      ) : (
-                        <FiImage size={16} className="text-neutral-300" />
-                      )}
+      <div className="grid items-start gap-5 md:grid-cols-2 xl:grid-cols-5">
+        <div className="min-w-0 md:col-span-1 xl:col-span-3">
+          {loading ? (
+            <div className="flex min-h-[240px] items-center justify-center rounded-xl border border-neutral-200 bg-white text-sm text-neutral-500">
+              Loading categories...
+            </div>
+          ) : categories.length === 0 ? (
+            <div className="rounded-xl border border-neutral-200 bg-white px-5 py-12 text-center text-sm text-neutral-500">
+              No categories yet.
+            </div>
+          ) : (
+            <>
+              <div className="hidden overflow-x-auto rounded-xl border border-neutral-200 bg-white sm:block">
+                <table className="w-full min-w-[560px] text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-neutral-200 text-neutral-500">
+                      <th className="px-5 py-3 font-medium">Image</th>
+                      <th className="px-5 py-3 font-medium">Name</th>
+                      <th className="px-5 py-3 font-medium">Parent</th>
+                      <th className="px-5 py-3 font-medium">Slug</th>
+                      <th className="px-5 py-3 text-right font-medium">Products Count</th>
+                      <th className="px-5 py-3 text-right font-medium">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {categories.map((cat) => (
+                      <tr key={cat.id} className="border-b border-neutral-100 last:border-0">
+                        <td className="px-5 py-3">
+                          <div className="flex h-10 w-10 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                            {cat.image ? (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img
+                                src={cat.image}
+                                alt={cat.name}
+                                className="h-full w-full object-cover"
+                              />
+                            ) : (
+                              <FiImage size={16} className="text-neutral-300" />
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-5 py-3 font-medium text-neutral-900">{cat.name}</td>
+                        <td className="px-5 py-3 text-neutral-500">{parentLabel(cat)}</td>
+                        <td className="px-5 py-3 text-neutral-500">{cat.slug}</td>
+                        <td className="px-5 py-3 text-right font-medium tabular-nums text-neutral-700">
+                          {cat.products_count ?? 0}
+                        </td>
+                        <td className="px-5 py-3">{renderActions(cat)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+
+              <div className="flex flex-col gap-3 sm:hidden">
+                {categories.map((cat) => (
+                  <div key={cat.id} className="rounded-xl border border-neutral-200 bg-white p-4">
+                    <div className="flex items-start gap-3">
+                      <div className="flex h-12 w-12 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                        {cat.image ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img
+                            src={cat.image}
+                            alt={cat.name}
+                            className="h-full w-full object-cover"
+                          />
+                        ) : (
+                          <FiImage size={18} className="text-neutral-300" />
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="font-medium text-neutral-900">{cat.name}</p>
+                        <p className="mt-0.5 truncate text-xs text-neutral-500">{cat.slug}</p>
+                        <p className="mt-0.5 text-xs text-neutral-500">
+                          Parent: {parentLabel(cat)}
+                        </p>
+                        <p className="mt-1 text-xs font-medium text-neutral-700">
+                          {cat.products_count ?? 0} products
+                        </p>
+                      </div>
                     </div>
-                  </td>
-                  <td className="px-5 py-3 font-medium text-neutral-900">{cat.name}</td>
-                  <td className="px-5 py-3 text-neutral-500">
-                    {categories.find((c) => c.id === cat.parent)?.name || "—"}
-                  </td>
-                  <td className="px-5 py-3 text-neutral-500">{cat.slug}</td>
-                  <td className="px-5 py-3">
-                    <div className="flex justify-end gap-4">
-                      <button
-                        type="button"
-                        onClick={() => openEditForm(cat)}
-                        className="flex items-center gap-1.5 font-medium text-neutral-600 hover:text-(--primary)"
-                      >
-                        <FiEdit2 size={14} />
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDelete(cat.id)}
-                        disabled={deletingId === cat.id}
-                        className="flex items-center gap-1.5 font-medium text-red-600 hover:text-red-700 disabled:opacity-50"
-                      >
-                        <FiTrash2 size={14} />
-                        {deletingId === cat.id ? "Deleting..." : "Delete"}
-                      </button>
+                    <div className="mt-3 border-t border-neutral-100 pt-3">
+                      {renderActions(cat)}
                     </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </div>
-      )}
+
+        <div className="flex min-w-0 flex-col gap-5 md:col-span-1 xl:col-span-2">
+          <ChartCard
+            title="Category Revenue"
+            subtitle="Net sales by category"
+            loading={performance.loading}
+            error={performance.error}
+            onRetry={performance.reload}
+            isEmpty={!(performance.data?.results ?? []).length}
+            height={280}
+          >
+            <CategoryBarChart data={performance.data?.results} />
+          </ChartCard>
+
+          <div className="rounded-xl border border-neutral-200 bg-white p-5">
+            <h3 className="mb-4 font-semibold text-neutral-900">Category Performance</h3>
+            {performance.loading ? (
+              <p className="py-6 text-center text-sm text-neutral-500">Loading…</p>
+            ) : performance.error ? (
+              <p className="py-6 text-center text-sm text-red-600">{performance.error}</p>
+            ) : (performance.data?.results ?? []).length === 0 ? (
+              <p className="py-6 text-center text-sm text-neutral-500">No category sales in this period.</p>
+            ) : (
+              <div className="max-h-[220px] overflow-auto">
+                <table className="w-full min-w-[300px] text-left text-sm">
+                  <thead className="sticky top-0 bg-white">
+                    <tr className="border-b border-neutral-200 text-neutral-500">
+                      <th className="px-2 py-2 font-medium">Category</th>
+                      <th className="px-2 py-2 font-medium">Units</th>
+                      <th className="px-2 py-2 font-medium">Orders</th>
+                      <th className="px-2 py-2 font-medium">Net</th>
+                      <th className="px-2 py-2 font-medium">Share</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {performance.data.results.map((category) => (
+                      <tr key={category.id} className="border-b border-neutral-100 last:border-0">
+                        <td className="px-2 py-2 font-medium text-neutral-900">{category.name}</td>
+                        <td className="px-2 py-2 text-neutral-600">{category.units_sold}</td>
+                        <td className="px-2 py-2 text-neutral-600">{category.orders}</td>
+                        <td className="px-2 py-2 font-medium text-neutral-900">{formatBDT(category.net_sales)}</td>
+                        <td className="px-2 py-2 text-neutral-600">{category.contribution_pct}%</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
