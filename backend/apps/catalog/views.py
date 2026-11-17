@@ -1,10 +1,12 @@
+from collections import defaultdict
+
 from django.db.models import Count, Prefetch, Q
 from django.db.models.functions import Lower
 from django.http import HttpResponse
 from django.utils import timezone
 from rest_framework import permissions, serializers, status, viewsets
 from rest_framework.decorators import action
-from rest_framework.filters import OrderingFilter
+from rest_framework.filters import OrderingFilter, SearchFilter
 from rest_framework.parsers import FormParser, JSONParser, MultiPartParser
 from rest_framework.permissions import SAFE_METHODS
 from rest_framework.response import Response
@@ -47,14 +49,62 @@ from .serializers import (
 )
 
 
+def _category_product_counts():
+    """Active product counts for every category, including its descendants.
+
+    One query reads the category tree and one reads the active product-category
+    links. Counting unique product ids in each subtree keeps a product that is
+    linked to both a parent and a child from being counted twice.
+    """
+    parents = dict(Category.objects.values_list("id", "parent_id"))
+    children = defaultdict(list)
+    for category_id, parent_id in parents.items():
+        if parent_id is not None:
+            children[parent_id].append(category_id)
+
+    direct_products = defaultdict(set)
+    links = Product.categories.through.objects.filter(
+        product__status=Product.Status.ACTIVE
+    )
+    for product_id, category_id in links.values_list("product_id", "category_id"):
+        direct_products[category_id].add(product_id)
+
+    counts = {}
+
+    def collect(category_id, visiting):
+        if category_id in visiting:
+            return set()
+        visiting.add(category_id)
+        product_ids = set(direct_products[category_id])
+        for child_id in children.get(category_id, ()):
+            product_ids |= collect(child_id, visiting)
+        visiting.discard(category_id)
+        counts[category_id] = len(product_ids)
+        return product_ids
+
+    for category_id, parent_id in parents.items():
+        if parent_id is None:
+            collect(category_id, set())
+    for category_id in parents:
+        if category_id not in counts:
+            collect(category_id, set())
+    return counts
+
+
 class CategoryViewSet(viewsets.ModelViewSet):
-    queryset = Category.objects.all().order_by("name")
+    queryset = Category.objects.select_related("parent").order_by("name")
     permission_classes = [IsAdminOrReadOnly]
 
     def get_serializer_class(self):
         if self.action == "retrieve":
             return CategoryDetailSerializer
         return CategorySerializer
+
+    def get_serializer_context(self):
+        context = super().get_serializer_context()
+        if is_admin(self.request.user):
+            context["category_product_counts"] = _category_product_counts()
+        return context
 
 
 class AttributeViewSet(viewsets.ModelViewSet):
@@ -249,7 +299,8 @@ class ProductViewSet(viewsets.ModelViewSet):
         base = Product.objects.filter(status=Product.Status.ACTIVE).exclude(
             visibility_type=Product.VisibilityType.ADDON_ONLY
         )
-        filtered = ProductFilter(params, queryset=base).qs.distinct()
+        filtered = ProductFilter(params, queryset=base).qs
+        filtered = SearchFilter().filter_queryset(request, filtered, self).distinct()
 
         color_values = [
             attribute_value
@@ -261,7 +312,12 @@ class ProductViewSet(viewsets.ModelViewSet):
 
         colors = []
         for attribute_value in color_values:
-            count = filtered.filter(color_condition(attribute_value.id)).distinct().count()
+            count = (
+                filtered.filter(color_condition(attribute_value.id))
+                .values("pk")
+                .distinct()
+                .count()
+            )
             colors.append(
                 {
                     "attribute_value": attribute_value.id,

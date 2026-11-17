@@ -42,10 +42,29 @@ def absolute_file_url(request, field_file):
 
 
 class CategorySerializer(serializers.ModelSerializer):
+    parent_name = serializers.SerializerMethodField()
+    products_count = serializers.SerializerMethodField()
+
     class Meta:
         model = Category
-        fields = ["id", "name", "slug", "image", "parent", "description"]
+        fields = [
+            "id",
+            "name",
+            "slug",
+            "image",
+            "parent",
+            "parent_name",
+            "products_count",
+            "description",
+        ]
         extra_kwargs = {"slug": {"required": False}}
+
+    def get_parent_name(self, obj):
+        return obj.parent.name if obj.parent_id else None
+
+    def get_products_count(self, obj):
+        counts = self.context.get("category_product_counts")
+        return counts.get(obj.pk, 0) if counts is not None else None
 
 
 class CategoryDetailSerializer(CategorySerializer):

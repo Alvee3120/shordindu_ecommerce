@@ -208,7 +208,9 @@ export default function FilterSidebar({
                     style={{ backgroundColor: color.hex_code }}
                   />
                   <span className="flex-1">{color.name}</span>
-                  <span className="text-xs text-neutral-400">{color.count}</span>
+                  <span className="text-xs text-neutral-400">
+                    {checked && Number(color.count) === 0 ? "No matches" : color.count}
+                  </span>
                 </label>
               );
             })}

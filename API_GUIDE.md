@@ -277,7 +277,7 @@ The big one. Full shape:
 | `visibility_type` | `?visibility_type=standalone` | |
 | `status` | `?status=active` | |
 | `attribute_value` | `?attribute_value=1` | products that offer this attribute value |
-| `color` | `?color=4` or `?color=4,7` | products with any of these colors (active color config, product-level color, or an active in-stock variation) |
+| `color` | `?color=4` or `?color=4,7` | products with any of these colors (active color config, product-level color, or any variation); multiple ids use OR |
 | `min_price` / `max_price` | `?min_price=500&max_price=2000` | filters on variation price |
 | `search` | `?search=dress` | matches name, description, sku_prefix |
 | `ordering` | `?ordering=-created_at` | or `name`, `created_at`, `price` (prefix `-` for desc) |
@@ -293,8 +293,13 @@ the current filters (the `color` param is ignored for facet counts, so options r
 ```json
 { "colors": [{ "attribute_value": 4, "name": "Black", "hex_code": "#000000", "count": 12 }] }
 ```
-Only active products are counted. Colors with `count: 0` are returned so the UI can keep a
-currently-selected color visible; unselected zero-count colors are hidden client-side.
+Only active products are counted. Counts are distinct product ids: a product that carries the
+same color through a config, a product-level link, or several variations counts once. Colors
+assigned to out-of-stock variations still count because the storefront still shows their swatch.
+Facets apply every non-color filter (category, price, search, discount) before counting, ignore
+the selected `color` param so alternative colors stay visible, and are independent of
+pagination. Colors with `count: 0` are returned so the UI can keep a currently-selected color
+visible; unselected zero-count colors are hidden client-side.
 
 ### Product colors
 Colors are stored as the shared `Color` attribute value used by variations, plus a per-product
