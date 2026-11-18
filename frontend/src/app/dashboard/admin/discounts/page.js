@@ -29,8 +29,18 @@ const selectClass =
   "rounded-lg border border-neutral-300 bg-white px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-(--primary)";
 
 function targetSummary(discount) {
-  if (discount.target_type === "category") return discount.category_names || "No categories";
-  return `${discount.product_count} product${discount.product_count === 1 ? "" : "s"}`;
+  const categories = discount.category_names || "";
+  const count = discount.product_count ?? 0;
+  const products = `${count} product${count === 1 ? "" : "s"}`;
+  if (categories && count) return `${categories} + ${products}`;
+  if (categories) return categories;
+  return products;
+}
+
+function targetLabel(discount) {
+  if (discount.target_type === "both") return "Categories + products";
+  if (discount.target_type === "category") return "Category";
+  return "Products";
 }
 
 export default function AdminDiscountsPage() {
@@ -160,6 +170,7 @@ export default function AdminDiscountsPage() {
           <option value="">All targets</option>
           <option value="category">Category</option>
           <option value="products">Products</option>
+          <option value="both">Categories + products</option>
         </select>
       </div>
 
@@ -213,7 +224,7 @@ export default function AdminDiscountsPage() {
                   <td className="px-5 py-3 font-semibold text-neutral-900">{formatDiscountValue(discount)}</td>
                   <td className="px-5 py-3">
                     <p className="text-neutral-900">{targetSummary(discount)}</p>
-                    <p className="text-xs text-neutral-500">{discount.target_type === "category" ? "Category" : "Products"}</p>
+                    <p className="text-xs text-neutral-500">{targetLabel(discount)}</p>
                   </td>
                   <td className="px-5 py-3 text-neutral-600">
                     {formatDate(discount.starts_at)} → {formatDate(discount.ends_at)}

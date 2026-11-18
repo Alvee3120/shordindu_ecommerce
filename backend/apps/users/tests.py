@@ -311,3 +311,15 @@ class PhoneUniquenessTests(APITestCase):
         self.assertEqual(response.status_code, 400)
         self.assertIn("phone", response.data)
 
+
+
+class StaleAuthCookieTests(APITestCase):
+    """A leftover/foreign auth cookie must not break anonymous access."""
+
+    def test_invalid_access_cookie_does_not_break_public_reads(self):
+        self.client.cookies["access_token"] = "bogus.token.value"
+        self.assertEqual(self.client.get("/api/categories/").status_code, 200)
+
+    def test_invalid_access_cookie_still_requires_auth_for_protected_views(self):
+        self.client.cookies["access_token"] = "bogus.token.value"
+        self.assertEqual(self.client.get("/api/auth/me/").status_code, 401)

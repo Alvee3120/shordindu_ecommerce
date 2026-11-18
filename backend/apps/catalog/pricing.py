@@ -26,6 +26,7 @@ from collections import defaultdict
 from dataclasses import dataclass
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.db.models import Q
 from django.utils import timezone
 
 CENT = Decimal("0.01")
@@ -116,13 +117,15 @@ class PricingEngine:
         self._by_category = defaultdict(list)
         parent_of = None
         for discount in live:
-            if discount.target_type == Discount.Target.PRODUCTS:
-                for product in discount.products.all():
-                    self._by_product[product.pk].append(discount)
-            elif discount.target_type == Discount.Target.CATEGORY:
+            # A discount may target categories, products, or both. Both sets are
+            # registered so eligibility is their union (OR), never AND.
+            for product in discount.products.all():
+                self._by_product[product.pk].append(discount)
+            categories = list(discount.categories.all())
+            if categories:
                 if parent_of is None:
                     parent_of = dict(Category.objects.values_list("id", "parent_id"))
-                ids = categories_with_descendants([c.pk for c in discount.categories.all()], parent_of)
+                ids = categories_with_descendants([c.pk for c in categories], parent_of)
                 for category_id in ids:
                     self._by_category[category_id].append(discount)
         self._loaded = True
@@ -178,13 +181,15 @@ def discounted_product_ids(discount, engine):
     products = Product.objects.filter(status=Product.Status.ACTIVE).exclude(
         visibility_type=Product.VisibilityType.ADDON_ONLY
     )
-    if discount.target_type == Discount.Target.PRODUCTS:
-        products = products.filter(pk__in=discount.products.values("pk"))
-    elif discount.categories.exists():
+    target = Q()
+    if discount.products.exists():
+        target |= Q(pk__in=discount.products.values("pk"))
+    if discount.categories.exists():
         ids = categories_with_descendants(discount.categories.values_list("pk", flat=True))
-        products = products.filter(categories__in=ids)
-    else:
+        target |= Q(categories__in=ids)
+    if not target:
         return []
+    products = products.filter(target)
     products = products.distinct().order_by("-created_at").prefetch_related("variations", "categories")
 
     ids = []

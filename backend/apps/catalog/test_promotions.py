@@ -176,6 +176,21 @@ class PromotionEngineTests(PromotionFixtures, TestCase):
         self.assertEqual(applied[0].discount_amount, D("250.00"))
         self.assertEqual(applied[0].qualifying_quantity, 2)
 
+    def test_category_and_product_targets_union_eligible_units(self):
+        self.promo(
+            type="bxgy_percent",
+            categories=[self.parent],
+            products=[self.bag],
+            min_quantity=3,
+            percent_off=D("10"),
+        )
+        # Serum + cream (Skincare) and the bag (selected product) all qualify.
+        applied = PromotionEngine().apply(
+            self.units((0, self.serum, 1), (1, self.cream, 1), (2, self.bag, 1))
+        )
+        self.assertEqual(applied[0].qualifying_quantity, 3)
+        self.assertEqual(applied[0].discount_amount, D("350.00"))  # 10% of 3,500
+
     def test_variant_prices_drive_the_calculation(self):
         variable = Product.objects.create(name="Palette", status=Product.Status.ACTIVE)
         variable.categories.set([self.parent])

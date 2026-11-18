@@ -302,6 +302,7 @@ class Discount(models.Model):
     class Target(models.TextChoices):
         CATEGORY = "category", "Category"
         PRODUCTS = "products", "Specific products"
+        BOTH = "both", "Categories and products"
 
     class Status(models.TextChoices):
         ACTIVE = "active", "Active"
