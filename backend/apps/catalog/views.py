@@ -467,7 +467,7 @@ class DiscountViewSet(viewsets.ModelViewSet):
     """Automatic category/product discounts — administrators only (read and write).
 
     Filters: ?search= (name), ?status=active|scheduled|expired|inactive,
-    ?type=percent|fixed, ?target_type=category|products.
+    ?type=percent|fixed, ?target_type=category|products|both.
     """
 
     serializer_class = DiscountSerializer

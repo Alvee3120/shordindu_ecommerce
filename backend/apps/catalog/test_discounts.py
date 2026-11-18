@@ -100,6 +100,20 @@ class PricingEngineTests(DiscountFixtures, TestCase):
         self.assertEqual(self.price(self.cream).final_price, Decimal("900.00"))  # Skincare
         self.assertEqual(self.price(self.bag).final_price, Decimal("450.00"))  # Bags
 
+    def test_categories_and_products_combine_with_or(self):
+        # Category products plus a selected product that sits outside the category.
+        self.discount(categories=[self.parent], products=[self.bag], value="10")
+        self.assertEqual(self.price(self.serum).final_price, Decimal("1800.00"))  # Skincare › Serums
+        self.assertEqual(self.price(self.cream).final_price, Decimal("900.00"))  # Skincare
+        self.assertEqual(self.price(self.bag).final_price, Decimal("450.00"))  # selected product
+
+        Discount.objects.all().delete()
+        # A product in both the category and the product list is discounted once.
+        discount = self.discount(categories=[self.parent], products=[self.serum], value="10")
+        quote = self.price(self.serum)
+        self.assertEqual(quote.discount, discount)
+        self.assertEqual(quote.discount_amount, Decimal("200.00"))
+
     def test_product_discount_beats_category_even_if_smaller(self):
         self.discount(categories=[self.parent], value="50", name="Category 50%")
         product_discount = self.discount(products=[self.serum], value="5", name="Product 5%")
@@ -168,7 +182,10 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             format="json",
         )
         self.assertEqual(response.status_code, 200, response.data)
-        self.assertEqual(response.data["categories"], [])
+        # A PATCH that only sends products keeps the stored categories: targets
+        # combine (OR) instead of replacing one another.
+        self.assertEqual(response.data["categories"], [self.parent.id])
+        self.assertEqual(response.data["target_type"], "both")
         self.assertEqual(response.data["product_count"], 2)
 
         detail = self.client.get(f"{self.URL}{discount_id}/").data
@@ -214,7 +231,7 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             ({"starts_at": "not a date"}, "starts_at"),
             ({"categories": []}, "categories"),
             ({"categories": [99999]}, "categories"),
-            ({"target_type": "products", "products": []}, "products"),
+            ({"categories": [], "products": []}, "products"),
             ({"target_type": "products", "products": [99999]}, "products"),
             # Cheapest item under Skincare is the ৳1000 cream.
             ({"type": "fixed", "value": "1000.01"}, "value"),
@@ -230,14 +247,20 @@ class DiscountApiTests(DiscountFixtures, APITestCase):
             self.client.post(self.URL, self.payload(type="fixed", value="1000"), format="json").status_code, 201
         )
 
-    def test_target_switch_clears_the_other_target(self):
+    def test_categories_and_products_are_stored_together(self):
         self.client.force_authenticate(self.admin)
-        response = self.client.post(
-            self.URL, self.payload(target_type="products", products=[self.serum.id]), format="json"
-        )
+        # The dashboard sends both lists and no target_type; it is derived here.
+        data = self.payload(products=[self.serum.id])
+        data.pop("target_type")
+        response = self.client.post(self.URL, data, format="json")
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(response.data["categories"], [])
-        response = self.client.post(self.URL, self.payload(products=[self.serum.id]), format="json")
+        self.assertEqual(response.data["target_type"], "both")
+        self.assertEqual(response.data["categories"], [self.parent.id])
+        self.assertEqual(response.data["product_count"], 1)
+
+        # Category-only and product-only still derive their own target type.
+        response = self.client.post(self.URL, self.payload(), format="json")
+        self.assertEqual(response.data["target_type"], "category")
         self.assertEqual(response.data["product_count"], 0)
 
     def test_status_and_filters(self):
@@ -431,6 +454,13 @@ class DiscountShowcaseTests(DiscountFixtures, APITestCase):
         sections = self.sections()
         self.assertEqual(self.product_names(sections["Skincare Week"]), {"Hydrating Cream"})
         self.assertEqual(self.product_names(sections["Serum Special"]), {"Vitamin C Serum"})
+
+    def test_combined_target_section_includes_both(self):
+        self.discount(categories=[self.parent], products=[self.bag], name="Combo", value="10")
+        section = self.sections()["Combo"]
+        self.assertEqual(
+            self.product_names(section), {"Vitamin C Serum", "Hydrating Cream", "Tote Bag"}
+        )
 
     def test_no_empty_sections(self):
         hidden = Product.objects.create(name="Draft", status=Product.Status.DRAFT)

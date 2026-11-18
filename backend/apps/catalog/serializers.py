@@ -1,7 +1,7 @@
 import re
 from decimal import Decimal
 
-from django.db.models import Avg, Max, Min
+from django.db.models import Avg, Max, Min, Q
 from rest_framework import serializers
 
 from .models import (
@@ -542,6 +542,7 @@ class DiscountSerializer(serializers.ModelSerializer):
     max_discount_amount = serializers.DecimalField(
         max_digits=10, decimal_places=2, min_value=Decimal("0.01"), required=False, allow_null=True
     )
+    target_type = serializers.ChoiceField(choices=Discount.Target.choices, required=False)
     categories = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, required=False)
     products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), many=True, required=False)
     category_names = serializers.SerializerMethodField()
@@ -641,17 +642,22 @@ class DiscountSerializer(serializers.ModelSerializer):
         if starts_at and ends_at and ends_at <= starts_at:
             errors["ends_at"] = ["The end must be after the start."]
 
-        target_type = final("target_type")
-        categories = final("categories")
-        products = final("products", [])
-        if target_type == Discount.Target.CATEGORY:
-            if not categories:
-                errors["categories"] = ["Choose at least one category."]
-            attrs["products"] = []
-        elif target_type == Discount.Target.PRODUCTS:
-            if not products:
-                errors["products"] = ["Choose at least one product."]
-            attrs["categories"] = []
+        # Categories and products combine with OR: a variation is eligible when
+        # it belongs to any selected category (or descendant) OR is selected
+        # directly. target_type is derived so the list filter stays meaningful.
+        categories = final("categories") or []
+        products = final("products") or []
+        if not categories and not products:
+            message = ["Choose at least one category or product."]
+            errors["categories"] = message
+            errors["products"] = message
+        attrs["target_type"] = (
+            Discount.Target.BOTH
+            if categories and products
+            else Discount.Target.CATEGORY
+            if categories
+            else Discount.Target.PRODUCTS
+        )
 
         self._validate_offer(discount_type, attrs, instance, errors)
 
@@ -659,7 +665,7 @@ class DiscountSerializer(serializers.ModelSerializer):
             raise serializers.ValidationError(errors)
 
         if discount_type == Discount.Type.FIXED:
-            self._check_fixed_amount(final("value"), target_type, categories, products)
+            self._check_fixed_amount(final("value"), categories, products)
         return attrs
 
     @staticmethod
@@ -747,14 +753,15 @@ class DiscountSerializer(serializers.ModelSerializer):
             clear("bundle_price")
 
     @staticmethod
-    def _check_fixed_amount(value, target_type, categories, products):
+    def _check_fixed_amount(value, categories, products):
         """A fixed discount must not exceed the price of anything it targets."""
-        variations = ProductVariation.objects.filter(is_active=True)
-        if target_type == Discount.Target.CATEGORY:
+        target = Q()
+        if categories:
             ids = categories_with_descendants([category.pk for category in categories])
-            variations = variations.filter(product__categories__in=ids)
-        else:
-            variations = variations.filter(product__in=products)
+            target |= Q(product__categories__in=ids)
+        if products:
+            target |= Q(product__in=products)
+        variations = ProductVariation.objects.filter(is_active=True).filter(target)
         cheapest = variations.aggregate(price=Min("price"))["price"]
         if cheapest is not None and value > cheapest:
             raise serializers.ValidationError(

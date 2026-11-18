@@ -49,6 +49,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from decimal import ROUND_HALF_UP, Decimal
 
+from django.db.models import Q
 from django.utils import timezone
 
 from .pricing import categories_with_descendants
@@ -191,7 +192,7 @@ class PromotionEngine:
                 # a specific free-item/bundle offer keeps its units instead of
                 # being swallowed by the broad offer.
                 1 if d.type == Discount.Type.MIN_PURCHASE else 0,
-                0 if d.target_type == Discount.Target.PRODUCTS else 1,
+                0 if d.target_type in (Discount.Target.PRODUCTS, Discount.Target.BOTH) else 1,
                 -d.starts_at.timestamp(),
                 -d.id,
             ),
@@ -200,23 +201,27 @@ class PromotionEngine:
         self._product_targets = {}
         self._category_targets = {}
         for discount in live:
-            if discount.target_type == Discount.Target.PRODUCTS:
-                self._product_targets[discount.id] = {p.pk for p in discount.products.all()}
-            elif discount.target_type == Discount.Target.CATEGORY:
+            # A discount may target categories, products, or both; register
+            # every non-empty set so eligibility is their union (OR).
+            products = list(discount.products.all())
+            if products:
+                self._product_targets[discount.id] = {p.pk for p in products}
+            categories = list(discount.categories.all())
+            if categories:
                 if parent_of is None:
                     parent_of = dict(Category.objects.values_list("id", "parent_id"))
                 self._category_targets[discount.id] = categories_with_descendants(
-                    [c.pk for c in discount.categories.all()], parent_of
+                    [c.pk for c in categories], parent_of
                 )
         self._loaded = True
 
     def _is_eligible(self, discount, unit):
         products = self._product_targets.get(discount.id)
-        if products is not None:
-            return unit.product_id in products
+        if products and unit.product_id in products:
+            return True
         categories = self._category_targets.get(discount.id)
-        if categories:
-            return bool(categories & unit.category_ids)
+        if categories and categories & unit.category_ids:
+            return True
         return False
 
     @staticmethod
@@ -486,11 +491,13 @@ def promotion_product_ids(discount):
     products = Product.objects.filter(status=Product.Status.ACTIVE).exclude(
         visibility_type=Product.VisibilityType.ADDON_ONLY
     )
-    if discount.target_type == Discount.Target.PRODUCTS:
-        products = products.filter(pk__in=discount.products.values("pk"))
-    elif discount.categories.exists():
+    target = Q()
+    if discount.products.exists():
+        target |= Q(pk__in=discount.products.values("pk"))
+    if discount.categories.exists():
         ids = categories_with_descendants(discount.categories.values_list("pk", flat=True))
-        products = products.filter(categories__in=ids)
-    else:
+        target |= Q(categories__in=ids)
+    if not target:
         return []
+    products = products.filter(target)
     return list(products.distinct().order_by("-created_at").values_list("pk", flat=True))

@@ -40,7 +40,6 @@ const EMPTY_FORM = {
   // Minimum-purchase parameters (percent_off + min_purchase_amount + optional cap).
   min_purchase_amount: "",
   max_discount_amount: "",
-  target_type: "category",
   categories: [],
   start_date: "",
   start_time: "00:00",
@@ -92,7 +91,6 @@ function toForm(discount) {
     free_same_product: discount.free_same_product ?? true,
     min_purchase_amount: num(discount.min_purchase_amount),
     max_discount_amount: num(discount.max_discount_amount),
-    target_type: discount.target_type,
     categories: discount.categories ?? [],
     start_date: start.date,
     start_time: start.time,
@@ -133,27 +131,6 @@ function Field({ label, error, hint, htmlFor, children, className = "" }) {
       ) : (
         hint && <p className="mt-1 text-xs text-neutral-400">{hint}</p>
       )}
-    </div>
-  );
-}
-
-function Segmented({ value, onChange, options, label }) {
-  return (
-    <div role="radiogroup" aria-label={label} className="grid grid-cols-2 gap-1 rounded-lg bg-neutral-100 p-1">
-      {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={value === option.value}
-          onClick={() => onChange(option.value)}
-          className={`rounded-md px-3 py-1.5 text-sm font-medium transition-colors ${
-            value === option.value ? "bg-white text-(--primary) shadow-sm" : "text-neutral-500 hover:text-neutral-700"
-          }`}
-        >
-          {option.label}
-        </button>
-      ))}
     </div>
   );
 }
@@ -217,10 +194,9 @@ function validate(form, products) {
   const errors = {};
   if (!form.name.trim()) errors.name = "Give the discount a name.";
   validateOffer(form, errors);
-  if (form.target_type === "category" && form.categories.length === 0) {
-    errors.categories = "Choose at least one category.";
+  if (form.categories.length === 0 && products.length === 0) {
+    errors.targeting = "Choose at least one category or product.";
   }
-  if (form.target_type === "products" && products.length === 0) errors.products = "Choose at least one product.";
   if (!form.start_date || !form.start_time) errors.starts_at = "Choose a start date and time.";
   if (!form.end_date || !form.end_time) errors.ends_at = "Choose an end date and time.";
   if (!errors.starts_at && !errors.ends_at) {
@@ -276,6 +252,7 @@ export default function DiscountEditor({ discountId }) {
     const errorKey = field.startsWith("start_") ? "starts_at" : field.startsWith("end_") ? "ends_at" : field;
     setErrors((prev) => {
       const next = { ...prev, [errorKey]: undefined };
+      if (field === "categories") next.targeting = undefined;
       // Switching offer type invalidates every type-specific field's error.
       if (field === "type") {
         for (const key of [
@@ -290,17 +267,13 @@ export default function DiscountEditor({ discountId }) {
           next[key] = undefined;
         }
       }
-      if (field === "target_type") {
-        next.categories = undefined;
-        next.products = undefined;
-      }
       return next;
     });
   };
 
   const addProduct = (product) => {
     setProducts((prev) => (prev.some((p) => p.id === product.id) ? prev : [...prev, toSelectedProduct(product)]));
-    setErrors((prev) => ({ ...prev, products: undefined, value: undefined }));
+    setErrors((prev) => ({ ...prev, products: undefined, targeting: undefined, value: undefined }));
   };
 
   const removeProduct = (id) => setProducts((prev) => prev.filter((p) => p.id !== id));
@@ -317,9 +290,8 @@ export default function DiscountEditor({ discountId }) {
     const payload = {
       name: form.name.trim(),
       type: form.type,
-      target_type: form.target_type,
-      categories: form.target_type === "category" ? form.categories : [],
-      products: form.target_type === "products" ? products.map((p) => p.id) : [],
+      categories: form.categories,
+      products: products.map((p) => p.id),
       starts_at: `${form.start_date}T${form.start_time}`,
       ends_at: `${form.end_date}T${form.end_time}`,
       is_active: form.is_active,
@@ -632,84 +604,81 @@ export default function DiscountEditor({ discountId }) {
       </section>
 
       <section className="mb-5 rounded-xl border border-neutral-200 bg-white p-5">
-        <h2 className="mb-4 font-semibold text-neutral-900">Applies to</h2>
-        <Segmented
-          label="Target type"
-          value={form.target_type}
-          onChange={(v) => update("target_type", v)}
-          options={[
-            { value: "category", label: "Category" },
-            { value: "products", label: "Specific products" },
-          ]}
-        />
+        <h2 className="mb-1 font-semibold text-neutral-900">Applies to</h2>
+        <p className="mb-4 flex items-start gap-1.5 text-xs text-neutral-500">
+          <FiInfo size={13} className="mt-0.5 shrink-0" />
+          Pick categories, products, or both. The discount applies to every product in the selected categories (and
+          their sub-categories) <strong className="font-semibold">plus</strong> every individually selected product. A
+          product matching both is discounted once.
+        </p>
+        {errors.targeting && <p className="mb-3 text-xs text-red-600">{errors.targeting}</p>}
 
-        {form.target_type === "category" ? (
-          <div className="mt-4">
-            <Field label="Target categories" error={null} htmlFor="categories">
-              <CategorySelect
-                multiple
-                categories={categories}
-                loading={categoriesLoading}
-                value={form.categories}
-                onChange={(ids) => update("categories", ids)}
-                error={errors.categories}
-              />
-            </Field>
-            <p className="mt-2 flex items-start gap-1.5 text-xs text-neutral-500">
-              <FiInfo size={13} className="mt-0.5 shrink-0" />
-              Includes products in any of these categories and all of their sub-categories — the same products the
-              shop shows for them.
-            </p>
-          </div>
-        ) : (
-          <div className="mt-4">
-            <ProductPicker
-              status={null}
-              onSelectProduct={addProduct}
-              isProductSelected={(product) => products.some((p) => p.id === product.id)}
+        <div>
+          <Field label="Categories" error={errors.categories} htmlFor="categories">
+            <CategorySelect
+              multiple
+              categories={categories}
+              loading={categoriesLoading}
+              value={form.categories}
+              onChange={(ids) => update("categories", ids)}
+              error={errors.categories}
             />
-            {errors.products && <p className="mt-2 text-xs text-red-600">{errors.products}</p>}
-            <p className="mt-4 mb-2 text-xs font-medium text-neutral-700">
-              Selected products {products.length > 0 && <span className="text-neutral-400">({products.length})</span>}
+          </Field>
+          <p className="mt-2 flex items-start gap-1.5 text-xs text-neutral-500">
+            <FiInfo size={13} className="mt-0.5 shrink-0" />
+            Includes products in any of these categories and all of their sub-categories — the same products the
+            shop shows for them.
+          </p>
+        </div>
+
+        <div className="mt-6">
+          <p className="mb-2 text-xs font-medium text-neutral-700">Specific products</p>
+          <ProductPicker
+            status={null}
+            onSelectProduct={addProduct}
+            isProductSelected={(product) => products.some((p) => p.id === product.id)}
+          />
+          {errors.products && <p className="mt-2 text-xs text-red-600">{errors.products}</p>}
+          <p className="mt-4 mb-2 text-xs font-medium text-neutral-700">
+            Selected products {products.length > 0 && <span className="text-neutral-400">({products.length})</span>}
+          </p>
+          {products.length === 0 ? (
+            <p className="rounded-lg border border-dashed border-neutral-200 py-6 text-center text-sm text-neutral-400">
+              Search above and click a product to add it.
             </p>
-            {products.length === 0 ? (
-              <p className="rounded-lg border border-dashed border-neutral-200 py-6 text-center text-sm text-neutral-400">
-                Search above and click a product to add it.
-              </p>
-            ) : (
-              <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
-                {products.map((product) => (
-                  <li key={product.id} className="flex items-center gap-3 px-3 py-2">
-                    <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
-                      {product.image ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={product.image} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <FiBox size={15} className="text-neutral-300" />
-                      )}
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
-                      <p className="truncate text-xs text-neutral-500">
-                        {[product.sku, product.min_price != null && `from ${formatBDT(product.min_price)}`, product.status !== "active" && product.status]
-                          .filter(Boolean)
-                          .join(" · ")}
-                      </p>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => removeProduct(product.id)}
-                      aria-label={`Remove ${product.name}`}
-                      className="rounded-full p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
-                    >
-                      <FiX size={16} />
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
-        )}
+          ) : (
+            <ul className="divide-y divide-neutral-100 rounded-lg border border-neutral-200">
+              {products.map((product) => (
+                <li key={product.id} className="flex items-center gap-3 px-3 py-2">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-neutral-200 bg-neutral-50">
+                    {product.image ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={product.image} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <FiBox size={15} className="text-neutral-300" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-medium text-neutral-900">{product.name}</p>
+                    <p className="truncate text-xs text-neutral-500">
+                      {[product.sku, product.min_price != null && `from ${formatBDT(product.min_price)}`, product.status !== "active" && product.status]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => removeProduct(product.id)}
+                    aria-label={`Remove ${product.name}`}
+                    className="rounded-full p-1.5 text-neutral-400 hover:bg-red-50 hover:text-red-600"
+                  >
+                    <FiX size={16} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
       </section>
 
       <section className="mb-5 rounded-xl border border-neutral-200 bg-white p-5">
