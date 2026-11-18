@@ -1,6 +1,7 @@
 // lib/discounts.js — automatic category/product discounts (admin only).
 // Separate from coupons (lib/coupons.js), which customers type in at checkout.
 import { apiFetch } from "./api";
+import { formatBDT } from "./format";
 
 /** Paginated `{count, results}`; filters: search, status, type, target_type. */
 export function listDiscounts({ page, search, status, type, target_type } = {}) {
@@ -80,6 +81,7 @@ export const DISCOUNT_TYPES = [
   { value: "lowest_free", label: "Buy X, get cheapest free", group: "Cart offer" },
   { value: "three_for_two", label: "3 for 2", group: "Cart offer" },
   { value: "bundle_price", label: "Bundle for a fixed price", group: "Cart offer" },
+  { value: "min_purchase", label: "Flat % off on minimum purchase", group: "Cart offer" },
 ];
 
 export const DISCOUNT_TYPE_LABEL = Object.fromEntries(DISCOUNT_TYPES.map((t) => [t.value, t.label]));
@@ -95,10 +97,31 @@ export function isBasketDiscount(type) {
   return type !== "percent" && type !== "fixed";
 }
 
+/** Flat percentage off once the eligible subtotal reaches a minimum. */
+export function isMinimumPurchaseDiscount(type) {
+  return type === "min_purchase";
+}
+
 /** How a discount's offer reads in lists: "20%", "৳200 OFF" or "Buy 3, get 20% off". */
 export function formatDiscountValue(discount) {
   if (isBasketDiscount(discount.type)) return discount.label;
   const value = Number(discount.value);
   const shown = Number.isInteger(value) ? value.toLocaleString("en-US") : value.toFixed(2);
   return discount.type === "percent" ? `${shown}%` : `৳${shown} OFF`;
+}
+
+/**
+ * Storefront progress of one minimum-purchase offer (see the cart API's
+ * `minimum_purchase_offers`): "Spend ৳2,000 and get 10% OFF", "Add ৳500 more
+ * to unlock 10% OFF!" or "Congratulations! You unlocked 10% OFF.".
+ */
+export function minimumPurchaseMessage(offer) {
+  if (!offer) return null;
+  const percent = `${Number(offer.percent_off)}%`;
+  if (offer.qualified) return `Congratulations! You unlocked ${percent} OFF.`;
+  const remaining = Number(offer.remaining);
+  if (Number.isFinite(remaining) && remaining > 0) {
+    return `Add ${formatBDT(remaining)} more to unlock ${percent} OFF!`;
+  }
+  return `Spend ${formatBDT(offer.min_purchase_amount)} and get ${percent} OFF.`;
 }

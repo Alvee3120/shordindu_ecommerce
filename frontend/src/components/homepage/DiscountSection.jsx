@@ -16,7 +16,8 @@ export default function DiscountSection({ section, products }) {
   if (expired) return null;
 
   // Basket offers never change a product's price, so the section spells the
-  // offer out ("Buy 3, get 20% off"); price-cut sections only need the countdown.
+  // offer out ("Buy 3, get 20% off", "Spend ৳2,000 and get 10% off");
+  // price-cut sections only need the countdown.
   const subtitle = (
     <div className="flex flex-wrap items-center gap-2">
       {section.label && (

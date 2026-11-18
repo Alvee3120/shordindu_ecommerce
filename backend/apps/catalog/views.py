@@ -549,6 +549,16 @@ class DiscountShowcaseView(APIView):
                     "percent_off": str(discount.percent_off) if discount.percent_off is not None else None,
                     "free_quantity": discount.free_quantity,
                     "bundle_price": str(discount.bundle_price) if discount.bundle_price is not None else None,
+                    "min_purchase_amount": (
+                        str(discount.min_purchase_amount)
+                        if discount.min_purchase_amount is not None
+                        else None
+                    ),
+                    "max_discount_amount": (
+                        str(discount.max_discount_amount)
+                        if discount.max_discount_amount is not None
+                        else None
+                    ),
                     "target_type": discount.target_type,
                     "categories": [{"id": c.id, "name": c.name} for c in discount.categories.all()],
                     "starts_at": datetime_field.to_representation(discount.starts_at),

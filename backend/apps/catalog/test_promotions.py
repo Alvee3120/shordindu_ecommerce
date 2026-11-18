@@ -363,6 +363,311 @@ class PromotionCheckoutTests(PromotionFixtures, APITestCase):
         self.assertEqual(names, {"Vitamin C Serum"})
 
 
+class MinimumPurchaseTests(PromotionFixtures, TestCase):
+    """Flat X% off once the eligible subtotal reaches ৳Y, with an optional cap."""
+
+    def setUp(self):
+        self.make_catalog()
+
+    def units(self, *specs):
+        out = []
+        for spec in specs:
+            line_key, product, quantity = spec[:3]
+            price = spec[3] if len(spec) > 3 else None
+            variation = self.variation(product)
+            unit_price = D(price) if price is not None else variation.price
+            for _ in range(quantity):
+                out.append(
+                    Unit(
+                        line_key=line_key,
+                        product_id=product.pk,
+                        variation_id=variation.pk,
+                        price=unit_price,
+                        category_ids=frozenset(product.categories.values_list("id", flat=True)),
+                    )
+                )
+        return out
+
+    def offer(self, **overrides):
+        fields = {
+            "type": "min_purchase",
+            "percent_off": D("10"),
+            "min_purchase_amount": D("2000"),
+            "products": [self.bag],
+        }
+        fields.update(overrides)
+        return self.promo(**fields)
+
+    def test_below_minimum_gives_nothing(self):
+        self.offer()
+        applied = PromotionEngine().apply(self.units((0, self.bag, 3, "500")))  # ৳1,500
+        self.assertEqual(applied, [])
+
+    def test_exactly_at_minimum_qualifies(self):
+        self.offer()
+        applied = PromotionEngine().apply(self.units((0, self.bag, 4, "500")))  # ৳2,000
+        self.assertEqual(len(applied), 1)
+        self.assertEqual(applied[0].discount_amount, D("200.00"))
+
+    def test_above_minimum_discounts_the_whole_subtotal(self):
+        self.offer()
+        applied = PromotionEngine().apply(self.units((0, self.bag, 6, "500")))  # ৳3,000
+        self.assertEqual(applied[0].discount_amount, D("300.00"))
+
+    def test_max_discount_caps_the_saving(self):
+        self.offer(min_purchase_amount=D("3000"), percent_off=D("15"), max_discount_amount=D("500"))
+        applied = PromotionEngine().apply(self.units((0, self.bag, 10, "500")))  # ৳5,000
+        self.assertEqual(applied[0].discount_amount, D("500.00"))  # 15% = 750, capped
+
+    def test_goal_table_from_the_brief(self):
+        # ৳5,000 cart at 15% over a ৳3,000 minimum -> ৳750 off.
+        self.offer(min_purchase_amount=D("3000"), percent_off=D("15"))
+        applied = PromotionEngine().apply(self.units((0, self.bag, 10, "500")))
+        self.assertEqual(applied[0].discount_amount, D("750.00"))
+
+    def test_goal_table_below_threshold(self):
+        self.offer(min_purchase_amount=D("3000"), percent_off=D("15"))
+        self.assertEqual(PromotionEngine().apply(self.units((0, self.bag, 3, "500"))), [])
+
+    def test_discount_never_exceeds_subtotal(self):
+        self.offer(percent_off=D("100"))
+        applied = PromotionEngine().apply(self.units((0, self.bag, 4, "500")))
+        self.assertEqual(applied[0].discount_amount, D("2000.00"))
+        self.assertLessEqual(sum(applied[0].line_discounts.values(), ZERO), D("2000.00"))
+
+    def test_rounds_to_poisha(self):
+        self.offer(min_purchase_amount=D("2000"), percent_off=D("12.5"))
+        applied = PromotionEngine().apply(self.units((0, self.bag, 4, "500")))
+        self.assertEqual(applied[0].discount_amount, D("250.00"))
+
+    def test_only_eligible_lines_count_toward_the_minimum(self):
+        self.offer()
+        # ৳1,000 bag + ৳2,000 serum; only the bag is targeted → below minimum.
+        applied = PromotionEngine().apply(self.units((0, self.bag, 2, "500"), (1, self.serum, 1)))
+        self.assertEqual(applied, [])
+
+    def test_category_target_includes_subcategories(self):
+        self.offer(products=None, categories=[self.parent], min_purchase_amount=D("3000"))
+        applied = PromotionEngine().apply(self.units((0, self.serum, 2)))  # ৳4,000
+        self.assertEqual(applied[0].discount_amount, D("400.00"))
+
+    def test_falls_back_to_remaining_units_after_another_offer(self):
+        # A free-item offer consumes serum units; the threshold offer then only
+        # sees what is left, so it never double-discounts the same units.
+        self.promo(type="bxgy_free", products=[self.serum], min_quantity=2, free_quantity=1)
+        self.offer(products=[self.serum], min_purchase_amount=D("1000"), percent_off=D("10"))
+        applied = PromotionEngine().apply(self.units((0, self.serum, 3)))
+        # 3 units → one free offer group consumes all three; threshold has none.
+        names = [offer.type for offer in applied]
+        self.assertIn("bxgy_free", names)
+        self.assertNotIn("min_purchase", names)
+
+    def test_threshold_offers_report_progress(self):
+        self.offer()
+        engine = PromotionEngine()
+        progress = engine.threshold_offers(self.units((0, self.bag, 3, "500")))
+        self.assertEqual(len(progress), 1)
+        self.assertFalse(progress[0]["qualified"])
+        self.assertEqual(D(progress[0]["eligible_subtotal"]), D("1500.00"))
+        self.assertEqual(D(progress[0]["remaining"]), D("500.00"))
+
+        engine = PromotionEngine()
+        progress = engine.threshold_offers(self.units((0, self.bag, 4, "500")))
+        self.assertTrue(progress[0]["qualified"])
+        self.assertEqual(D(progress[0]["discount_amount"]), D("200.00"))
+
+    def test_inactive_or_expired_offers_do_not_apply(self):
+        self.offer(start=1, end=2)
+        self.offer(start=-5, end=-2)
+        self.offer(active=False)
+        self.assertEqual(PromotionEngine().apply(self.units((0, self.bag, 4, "500"))), [])
+
+
+class MinimumPurchaseCheckoutTests(PromotionFixtures, APITestCase):
+    def setUp(self):
+        self.make_catalog()
+        self.customer = User.objects.create_user(email="u@x.com", password="pw", name="Customer")
+        self.admin = User.objects.create_user(email="a@x.com", password="pw", name="Admin", role=User.Role.ADMIN)
+
+    def add_to_cart(self, product, quantity=1):
+        variation = self.variation(product)
+        response = self.client.post(
+            "/api/cart/items/",
+            {"product": product.id, "variation": variation.id, "quantity": quantity},
+            format="json",
+        )
+        self.assertIn(response.status_code, (200, 201), response.data)
+        return response
+
+    def cart(self):
+        response = self.client.get("/api/cart/")
+        self.assertEqual(response.status_code, 200)
+        return response.data
+
+    def test_cart_shows_offer_progress_and_discount(self):
+        self.promo(
+            type="min_purchase", products=[self.bag],
+            percent_off=D("10"), min_purchase_amount=D("2000"),
+        )
+        self.client.force_authenticate(self.customer)
+        self.add_to_cart(self.bag, 3)  # ৳1,500 → not qualified
+        cart = self.cart()
+        offer = cart["minimum_purchase_offers"][0]
+        self.assertEqual(D(offer["eligible_subtotal"]), D("1500.00"))
+        self.assertEqual(D(offer["remaining"]), D("500.00"))
+        self.assertFalse(offer["qualified"])
+        self.assertEqual(D(cart["promotion_discount_total"]), ZERO)
+
+        item_id = cart["items"][0]["id"]
+        self.client.patch(f"/api/cart/items/{item_id}/", {"quantity": 4}, format="json")
+        cart = self.cart()
+        self.assertTrue(cart["minimum_purchase_offers"][0]["qualified"])
+        self.assertEqual(D(cart["promotion_discount_total"]), D("200.00"))
+        self.assertEqual(D(cart["subtotal"]), D("1800.00"))
+
+    def test_checkout_charges_the_threshold_discount_and_never_delivery(self):
+        self.promo(
+            type="min_purchase", products=[self.bag],
+            percent_off=D("10"), min_purchase_amount=D("2000"),
+        )
+        self.client.force_authenticate(self.customer)
+        self.add_to_cart(self.bag, 4)  # ৳2,000
+        response = self.client.post(
+            "/api/checkout/",
+            {"shipping_address": "House 1", "shipping_district": "Khulna", "shipping_phone": "01712345678"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(D(response.data["subtotal"]), D("2000.00"))
+        self.assertEqual(D(response.data["promotion_discount_total"]), D("200.00"))
+        # 2000 − 200 + 120 delivery; delivery is never discounted.
+        self.assertEqual(D(response.data["grand_total"]), D("1920.00"))
+
+    def test_checkout_ignores_a_below_minimum_basket(self):
+        self.promo(
+            type="min_purchase", products=[self.bag],
+            percent_off=D("10"), min_purchase_amount=D("2000"),
+        )
+        self.client.force_authenticate(self.customer)
+        self.add_to_cart(self.bag, 3)  # ৳1,500
+        response = self.client.post(
+            "/api/checkout/",
+            {"shipping_address": "House 1", "shipping_district": "Khulna", "shipping_phone": "01712345678"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(D(response.data["promotion_discount_total"]), ZERO)
+        self.assertEqual(D(response.data["grand_total"]), D("1620.00"))  # 1500 + 120
+
+    def test_coupon_applies_after_the_threshold_discount(self):
+        self.promo(
+            type="min_purchase", products=[self.bag],
+            percent_off=D("10"), min_purchase_amount=D("2000"),
+        )
+        Coupon.objects.create(code="EXTRA10", type="percent", value=D("10"))
+        self.client.force_authenticate(self.customer)
+        self.add_to_cart(self.bag, 4)
+        response = self.client.post(
+            "/api/checkout/",
+            {
+                "shipping_address": "House 1", "shipping_district": "Khulna",
+                "shipping_phone": "01712345678", "coupon_code": "EXTRA10",
+            },
+            format="json",
+        )
+        self.assertEqual(response.status_code, 201, response.data)
+        # 2000 − 200 (offer) − 180 (10% of 1800) + 120 = 1740
+        self.assertEqual(D(response.data["grand_total"]), D("1740.00"))
+
+
+class MinimumPurchaseAdminTests(PromotionFixtures, APITestCase):
+    URL = "/api/discounts/"
+
+    def setUp(self):
+        self.make_catalog()
+        self.admin = User.objects.create_user(email="a@x.com", password="pw", name="Admin", role=User.Role.ADMIN)
+
+    def payload(self, **overrides):
+        start = (now() - timedelta(days=1)).strftime("%Y-%m-%dT%H:%M")
+        end = (now() + timedelta(days=5)).strftime("%Y-%m-%dT%H:%M")
+        data = {
+            "name": "Spend & Save",
+            "type": "min_purchase",
+            "target_type": "products",
+            "products": [self.bag.id],
+            "percent_off": "10",
+            "min_purchase_amount": "2000",
+            "starts_at": start,
+            "ends_at": end,
+            "is_active": True,
+        }
+        data.update(overrides)
+        return data
+
+    def test_admin_creates_and_label_reads_naturally(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(self.URL, self.payload(), format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["label"], "Spend ৳2000 and get 10% off")
+        self.assertEqual(response.data["min_purchase_amount"], "2000.00")
+        self.assertIsNone(response.data["value"])
+        self.assertIsNone(response.data["min_quantity"])
+
+    def test_cap_is_optional(self):
+        self.client.force_authenticate(self.admin)
+        response = self.client.post(self.URL, self.payload(max_discount_amount="500"), format="json")
+        self.assertEqual(response.status_code, 201, response.data)
+        self.assertEqual(response.data["max_discount_amount"], "500.00")
+
+    def test_validation(self):
+        self.client.force_authenticate(self.admin)
+        cases = [
+            ({"percent_off": None}, "percent_off"),
+            ({"min_purchase_amount": None}, "min_purchase_amount"),
+            ({"min_purchase_amount": "0"}, "min_purchase_amount"),
+            ({"max_discount_amount": "0"}, "max_discount_amount"),
+        ]
+        for overrides, field in cases:
+            response = self.client.post(self.URL, self.payload(**overrides), format="json")
+            self.assertEqual(response.status_code, 400, overrides)
+            self.assertIn(field, response.data, overrides)
+
+    def test_switching_type_clears_threshold_fields(self):
+        self.client.force_authenticate(self.admin)
+        created = self.client.post(self.URL, self.payload(), format="json").data
+        response = self.client.patch(
+            f"{self.URL}{created['id']}/",
+            {"type": "bxgy_percent", "min_quantity": 3, "percent_off": "20"},
+            format="json",
+        )
+        self.assertEqual(response.status_code, 200, response.data)
+        self.assertIsNone(response.data["min_purchase_amount"])
+        self.assertIsNone(response.data["max_discount_amount"])
+
+    def test_product_endpoint_advertises_the_offer(self):
+        self.client.force_authenticate(self.admin)
+        self.client.post(self.URL, self.payload(), format="json")
+        self.client.force_authenticate(None)
+        product = self.client.get(f"/api/products/{self.bag.id}/").data
+        offers = product["minimum_purchase_offers"]
+        self.assertEqual(len(offers), 1)
+        self.assertEqual(D(offers[0]["percent_off"]), D("10.00"))
+        self.assertEqual(D(offers[0]["min_purchase_amount"]), D("2000.00"))
+        # A product the offer doesn't target has none.
+        self.assertEqual(self.client.get(f"/api/products/{self.serum.id}/").data["minimum_purchase_offers"], [])
+
+    def test_showcase_section_exposes_threshold_config(self):
+        self.client.force_authenticate(self.admin)
+        self.client.post(self.URL, self.payload(name="Spend & Save"), format="json")
+        self.client.force_authenticate(None)
+        sections = {s["name"]: s for s in self.client.get("/api/discount-showcases/").data}
+        section = sections["Spend & Save"]
+        self.assertTrue(section["is_basket"])
+        self.assertEqual(section["label"], "Spend ৳2000 and get 10% off")
+        self.assertEqual(section["min_purchase_amount"], "2000.00")
+        self.assertEqual({p["name"] for p in section["products"]}, {"Tote Bag"})
+
+
 class PromotionAdminApiTests(PromotionFixtures, APITestCase):
     URL = "/api/discounts/"
 

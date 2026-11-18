@@ -143,6 +143,7 @@ class CartSerializer(serializers.ModelSerializer):
     subtotal = serializers.SerializerMethodField()
     promotion_discount_total = serializers.SerializerMethodField()
     promotions = serializers.SerializerMethodField()
+    minimum_purchase_offers = serializers.SerializerMethodField()
     item_count = serializers.SerializerMethodField()
 
     class Meta:
@@ -153,6 +154,7 @@ class CartSerializer(serializers.ModelSerializer):
             "subtotal",
             "promotion_discount_total",
             "promotions",
+            "minimum_purchase_offers",
             "item_count",
             "created_at",
         ]
@@ -177,6 +179,10 @@ class CartSerializer(serializers.ModelSerializer):
     def get_promotions(self, obj):
         promotions = self._promotions()
         return promotions["applied"] if promotions else []
+
+    def get_minimum_purchase_offers(self, obj):
+        promotions = self._promotions()
+        return promotions.get("thresholds", []) if promotions else []
 
     def get_item_count(self, obj):
         return sum(item.quantity for item in obj.items.all())
