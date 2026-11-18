@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -16,6 +16,8 @@ import { useCart } from "@/context/CartContext";
 import DistrictSelect from "@/components/shared/DistrictSelect";
 import DhakaZoneSelect from "@/components/shared/DhakaZoneSelect";
 import { useDeliveryCharges } from "@/components/shared/useDeliveryCharges";
+import MinimumPurchaseOffers from "@/components/shared/MinimumPurchaseOffers";
+import { useDiscountChanges } from "@/components/shared/useDiscountChanges";
 
 const PHONE_RE = /^(?:\+?880|0)1[3-9]\d{8}$/;
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -89,6 +91,13 @@ export default function CheckoutPage() {
       cancelled = true;
     };
   }, [router]);
+
+  // An admin starting/ending a discount changes these totals; refetch the cart.
+  const refreshOnDiscountChange = useCallback(() => {
+    getCart().then(setCart).catch(() => {});
+  }, []);
+
+  useDiscountChanges(refreshOnDiscountChange);
 
   const handleGuestChange = (e) => {
     const { name, value } = e.target;
@@ -305,6 +314,7 @@ export default function CheckoutPage() {
   // `subtotal` is already net of basket promotions; keep the gross figure for
   // the "Subtotal − offer = …" breakdown, then add delivery.
   const promotions = cart?.promotions || [];
+  const minimumPurchaseOffers = cart?.minimum_purchase_offers || [];
   const promotionTotal = Number(cart?.promotion_discount_total || 0);
   const subtotal = Number(cart?.subtotal || 0);
   const grossSubtotal = subtotal + promotionTotal;
@@ -659,6 +669,8 @@ export default function CheckoutPage() {
 
         <div className="h-fit rounded-xl border border-neutral-200 bg-background p-5">
           <h2 className="mb-4 font-sora text-lg font-semibold text-(--primary)">Order Summary</h2>
+
+          <MinimumPurchaseOffers offers={minimumPurchaseOffers} className="mb-4" />
 
           <div className="flex flex-col gap-3 border-b border-neutral-100 pb-4">
             {items.map((item) => (

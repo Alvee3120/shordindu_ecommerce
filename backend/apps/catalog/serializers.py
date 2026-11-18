@@ -20,6 +20,7 @@ from .models import (
     is_color_attribute,
 )
 from .pricing import categories_with_descendants, pricing_engine_for
+from .promotions import PromotionEngine
 
 HEX_COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 DEFAULT_COLOR_HEX = "#D1D5DB"
@@ -344,6 +345,7 @@ class ProductSerializer(serializers.ModelSerializer):
     images = ProductImageSerializer(many=True, read_only=True)
     colors = serializers.SerializerMethodField()
     has_addons = serializers.SerializerMethodField()
+    minimum_purchase_offers = serializers.SerializerMethodField()
     average_rating = serializers.SerializerMethodField()
     review_count = serializers.SerializerMethodField()
 
@@ -366,6 +368,7 @@ class ProductSerializer(serializers.ModelSerializer):
             "images",
             "colors",
             "has_addons",
+            "minimum_purchase_offers",
             "average_rating",
             "review_count",
             "created_at",
@@ -376,6 +379,20 @@ class ProductSerializer(serializers.ModelSerializer):
     def get_has_addons(self, obj):
         count = getattr(obj, "addon_count", None)
         return bool(count) if count is not None else obj.addon_links.exists()
+
+    def get_minimum_purchase_offers(self, obj):
+        """Live "spend ৳Y, get X% off" offers that target this product, so the
+        product page can advertise the offer before it's in the cart."""
+        if self.context is None:
+            return []
+        cache = self.context.setdefault("threshold_configs", {})
+        if obj.pk not in cache:
+            engine = self.context.get("promotion_engine")
+            if engine is None:
+                engine = self.context["promotion_engine"] = PromotionEngine()
+            category_ids = [category.pk for category in obj.categories.all()]
+            cache[obj.pk] = engine.threshold_configs_for([obj.pk], category_ids)
+        return cache[obj.pk]
 
     def get_colors(self, obj):
         request = self.context.get("request")
@@ -519,6 +536,12 @@ class DiscountSerializer(serializers.ModelSerializer):
         max_digits=10, decimal_places=2, min_value=Decimal("0.01"), required=False, allow_null=True
     )
     free_same_product = serializers.BooleanField(required=False)
+    min_purchase_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"), required=False, allow_null=True
+    )
+    max_discount_amount = serializers.DecimalField(
+        max_digits=10, decimal_places=2, min_value=Decimal("0.01"), required=False, allow_null=True
+    )
     categories = serializers.PrimaryKeyRelatedField(queryset=Category.objects.all(), many=True, required=False)
     products = serializers.PrimaryKeyRelatedField(queryset=Product.objects.all(), many=True, required=False)
     category_names = serializers.SerializerMethodField()
@@ -539,6 +562,8 @@ class DiscountSerializer(serializers.ModelSerializer):
             "free_quantity",
             "bundle_price",
             "free_same_product",
+            "min_purchase_amount",
+            "max_discount_amount",
             "target_type",
             "categories",
             "category_names",
@@ -662,12 +687,34 @@ class DiscountSerializer(serializers.ModelSerializer):
                 errors["value"] = ["The value must be greater than 0."]
             elif discount_type == Discount.Type.PERCENT and value > 100:
                 errors["value"] = ["A percentage discount can't be more than 100%."]
-            for field in ("min_quantity", "percent_off", "free_quantity", "bundle_price"):
+            for field in (
+                "min_quantity",
+                "percent_off",
+                "free_quantity",
+                "bundle_price",
+                "min_purchase_amount",
+                "max_discount_amount",
+            ):
                 clear(field)
             return
 
         # Basket-level offer: `value` is never used.
         clear("value")
+
+        if discount_type == Discount.Type.MIN_PURCHASE:
+            if current("percent_off") is None:
+                errors["percent_off"] = ["Enter the discount percentage."]
+            if current("min_purchase_amount") is None:
+                errors["min_purchase_amount"] = ["Enter the minimum purchase amount."]
+            elif current("min_purchase_amount") <= 0:
+                errors["min_purchase_amount"] = ["The minimum purchase amount must be greater than 0."]
+            cap = current("max_discount_amount")
+            if cap is not None and cap <= 0:
+                errors["max_discount_amount"] = ["The maximum discount must be greater than 0."]
+            for field in ("min_quantity", "free_quantity", "bundle_price"):
+                clear(field)
+            return
+
         if discount_type in (
             Discount.Type.BXGY_PERCENT,
             Discount.Type.BXGY_FREE,
@@ -675,6 +722,9 @@ class DiscountSerializer(serializers.ModelSerializer):
             Discount.Type.BUNDLE_PRICE,
         ) and current("min_quantity") is None:
             errors["min_quantity"] = ["Enter the required quantity."]
+
+        for field in ("min_purchase_amount", "max_discount_amount"):
+            clear(field)
 
         if discount_type == Discount.Type.BXGY_PERCENT:
             if current("percent_off") is None:

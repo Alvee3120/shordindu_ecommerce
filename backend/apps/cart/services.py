@@ -101,13 +101,14 @@ def reprice_cart(cart, engine=None):
     return engine
 
 
-def cart_promotions(cart, engine=None):
+def cart_promotions(cart, engine=None, promo_service=None):
     """Basket-level offers for the cart's top-level lines (add-ons excluded).
 
     Priced on each line's *current* effective unit price (``reprice_cart`` runs
     first), so this always matches what checkout will charge. Returns
-    ``{"total", "applied", "by_item"}`` where ``by_item`` maps a cart item id to
-    the promotion amount/free units shown on that line.
+    ``{"total", "applied", "by_item", "thresholds"}`` where ``by_item`` maps a
+    cart item id to the promotion amount/free units shown on that line, and
+    ``thresholds`` reports progress toward each live minimum-purchase offer.
     """
     items = list(
         cart.items.filter(parent_cart_item__isnull=True)
@@ -123,7 +124,11 @@ def cart_promotions(cart, engine=None):
         }
         for item in items
     ]
-    applied = PromotionEngine(now=engine.now if engine else None).apply(units_from_lines(lines))
+    if promo_service is None:
+        promo_service = PromotionEngine(now=engine.now if engine else None)
+    units = units_from_lines(lines)
+    applied = promo_service.apply(units)
+    thresholds = promo_service.threshold_offers(units)
 
     by_item = defaultdict(lambda: {"discount": ZERO, "free": 0, "best": ZERO, "name": "", "label": "", "type": ""})
     for promotion in applied:
@@ -136,4 +141,9 @@ def cart_promotions(cart, engine=None):
             by_item[items[index].id]["free"] += free
 
     total = sum((promotion.discount_amount for promotion in applied), ZERO)
-    return {"total": total, "applied": [p.to_dict() for p in applied], "by_item": dict(by_item)}
+    return {
+        "total": total,
+        "applied": [p.to_dict() for p in applied],
+        "by_item": dict(by_item),
+        "thresholds": thresholds,
+    }

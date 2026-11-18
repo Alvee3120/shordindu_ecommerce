@@ -11,6 +11,7 @@ import {
   createDiscount,
   getDiscount,
   isBasketDiscount,
+  isMinimumPurchaseDiscount,
   notifyDiscountsChanged,
   updateDiscount,
 } from "@/lib/discounts";
@@ -36,6 +37,9 @@ const EMPTY_FORM = {
   free_quantity: "1",
   bundle_price: "",
   free_same_product: true,
+  // Minimum-purchase parameters (percent_off + min_purchase_amount + optional cap).
+  min_purchase_amount: "",
+  max_discount_amount: "",
   target_type: "category",
   categories: [],
   start_date: "",
@@ -59,6 +63,8 @@ function offerPreview(form) {
       return "3 for 2";
     case "bundle_price":
       return `${x} for ৳${form.bundle_price || "?"}`;
+    case "min_purchase":
+      return `Spend over ৳${form.min_purchase_amount || "?"} and get ${form.percent_off || "?"}% off`;
     default:
       return null;
   }
@@ -84,6 +90,8 @@ function toForm(discount) {
     free_quantity: num(discount.free_quantity, "1"),
     bundle_price: num(discount.bundle_price),
     free_same_product: discount.free_same_product ?? true,
+    min_purchase_amount: num(discount.min_purchase_amount),
+    max_discount_amount: num(discount.max_discount_amount),
     target_type: discount.target_type,
     categories: discount.categories ?? [],
     start_date: start.date,
@@ -167,6 +175,24 @@ function validateOffer(form, errors) {
     const value = Number(form[field]);
     if (form[field] === "" || !Number.isInteger(value) || value < 1) errors[field] = message;
   };
+
+  const positiveMoney = (field, message) => {
+    const value = Number(form[field]);
+    if (form[field] === "" || !Number.isFinite(value) || value <= 0) errors[field] = message;
+    else if (!MONEY_RE.test(form[field].trim())) errors[field] = "Use at most 2 decimal places.";
+  };
+
+  if (form.type === "min_purchase") {
+    const percent = Number(form.percent_off);
+    if (form.percent_off === "" || !Number.isFinite(percent)) errors.percent_off = "Enter the discount percentage.";
+    else if (percent <= 0 || percent > 100) errors.percent_off = "Enter a percentage between 1 and 100.";
+    else if (!MONEY_RE.test(form.percent_off.trim())) errors.percent_off = "Use at most 2 decimal places.";
+    positiveMoney("min_purchase_amount", "Enter the minimum purchase amount.");
+    if (form.max_discount_amount !== "") {
+      positiveMoney("max_discount_amount", "Enter the maximum discount, or leave it blank.");
+    }
+    return;
+  }
 
   if (form.type !== "three_for_two") positiveInt("min_quantity", "Enter the required quantity.");
 
@@ -252,7 +278,15 @@ export default function DiscountEditor({ discountId }) {
       const next = { ...prev, [errorKey]: undefined };
       // Switching offer type invalidates every type-specific field's error.
       if (field === "type") {
-        for (const key of ["value", "min_quantity", "percent_off", "free_quantity", "bundle_price"]) {
+        for (const key of [
+          "value",
+          "min_quantity",
+          "percent_off",
+          "free_quantity",
+          "bundle_price",
+          "min_purchase_amount",
+          "max_discount_amount",
+        ]) {
           next[key] = undefined;
         }
       }
@@ -293,10 +327,23 @@ export default function DiscountEditor({ discountId }) {
     if (isBasketDiscount(form.type)) {
       // Only the fields this offer type uses; the rest are sent null so an edit
       // that switches type never leaves a stale configuration behind.
-      payload.min_quantity = form.type === "three_for_two" ? null : Number(form.min_quantity);
-      payload.percent_off = form.type === "bxgy_percent" ? form.percent_off.trim() : null;
+      payload.min_quantity =
+        form.type === "three_for_two" || isMinimumPurchaseDiscount(form.type)
+          ? null
+          : Number(form.min_quantity);
+      payload.percent_off =
+        form.type === "bxgy_percent" || isMinimumPurchaseDiscount(form.type)
+          ? form.percent_off.trim()
+          : null;
       payload.free_quantity = form.type === "bxgy_free" ? Number(form.free_quantity) : null;
       payload.bundle_price = form.type === "bundle_price" ? form.bundle_price.trim() : null;
+      payload.min_purchase_amount = isMinimumPurchaseDiscount(form.type)
+        ? form.min_purchase_amount.trim()
+        : null;
+      payload.max_discount_amount =
+        isMinimumPurchaseDiscount(form.type) && form.max_discount_amount !== ""
+          ? form.max_discount_amount.trim()
+          : null;
       if (form.type === "bxgy_free") payload.free_same_product = form.free_same_product;
     } else {
       payload.value = form.value.trim();
@@ -389,7 +436,7 @@ export default function DiscountEditor({ discountId }) {
 
           {isBasketDiscount(form.type) ? (
             <>
-              {form.type !== "three_for_two" && (
+              {form.type !== "three_for_two" && form.type !== "min_purchase" && (
                 <Field
                   label="Buy quantity (X)"
                   error={errors.min_quantity}
@@ -407,6 +454,70 @@ export default function DiscountEditor({ discountId }) {
                     className={inputClass(errors.min_quantity)}
                   />
                 </Field>
+              )}
+
+              {form.type === "min_purchase" && (
+                <>
+                  <Field label="Discount percentage" error={errors.percent_off} htmlFor="percent_off">
+                    <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.percent_off ? "border-red-400" : "border-neutral-300"}`}>
+                      <input
+                        id="percent_off"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        max="100"
+                        step="0.01"
+                        value={form.percent_off}
+                        onChange={(e) => update("percent_off", e.target.value)}
+                        className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
+                      />
+                      <span className="pr-3 text-sm text-neutral-500">%</span>
+                    </div>
+                  </Field>
+
+                  <Field
+                    label="Minimum purchase amount"
+                    error={errors.min_purchase_amount}
+                    htmlFor="min_purchase_amount"
+                    hint="The cart subtotal that unlocks the discount."
+                  >
+                    <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.min_purchase_amount ? "border-red-400" : "border-neutral-300"}`}>
+                      <span className="pl-3 text-sm text-neutral-500">৳</span>
+                      <input
+                        id="min_purchase_amount"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={form.min_purchase_amount}
+                        onChange={(e) => update("min_purchase_amount", e.target.value)}
+                        className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
+                      />
+                    </div>
+                  </Field>
+
+                  <Field
+                    label="Maximum discount cap (optional)"
+                    error={errors.max_discount_amount}
+                    htmlFor="max_discount_amount"
+                    hint="Leave blank for no cap."
+                    className="sm:col-span-2"
+                  >
+                    <div className={`flex items-center rounded-lg border bg-white focus-within:ring-2 focus-within:ring-(--primary) ${errors.max_discount_amount ? "border-red-400" : "border-neutral-300"}`}>
+                      <span className="pl-3 text-sm text-neutral-500">৳</span>
+                      <input
+                        id="max_discount_amount"
+                        type="number"
+                        inputMode="decimal"
+                        min="0.01"
+                        step="0.01"
+                        value={form.max_discount_amount}
+                        onChange={(e) => update("max_discount_amount", e.target.value)}
+                        className="w-full min-w-0 rounded-lg px-3 py-2 text-sm outline-none"
+                      />
+                    </div>
+                  </Field>
+                </>
               )}
 
               {form.type === "bxgy_percent" && (

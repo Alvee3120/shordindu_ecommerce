@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useParams, useSearchParams } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -13,6 +13,8 @@ import ProductReviews from "@/components/ProductReviews";
 import ProductRecommendations from "@/components/shop/ProductRecommendations";
 import ImageZoom from "@/components/ImageZoom";
 import NotifyMeModal from "@/components/shop/NotifyMeModal";
+import MinimumPurchaseOffers from "@/components/shared/MinimumPurchaseOffers";
+import { useDiscountChanges } from "@/components/shared/useDiscountChanges";
 
 function isColorName(name) {
   return ["color", "colour"].includes((name || "").trim().toLowerCase());
@@ -103,6 +105,15 @@ function ProductDetailsContent() {
       cancelled = true;
     };
   }, [id, requestedColor]);
+
+  // A discount starting/ending changes the product's live prices and the
+  // drawer totals; refetch both instead of waiting for a reload.
+  const refreshOnDiscountChange = useCallback(() => {
+    getProduct(id).then(setProduct).catch(() => {});
+    getCart().then(setDrawerCart).catch(() => {});
+  }, [id]);
+
+  useDiscountChanges(refreshOnDiscountChange);
 
   useEffect(() => {
     const imageCount = product?.images?.length || 0;
@@ -503,6 +514,10 @@ function ProductDetailsContent() {
             )}
           </div>
 
+          {(product.minimum_purchase_offers?.length ?? 0) > 0 && (
+            <MinimumPurchaseOffers offers={product.minimum_purchase_offers} className="mt-1" />
+          )}
+
           {product.description && (
             <p className="mt-1 text-sm leading-relaxed whitespace-pre-line text-neutral-600">
               {product.description}
@@ -885,6 +900,10 @@ function ProductDetailsContent() {
 
             {drawerCart?.items?.length > 0 && (
               <div className="border-t border-neutral-200 px-5 py-4">
+                <MinimumPurchaseOffers
+                  offers={drawerCart.minimum_purchase_offers || []}
+                  className="mb-4"
+                />
                 <div className="mb-4 flex items-center justify-between font-sora text-base font-bold text-neutral-900">
                   <span className="uppercase">Subtotal:</span>
                   <span>৳{Number(drawerCart.subtotal).toFixed(2)}</span>

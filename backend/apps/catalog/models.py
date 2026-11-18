@@ -285,9 +285,19 @@ class Discount(models.Model):
         LOWEST_FREE = "lowest_free", "Buy X, get cheapest free"
         THREE_FOR_TWO = "three_for_two", "3 for 2"
         BUNDLE_PRICE = "bundle_price", "Fixed bundle price"
+        # Basket-wide threshold offer: X% off once the eligible subtotal
+        # reaches ৳Y (min_purchase_amount), optionally capped at ৳Z.
+        MIN_PURCHASE = "min_purchase", "Minimum purchase discount"
 
     PER_ITEM_TYPES = (Type.PERCENT, Type.FIXED)
-    BASKET_TYPES = (Type.BXGY_PERCENT, Type.BXGY_FREE, Type.LOWEST_FREE, Type.THREE_FOR_TWO, Type.BUNDLE_PRICE)
+    BASKET_TYPES = (
+        Type.BXGY_PERCENT,
+        Type.BXGY_FREE,
+        Type.LOWEST_FREE,
+        Type.THREE_FOR_TWO,
+        Type.BUNDLE_PRICE,
+        Type.MIN_PURCHASE,
+    )
 
     class Target(models.TextChoices):
         CATEGORY = "category", "Category"
@@ -320,6 +330,11 @@ class Discount(models.Model):
     bundle_price = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     # bxgy_free: free units must come from the same product as the paid units.
     free_same_product = models.BooleanField(default=True)
+    # --- Minimum purchase discount configuration (min_purchase only) ---
+    # ৳Y the eligible subtotal must reach before percent_off applies.
+    min_purchase_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
+    # Optional ৳Z cap on the computed saving (max_discount).
+    max_discount_amount = models.DecimalField(max_digits=10, decimal_places=2, null=True, blank=True)
     starts_at = models.DateTimeField()
     ends_at = models.DateTimeField()
     is_active = models.BooleanField(default=True)
@@ -369,6 +384,11 @@ class Discount(models.Model):
             return "3 for 2"
         if self.type == self.Type.BUNDLE_PRICE:
             return f"{self.min_quantity} for {self._money(self.bundle_price)}"
+        if self.type == self.Type.MIN_PURCHASE:
+            return (
+                f"Spend over {self._money(self.min_purchase_amount)} and get "
+                f"{self._plain(self.percent_off)}% off"
+            )
         return self.name
 
     @staticmethod

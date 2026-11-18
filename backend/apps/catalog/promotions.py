@@ -24,6 +24,11 @@ Offer shapes (``group_plan``)
 * ``three_for_two`` — group = 3 units, benefit = the cheapest unit free.
 * ``bundle_price``  — group = X units, benefit = group subtotal − ৳Y (never
   negative, and skipped entirely when the group is already cheaper than ৳Y).
+* ``min_purchase``  — no grouping: benefit = Y% off the whole eligible subtotal,
+  but only once that subtotal reaches ৳Z (min_purchase_amount); the saving is
+  optionally capped at max_discount_amount. Applies to every remaining eligible
+  unit at once, so it never stacks with a free-item/bundle offer on the same
+  units.
 
 Deterministic rules
 -------------------
@@ -50,6 +55,9 @@ from .pricing import categories_with_descendants
 
 CENT = Decimal("0.01")
 ZERO = Decimal("0.00")
+# Value of Discount.Type.MIN_PURCHASE — kept as a constant so the engine can
+# branch on it without importing the model at module load (avoids a cycle).
+DISCOUNT_TYPE_MIN_PURCHASE = "min_purchase"
 
 
 @dataclass(frozen=True)
@@ -179,6 +187,10 @@ class PromotionEngine:
         self._ordered = sorted(
             live,
             key=lambda d: (
+                # Threshold offers always run last, whatever their target type, so
+                # a specific free-item/bundle offer keeps its units instead of
+                # being swallowed by the broad offer.
+                1 if d.type == Discount.Type.MIN_PURCHASE else 0,
                 0 if d.target_type == Discount.Target.PRODUCTS else 1,
                 -d.starts_at.timestamp(),
                 -d.id,
@@ -277,6 +289,48 @@ class PromotionEngine:
             consumed=tuple(consumed),
         )
 
+    @staticmethod
+    def _apply_threshold(discount, pairs):
+        """X% off the whole eligible subtotal once it reaches ৳Y, capped at ৳Z.
+
+        Unlike the grouped offers there is no partial group: either the eligible
+        subtotal clears ``min_purchase_amount`` (the whole basket is discounted)
+        or nothing happens. The saving is computed from the eligible subtotal,
+        the same figures checkout will charge, and never exceeds it.
+        """
+        if not pairs:
+            return None
+        percent_off = discount.percent_off
+        minimum = discount.min_purchase_amount
+        if percent_off is None or percent_off <= 0 or minimum is None or minimum <= 0:
+            return None
+
+        eligible_total = sum((unit.price for _, unit in pairs), ZERO)
+        if eligible_total < minimum:
+            return None
+
+        saving = (eligible_total * percent_off / Decimal("100")).quantize(CENT, ROUND_HALF_UP)
+        if discount.max_discount_amount is not None and discount.max_discount_amount > 0:
+            saving = min(saving, discount.max_discount_amount)
+        saving = min(saving, eligible_total)
+        if saving <= 0:
+            return None
+
+        line_discounts = defaultdict(lambda: ZERO)
+        _allocate_proportional(pairs, saving, line_discounts)
+        return AppliedPromotion(
+            discount_id=discount.id,
+            name=discount.name,
+            type=discount.type,
+            label=discount.label(),
+            qualifying_quantity=len(pairs),
+            free_quantity=0,
+            discount_amount=saving,
+            line_discounts=dict(line_discounts),
+            line_free_qty={},
+            consumed=tuple(index for index, _ in pairs),
+        )
+
     def apply(self, units):
         """Return the offers that apply to ``units`` (each unit used at most once)."""
         if not self._loaded:
@@ -290,11 +344,104 @@ class PromotionEngine:
                 for i, unit in enumerate(units)
                 if i not in used and self._is_eligible(discount, unit)
             ]
-            result = self._apply_one(discount, pairs)
+            if discount.type == DISCOUNT_TYPE_MIN_PURCHASE:
+                result = self._apply_threshold(discount, pairs)
+            else:
+                result = self._apply_one(discount, pairs)
             if result is not None:
                 applied.append(result)
                 used.update(result.consumed)
         return applied
+
+    def threshold_offers(self, units):
+        """Progress of every live minimum-purchase offer against ``units``.
+
+        Used by the storefront to show "Add ৳500 more to unlock 10% OFF" before
+        the offer actually applies. Eligibility and unit consumption follow the
+        exact same order as :meth:`apply`, so a qualified offer's
+        ``discount_amount`` is what checkout will charge.
+        """
+        if not self._loaded:
+            self._load()
+
+        units = list(units)
+        used = set()
+        offers = []
+        for discount in self._ordered:
+            pairs = [
+                (i, unit)
+                for i, unit in enumerate(units)
+                if i not in used and self._is_eligible(discount, unit)
+            ]
+            if discount.type != DISCOUNT_TYPE_MIN_PURCHASE:
+                result = self._apply_one(discount, pairs)
+                if result is not None:
+                    used.update(result.consumed)
+                continue
+
+            result = self._apply_threshold(discount, pairs)
+            if result is not None:
+                used.update(result.consumed)
+            if not pairs:
+                # Nothing the offer targets is in the basket — advertising
+                # "add ৳X more" would be misleading.
+                continue
+            eligible_total = sum((unit.price for _, unit in pairs), ZERO)
+            minimum = discount.min_purchase_amount or ZERO
+            offers.append(
+                {
+                    "id": discount.id,
+                    "name": discount.name,
+                    "type": discount.type,
+                    "label": discount.label(),
+                    "percent_off": discount.percent_off,
+                    "min_purchase_amount": discount.min_purchase_amount,
+                    "max_discount_amount": discount.max_discount_amount,
+                    "eligible_subtotal": eligible_total,
+                    "remaining": max(minimum - eligible_total, ZERO),
+                    "qualified": result is not None,
+                    "discount_amount": result.discount_amount if result is not None else ZERO,
+                    "ends_at": discount.ends_at,
+                }
+            )
+        return offers
+
+    def threshold_configs_for(self, product_ids, category_ids=()):
+        """Live minimum-purchase offers that target any of these products.
+
+        Unit-independent: just the offer's configuration, so a product page can
+        advertise "Spend over ৳2,000 and get 10% OFF" before anything is in the cart.
+        """
+        if not self._loaded:
+            self._load()
+
+        wanted_products = {int(pk) for pk in product_ids}
+        wanted_categories = {int(pk) for pk in category_ids}
+        configs = []
+        for discount in self._ordered:
+            if discount.type != DISCOUNT_TYPE_MIN_PURCHASE:
+                continue
+            targets = self._product_targets.get(discount.id)
+            if targets is not None:
+                applies = bool(targets & wanted_products)
+            else:
+                applies = bool(self._category_targets.get(discount.id, set()) & wanted_categories)
+            if not applies:
+                continue
+            configs.append(
+                {
+                    "id": discount.id,
+                    "name": discount.name,
+                    "type": discount.type,
+                    "label": discount.label(),
+                    "percent_off": discount.percent_off,
+                    "min_purchase_amount": discount.min_purchase_amount,
+                    "max_discount_amount": discount.max_discount_amount,
+                    "starts_at": discount.starts_at,
+                    "ends_at": discount.ends_at,
+                }
+            )
+        return configs
 
 
 def units_from_lines(lines):

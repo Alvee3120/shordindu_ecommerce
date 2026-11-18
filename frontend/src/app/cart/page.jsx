@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useCallback, useState } from "react";
 import { useRouter } from "next/navigation";
 import Image from "next/image";
 import Link from "next/link";
@@ -12,6 +12,8 @@ import { listAddresses } from "@/lib/addresses";
 import { useCart } from "@/context/CartContext";
 import { resolveDeliveryCharge } from "@/lib/delivery";
 import { useDeliveryCharges } from "@/components/shared/useDeliveryCharges";
+import MinimumPurchaseOffers from "@/components/shared/MinimumPurchaseOffers";
+import { useDiscountChanges } from "@/components/shared/useDiscountChanges";
 
 export default function CartPage() {
   const router = useRouter();
@@ -32,6 +34,14 @@ export default function CartPage() {
       setError(err.message);
     }
   };
+
+  // An admin starting/ending a discount changes this cart's totals; refetch
+  // instead of waiting for a reload.
+  const refreshOnDiscountChange = useCallback(() => {
+    loadCart();
+  }, []);
+
+  useDiscountChanges(refreshOnDiscountChange);
 
   useEffect(() => {
     let cancelled = false;
@@ -110,6 +120,7 @@ export default function CartPage() {
   // `subtotal` is already net of basket promotions; keep the gross figure for
   // the "Subtotal − offer = …" breakdown, then add shipping.
   const promotions = cart?.promotions || [];
+  const minimumPurchaseOffers = cart?.minimum_purchase_offers || [];
   const promotionTotal = Number(cart?.promotion_discount_total || 0);
   const subtotal = Number(cart?.subtotal || 0);
   const grossSubtotal = subtotal + promotionTotal;
@@ -248,6 +259,8 @@ export default function CartPage() {
 
           <div className="h-fit rounded-xl border border-neutral-200 bg-background p-5">
             <h2 className="mb-4 font-sora text-lg font-semibold text-neutral-900">Cart Totals</h2>
+
+            <MinimumPurchaseOffers offers={minimumPurchaseOffers} className="mb-4" />
 
             <div className="flex justify-between border-b border-neutral-100 py-3 text-sm">
               <span className="text-neutral-500">Subtotal</span>
