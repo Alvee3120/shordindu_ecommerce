@@ -64,7 +64,7 @@ function offerPreview(form) {
     case "bundle_price":
       return `${x} for ৳${form.bundle_price || "?"}`;
     case "min_purchase":
-      return `Spend ৳${form.min_purchase_amount || "?"} and get ${form.percent_off || "?"}% off`;
+      return `Spend over ৳${form.min_purchase_amount || "?"} and get ${form.percent_off || "?"}% off`;
     default:
       return null;
   }

@@ -5,7 +5,7 @@ import { formatBDT } from "@/lib/format";
 import { minimumPurchaseMessage } from "@/lib/discounts";
 
 /**
- * "Spend ৳2,000 and get 10% OFF", "Add ৳500 more to unlock 10% OFF!" or
+ * "Spend over ৳2,000 and get 10% OFF", "Add ৳500 more to unlock 10% OFF!" or
  * "Congratulations! You unlocked 10% OFF." — driven by the cart API's
  * `minimum_purchase_offers` (live progress) or a product's
  * `minimum_purchase_offers` (configuration only, before it's in the cart).

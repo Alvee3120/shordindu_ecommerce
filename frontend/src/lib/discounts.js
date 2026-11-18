@@ -112,8 +112,8 @@ export function formatDiscountValue(discount) {
 
 /**
  * Storefront progress of one minimum-purchase offer (see the cart API's
- * `minimum_purchase_offers`): "Spend ৳2,000 and get 10% OFF", "Add ৳500 more
- * to unlock 10% OFF!" or "Congratulations! You unlocked 10% OFF.".
+ * `minimum_purchase_offers`): "Spend over ৳2,000 and get 10% OFF", "Add ৳500
+ * more to unlock 10% OFF!" or "Congratulations! You unlocked 10% OFF.".
  */
 export function minimumPurchaseMessage(offer) {
   if (!offer) return null;
@@ -123,5 +123,5 @@ export function minimumPurchaseMessage(offer) {
   if (Number.isFinite(remaining) && remaining > 0) {
     return `Add ${formatBDT(remaining)} more to unlock ${percent} OFF!`;
   }
-  return `Spend ${formatBDT(offer.min_purchase_amount)} and get ${percent} OFF.`;
+  return `Spend over ${formatBDT(offer.min_purchase_amount)} and get ${percent} OFF.`;
 }

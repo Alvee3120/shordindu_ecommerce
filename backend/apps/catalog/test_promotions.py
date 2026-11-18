@@ -608,7 +608,7 @@ class MinimumPurchaseAdminTests(PromotionFixtures, APITestCase):
         self.client.force_authenticate(self.admin)
         response = self.client.post(self.URL, self.payload(), format="json")
         self.assertEqual(response.status_code, 201, response.data)
-        self.assertEqual(response.data["label"], "Spend ৳2000 and get 10% off")
+        self.assertEqual(response.data["label"], "Spend over ৳2000 and get 10% off")
         self.assertEqual(response.data["min_purchase_amount"], "2000.00")
         self.assertIsNone(response.data["value"])
         self.assertIsNone(response.data["min_quantity"])
@@ -663,7 +663,7 @@ class MinimumPurchaseAdminTests(PromotionFixtures, APITestCase):
         sections = {s["name"]: s for s in self.client.get("/api/discount-showcases/").data}
         section = sections["Spend & Save"]
         self.assertTrue(section["is_basket"])
-        self.assertEqual(section["label"], "Spend ৳2000 and get 10% off")
+        self.assertEqual(section["label"], "Spend over ৳2000 and get 10% off")
         self.assertEqual(section["min_purchase_amount"], "2000.00")
         self.assertEqual({p["name"] for p in section["products"]}, {"Tote Bag"})
 

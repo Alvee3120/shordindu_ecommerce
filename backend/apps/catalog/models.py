@@ -386,7 +386,7 @@ class Discount(models.Model):
             return f"{self.min_quantity} for {self._money(self.bundle_price)}"
         if self.type == self.Type.MIN_PURCHASE:
             return (
-                f"Spend {self._money(self.min_purchase_amount)} and get "
+                f"Spend over {self._money(self.min_purchase_amount)} and get "
                 f"{self._plain(self.percent_off)}% off"
             )
         return self.name

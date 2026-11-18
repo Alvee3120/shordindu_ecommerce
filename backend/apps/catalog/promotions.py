@@ -410,7 +410,7 @@ class PromotionEngine:
         """Live minimum-purchase offers that target any of these products.
 
         Unit-independent: just the offer's configuration, so a product page can
-        advertise "Spend ৳2,000 and get 10% OFF" before anything is in the cart.
+        advertise "Spend over ৳2,000 and get 10% OFF" before anything is in the cart.
         """
         if not self._loaded:
             self._load()
